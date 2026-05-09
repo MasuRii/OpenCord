@@ -7,7 +7,7 @@
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs, EquicordDevs } from "@utils/constants";
-import { useFixedTimer } from "@utils/react";
+import { useTimer } from "@utils/react";
 import { formatDurationMs } from "@utils/text";
 import definePlugin, { OptionType } from "@utils/types";
 import { PassiveUpdateState, VoiceState } from "@vencord/discord-types";
@@ -264,17 +264,14 @@ export default definePlugin({
         );
     },
 
-    renderConnectionTimer({ channelId }: { channelId: string | undefined; }) {
+    renderConnectionTimer({ channelId }: { channelId: string; }) {
         return <ErrorBoundary noop>
             <this.ConnectionTimer channelId={channelId} />
         </ErrorBoundary>;
     },
 
-    ConnectionTimer: ErrorBoundary.wrap((_: { channelId: string | undefined; }) => {
-        const joinTime = userJoinTimes.get(UserStore.getCurrentUser().id)?.time;
-        const time = useFixedTimer({ initialTime: joinTime });
-
-        if (joinTime == null) return null;
+    ConnectionTimer: ErrorBoundary.wrap(({ channelId }: { channelId: string; }) => {
+        const time = useTimer({ deps: [channelId] });
 
         return (
             <p style={{ margin: 0, fontFamily: "var(--font-code)" }}>
