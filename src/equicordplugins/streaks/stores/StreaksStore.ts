@@ -26,6 +26,7 @@ export interface StreaksState {
     streaks: Record<string, RemoteStreak>;
     fetch: () => Promise<void>;
     update: (recipientId: string) => Promise<void>;
+    refresh: (recipientId: string) => Promise<void>;
     migrate: () => Promise<void>;
     clear: () => void;
 }
@@ -70,6 +71,22 @@ export const useStreaksStore = proxyLazy(() => zustandCreate((set: any, get: any
             }
         } catch (e) {
             console.error("Failed to update streak", e);
+        }
+    },
+    async refresh(recipientId: string) {
+        const { token } = useAuthorizationStore.getState();
+        if (!token) return;
+
+        try {
+            const res = await fetch(`${API_URL}/streaks/${recipientId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const streak: RemoteStreak = await res.json();
+                set({ streaks: { ...get().streaks, [recipientId]: streak } });
+            }
+        } catch (e) {
+            console.error("Failed to refresh streak", e);
         }
     },
     async migrate() {
