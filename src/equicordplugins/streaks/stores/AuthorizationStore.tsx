@@ -11,6 +11,7 @@ import { openModal } from "@utils/modal";
 import { OAuth2AuthorizeModal, showToast, Toasts, UserStore, zustandCreate, zustandPersist } from "@webpack/common";
 
 import { AUTHORIZE_URL, CLIENT_ID } from "../constants";
+import { useStreaksStore } from "./StreaksStore";
 
 interface AuthorizationState {
     token: string | null;
@@ -108,7 +109,6 @@ export const useAuthorizationStore = proxyLazy(() => zustandCreate(
                 if (!state) return;
                 state.init();
                 if (state.isAuthorized()) {
-                    const { useStreaksStore } = require("./StreaksStore");
                     useStreaksStore.getState().clear();
                     await useStreaksStore.getState().migrate();
                     await useStreaksStore.getState().fetch();
