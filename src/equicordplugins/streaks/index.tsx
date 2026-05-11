@@ -7,7 +7,9 @@
 import "./style.css";
 
 import { DecoratorProps } from "@api/MemberListDecorators";
+import { showNotification } from "@api/Notifications";
 import { iconsModule } from "@equicordplugins/_core/concatenatedModules";
+import { authorize } from "@plugins/reviewDB/auth";
 import { Devs, EquicordDevs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import definePlugin from "@utils/types";
@@ -70,6 +72,20 @@ export default definePlugin({
     tags: ["Friends", "Fun"],
     dependencies: ["MessageDecorationsAPI", "MemberListDecoratorsAPI", "ConcatenatedModules"],
     settings,
+
+    start() {
+        if (!useAuthorizationStore.getState().isAuthorized()) {
+            showNotification({
+                title: "Not Authorized To Use Streaks",
+                body: "Please click here to authorize",
+                async onClick() {
+                    await authorize();
+                    await useStreaksStore.getState().migrate();
+                    await useStreaksStore.getState().fetch();
+                }
+            });
+        }
+    },
 
     flux: {
         async CONNECTION_OPEN() {
