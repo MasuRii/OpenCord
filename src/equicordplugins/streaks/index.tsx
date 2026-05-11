@@ -103,8 +103,14 @@ export default definePlugin({
                 }
             } else if (message.author.id === recipientId) {
                 if (!theirFlag) {
-                    setTimeout(() => {
-                        useStreaksStore.getState().refresh(recipientId);
+                    setTimeout(async () => {
+                        const before = useStreaksStore.getState().streaks[recipientId]?.count;
+                        await useStreaksStore.getState().refresh(recipientId);
+                        const after = useStreaksStore.getState().streaks[recipientId]?.count;
+
+                        if (before === after) {
+                            useStreaksStore.getState().update(recipientId);
+                        }
                     }, 1000);
                 }
             }
