@@ -114,24 +114,20 @@ export function LogsModal({ modalProps, initalQuery }: Props) {
             }
             actions={[
                 {
-                    text: "Clear All Logs",
-                    variant: "dangerPrimary",
-                    onClick: () => Alerts.show({
-                        title: "Clear Logs",
-                        body: "Are you sure you want to clear all the logs",
-                        confirmText: "Clear",
-                        // @ts-expect-error not typed
-                        confirmVariant: "critical-primary",
-                        cancelText: "Cancel",
-                        onConfirm: async () => {
-                            await clearLogs();
-                            reset();
-                        }
-                    })
+                    text: `Sort ${sortNewest ? "Oldest First" : "Newest First"}`,
+                    variant: "secondary",
+                    onClick: () => {
+                        setSortNewest(e => {
+                            const val = !e;
+                            settings.store.sortNewest = val;
+                            return val;
+                        });
+                        contentRef.current?.firstElementChild?.scrollTo(0, 0);
+                    }
                 },
                 {
                     text: "Clear Visible Logs",
-                    variant: "dangerSecondary",
+                    variant: "critical-secondary",
                     disabled: messages?.length === 0,
                     onClick: () => Alerts.show({
                         title: "Clear Logs",
@@ -147,16 +143,20 @@ export function LogsModal({ modalProps, initalQuery }: Props) {
                     })
                 },
                 {
-                    text: `Sort ${sortNewest ? "Oldest First" : "Newest First"}`,
-                    variant: "secondary",
-                    onClick: () => {
-                        setSortNewest(e => {
-                            const val = !e;
-                            settings.store.sortNewest = val;
-                            return val;
-                        });
-                        contentRef.current?.firstElementChild?.scrollTo(0, 0);
-                    }
+                    text: "Clear All Logs",
+                    variant: "critical-primary",
+                    onClick: () => Alerts.show({
+                        title: "Clear Logs",
+                        body: "Are you sure you want to clear all the logs",
+                        confirmText: "Clear",
+                        // @ts-expect-error not typed
+                        confirmVariant: "critical-primary",
+                        cancelText: "Cancel",
+                        onConfirm: async () => {
+                            await clearLogs();
+                            reset();
+                        }
+                    })
                 }
             ]}
         >
