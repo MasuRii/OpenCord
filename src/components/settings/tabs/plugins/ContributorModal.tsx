@@ -13,7 +13,7 @@ import { Paragraph } from "@components/Paragraph";
 import { EquicordDevsById, VencordDevsById } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { fetchUserProfile } from "@utils/discord";
-import { classes, pluralise } from "@utils/misc";
+import { pluralise } from "@utils/misc";
 import { RenderModalProps, User } from "@vencord/discord-types";
 import { Modal, openModal, showToast, useEffect, useMemo, UserProfileStore, useStateFromStores } from "@webpack/common";
 
@@ -63,7 +63,7 @@ function ContributorModal({ user, modalProps }: { user: User; modalProps: Render
         <Modal
             {...modalProps}
             title={
-                <div className="vc-plugin-modal-header">
+                <div className={cl("header")}>
                     <img
                         className={cl("avatar")}
                         src={user.getAvatarURL(void 0, 512, true)}
@@ -85,36 +85,42 @@ function ContributorModal({ user, modalProps }: { user: User; modalProps: Render
                         </Paragraph>
                     )
             }
+            actionBarInput={
+                hasLinks && (
+                    <div
+                        className={cl("links")}
+                        style={{ width: "100%", justifyContent: "flex-end" }}
+                    >
+                        {website && (
+                            <WebsiteButton
+                                text={website}
+                                href={`https://${website}`}
+                            />
+                        )}
+                        {githubName && (
+                            <GithubButton
+                                text={githubName}
+                                href={`https://github.com/${githubName}`}
+                            />
+                        )}
+                    </div>
+                )
+            }
         >
-            {!!plugins.length && (
-                <div className={cl("plugins")}>
-                    {plugins.map(p =>
-                        <PluginCard
-                            key={p.name}
-                            plugin={p}
-                            disabled={p.required ?? false}
-                            onRestartNeeded={() => showToast("Restart to apply changes!")}
-                        />
-                    )}
-                </div>
-            )}
-
-            {hasLinks && (
-                <div className={classes("vc-settings-modal-links", cl("links"))}>
-                    {website && (
-                        <WebsiteButton
-                            text={website}
-                            href={`https://${website}`}
-                        />
-                    )}
-                    {githubName && (
-                        <GithubButton
-                            text={githubName}
-                            href={`https://github.com/${githubName}`}
-                        />
-                    )}
-                </div>
-            )}
+            <div className={cl("root")}>
+                {!!plugins.length && (
+                    <div className={cl("plugins")}>
+                        {plugins.map(p =>
+                            <PluginCard
+                                key={p.name}
+                                plugin={p}
+                                disabled={p.required ?? false}
+                                onRestartNeeded={() => showToast("Restart to apply changes!")}
+                            />
+                        )}
+                    </div>
+                )}
+            </div>
         </Modal>
     );
 }

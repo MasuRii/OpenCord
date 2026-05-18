@@ -9,9 +9,8 @@ import { BaseText } from "@components/BaseText";
 import { Flex } from "@components/Flex";
 import { CopyIcon, PasteIcon, ResetIcon } from "@components/Icons";
 import { copyWithToast } from "@utils/discord";
-import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot } from "@utils/modal";
 import { RenderModalProps } from "@vencord/discord-types";
-import { showToast, Toasts, Tooltip } from "@webpack/common";
+import { Modal, showToast, Toasts, Tooltip } from "@webpack/common";
 import { type ReactNode } from "react";
 import { UserstyleHeader } from "usercss-meta";
 
@@ -187,21 +186,22 @@ export function UserCSSSettingsModal({ modalProps, theme, onSettingsReset }: Use
     }
 
     return (
-        <ModalRoot {...modalProps}>
-            <ModalHeader separator={false}>
-                <BaseText size="lg" weight="semibold" style={{ flexGrow: 1 }}>Settings for {theme.name}</BaseText>
-                <Flex style={{ gap: 4, marginRight: 4 }} className="vc-settings-usercss-ie-buttons">
-                    <ExportButton themeSettings={themeVars} />
-                    <ImportButton themeSettings={themeVars} />
-                    <ResetButton themeSettings={userCssVars} themeId={theme.id} close={modalProps.onClose} onReset={onSettingsReset} />
+        <Modal
+            {...modalProps}
+            title={
+                <Flex style={{ alignItems: "center", gap: 4 }}>
+                    <BaseText size="lg" weight="semibold" style={{ flexGrow: 1 }}>Settings for {theme.name}</BaseText>
+                    <Flex style={{ gap: 4, marginRight: 4 }} className="vc-settings-usercss-ie-buttons">
+                        <ExportButton themeSettings={themeVars} />
+                        <ImportButton themeSettings={themeVars} />
+                        <ResetButton themeSettings={userCssVars} themeId={theme.id} close={modalProps.onClose} onReset={onSettingsReset} />
+                    </Flex>
                 </Flex>
-                <ModalCloseButton onClick={modalProps.onClose} />
-            </ModalHeader>
-            <ModalContent>
-                <Flex flexDirection="column" style={{ gap: 12, marginBottom: 16 }}>
-                    {controls}
-                </Flex>
-            </ModalContent>
-        </ModalRoot>
+            }
+        >
+            <Flex flexDirection="column" style={{ gap: 12, marginBottom: 16 }}>
+                {controls}
+            </Flex>
+        </Modal>
     );
 }

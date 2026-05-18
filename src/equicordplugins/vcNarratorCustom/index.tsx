@@ -11,31 +11,22 @@ import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
 import { Divider } from "@components/Divider";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { HeadingPrimary, HeadingSecondary } from "@components/Heading";
+import { HeadingSecondary } from "@components/Heading";
 import { Devs, EquicordDevs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { Margins } from "@utils/margins";
-import {
-    ModalCloseButton,
-    ModalContent,
-    ModalFooter,
-    ModalHeader,
-    ModalProps,
-    ModalRoot,
-    ModalSize,
-    openModal,
-} from "@utils/modal";
 import { wordsToTitle } from "@utils/text";
 import definePlugin, { OptionType } from "@utils/types";
-import type { User } from "@vencord/discord-types";
+import { RenderModalProps, type User } from "@vencord/discord-types";
 import { ChannelType } from "@vencord/discord-types/enums";
 import {
-    Button as DiscordButton,
     ChannelStore,
     Forms,
     GuildMemberStore,
     IconUtils,
     Menu,
+    Modal,
+    openModal,
     React,
     SearchableSelect,
     SelectedChannelStore,
@@ -686,7 +677,7 @@ interface UserContextProps {
     user: User;
 }
 
-function VoiceSelectModal({ modalProps, user }: { modalProps: ModalProps; user: User; }) {
+function VoiceSelectModal({ modalProps, user }: { modalProps: RenderModalProps; user: User; }) {
     const DEFAULT_VALUE = "__default__";
 
     const options = useMemo(() => {
@@ -741,80 +732,72 @@ function VoiceSelectModal({ modalProps, user }: { modalProps: ModalProps; user: 
     };
 
     return (
-        <ModalRoot {...modalProps} size={ModalSize.MEDIUM}>
-            <ModalHeader>
-                <HeadingPrimary className={cl("modal-title")}>VC Narrator Voice</HeadingPrimary>
-                <ModalCloseButton onClick={modalProps.onClose} />
-            </ModalHeader>
+        <Modal
+            {...modalProps}
+            size="md"
+            title="VC Narrator Voice"
+            actions={[
+                {
+                    text: "Cancel",
+                    variant: "secondary",
+                    onClick: modalProps.onClose
+                },
+                {
+                    text: "Save",
+                    variant: "primary",
+                    onClick: () => {
+                        if (currentValue === DEFAULT_VALUE) {
+                            settings.store.userVoiceMap = removeUserVoiceFromMap(settings.store.userVoiceMap, user.id);
+                        } else {
+                            settings.store.userVoiceMap = upsertUserVoiceMap(settings.store.userVoiceMap, user.id, currentValue);
+                        }
+                        modalProps.onClose();
+                    }
+                }
+            ]}
+        >
+            <section className={Margins.bottom16}>
+                <HeadingSecondary>Select voice for {user.username}</HeadingSecondary>
+                <SearchableSelect
+                    options={options}
+                    value={options.find(o => o.value === currentValue)?.value}
+                    placeholder="Select a voice"
+                    maxVisibleItems={6}
+                    closeOnSelect={true}
+                    onChange={v => setCurrentValue(v as any)}
+                />
 
-            <ModalContent>
-                <section className={Margins.bottom16}>
-                    <HeadingSecondary>Select voice for {user.username}</HeadingSecondary>
-                    <SearchableSelect
-                        options={options}
-                        value={options.find(o => o.value === currentValue)?.value}
-                        placeholder="Select a voice"
-                        maxVisibleItems={6}
-                        closeOnSelect={true}
-                        onChange={v => setCurrentValue(v as any)}
-                    />
-
-                    <Forms.FormText className={cl("preview-hint")}>
-                        Preview how this voice sounds with their name:
-                    </Forms.FormText>
-                    <div className={cl("preview-buttons")}>
-                        <Button
-                            variant="secondary"
-                            size="small"
-                            disabled={busy}
-                            onClick={() => previewVoice(clean(displayName, settings.store.latinOnly) || "Someone")}
-                        >
-                            {busy ? "Playing..." : `"${clean(displayName, settings.store.latinOnly) || "Someone"}"`}
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            size="small"
-                            disabled={busy}
-                            onClick={() => previewVoice(`${clean(displayName, settings.store.latinOnly) || "Someone"} joined`)}
-                        >
-                            Joined
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            size="small"
-                            disabled={busy}
-                            onClick={() => previewVoice(`${clean(displayName, settings.store.latinOnly) || "Someone"} left`)}
-                        >
-                            Left
-                        </Button>
-                    </div>
-                </section>
-            </ModalContent>
-
-            <ModalFooter>
-                <div className={cl("modal-footer")}>
-                    <DiscordButton
-                        color={DiscordButton.Colors.PRIMARY}
-                        onClick={modalProps.onClose}
+                <Forms.FormText className={cl("preview-hint")}>
+                    Preview how this voice sounds with their name:
+                </Forms.FormText>
+                <div className={cl("preview-buttons")}>
+                    <Button
+                        variant="secondary"
+                        size="small"
+                        disabled={busy}
+                        onClick={() => previewVoice(clean(displayName, settings.store.latinOnly) || "Someone")}
                     >
-                        Cancel
-                    </DiscordButton>
-                    <DiscordButton
-                        color={DiscordButton.Colors.BRAND}
-                        onClick={() => {
-                            if (currentValue === DEFAULT_VALUE) {
-                                settings.store.userVoiceMap = removeUserVoiceFromMap(settings.store.userVoiceMap, user.id);
-                            } else {
-                                settings.store.userVoiceMap = upsertUserVoiceMap(settings.store.userVoiceMap, user.id, currentValue);
-                            }
-                            modalProps.onClose();
-                        }}
+                        {busy ? "Playing..." : `"${clean(displayName, settings.store.latinOnly) || "Someone"}"`}
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="small"
+                        disabled={busy}
+                        onClick={() => previewVoice(`${clean(displayName, settings.store.latinOnly) || "Someone"} joined`)}
                     >
-                        Save
-                    </DiscordButton>
+                        Joined
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="small"
+                        disabled={busy}
+                        onClick={() => previewVoice(`${clean(displayName, settings.store.latinOnly) || "Someone"} left`)}
+                    >
+                        Left
+                    </Button>
                 </div>
-            </ModalFooter>
-        </ModalRoot>
+            </section>
+        </Modal>
     );
 }
 

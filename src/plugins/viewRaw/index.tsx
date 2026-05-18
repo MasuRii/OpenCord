@@ -18,7 +18,6 @@
 
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
-import { BaseText } from "@components/BaseText";
 import { CodeBlock } from "@components/CodeBlock";
 import { Divider } from "@components/Divider";
 import ErrorBoundary from "@components/ErrorBoundary";
@@ -29,7 +28,6 @@ import { Margins } from "@utils/margins";
 import definePlugin, { IconComponent, OptionType } from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { ChannelStore, Forms, GuildRoleStore, Menu, Modal, openModal } from "@webpack/common";
-
 
 const CopyIcon: IconComponent = ({ height = 20, width = 20, className }) => {
     return (

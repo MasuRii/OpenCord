@@ -17,7 +17,6 @@
 */
 
 import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
-import { Paragraph } from "@components/Paragraph";
 import { TooltipContainer } from "@components/TooltipContainer";
 import { classes } from "@utils/misc";
 import { IconComponent } from "@utils/types";
