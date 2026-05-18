@@ -9,7 +9,8 @@ import { BaseText } from "@components/BaseText";
 import { Flex } from "@components/Flex";
 import { CopyIcon, PasteIcon, ResetIcon } from "@components/Icons";
 import { copyWithToast } from "@utils/discord";
-import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot } from "@utils/modal";
+import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot } from "@utils/modal";
+import { RenderModalProps } from "@vencord/discord-types";
 import { showToast, Toasts, Tooltip } from "@webpack/common";
 import { type ReactNode } from "react";
 import { UserstyleHeader } from "usercss-meta";
@@ -17,7 +18,7 @@ import { UserstyleHeader } from "usercss-meta";
 import { SettingBooleanComponent, SettingColorComponent, SettingNumberComponent, SettingRangeComponent, SettingSelectComponent, SettingTextComponent } from "./components";
 
 interface UserCSSSettingsModalProps {
-    modalProps: ModalProps;
+    modalProps: RenderModalProps;
     theme: UserstyleHeader;
     onSettingsReset: () => void;
 }
