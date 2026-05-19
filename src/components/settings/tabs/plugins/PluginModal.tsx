@@ -223,6 +223,16 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
                     </div>
                 </section>
 
+                {!!plugin.settingsAboutComponent && (
+                    <div className={Margins.top16}>
+                        <section>
+                            <ErrorBoundary message="An error occurred while rendering this plugin's custom Info Component">
+                                <plugin.settingsAboutComponent />
+                            </ErrorBoundary>
+                        </section>
+                    </div>
+                )}
+
                 <section>
                     <BaseText size="lg" weight="semibold" color="text-strong" className={classes(Margins.top16, Margins.bottom8)}>Settings</BaseText>
                     {renderSettings()}

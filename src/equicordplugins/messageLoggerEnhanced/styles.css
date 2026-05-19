@@ -103,7 +103,3 @@
 .vc-updater-modal-content {
     padding: 1rem 2rem;
 }
-
-header:has(.vc-msg-logger-enhanced-modal-tab-bar) [class*="headerTrailing_"] {
-    margin-top: 0;
-}
