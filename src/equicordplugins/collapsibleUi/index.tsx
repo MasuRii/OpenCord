@@ -131,6 +131,7 @@ export default definePlugin({
             }
         },
     ],
+
     chatBarButtonWrapper: {
         wrapper: (buttons: ReactNode) => {
             if (!Array.isArray(buttons) || buttons.length === 0) return buttons;
