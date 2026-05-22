@@ -6,11 +6,13 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { disableStyle, enableStyle } from "@api/Styles";
+import { AppsIcon, CreditCardIcon, DeveloperIcon, EquicordIcon, GameControllerIcon, MainSettingsIcon, ShieldIcon } from "@components/Icons";
 import { buildPluginMenuEntries, buildThemeMenuEntries } from "@equicordplugins/equicordToolbox/menu";
 import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
+import { Icon } from "@vencord/discord-types";
 import { findCssClassesLazy } from "@webpack";
 import { ComponentDispatch, FocusLock, Menu, useEffect, useRef } from "@webpack/common";
 import type { HTMLAttributes, ReactNode } from "react";
@@ -19,6 +21,16 @@ import fullHeightStyle from "./fullHeightContext.css?managed";
 
 const cl = classNameFactory("");
 const Classes = findCssClassesLazy("animating", "baseLayer", "bg", "layer", "layers");
+
+const SECTION_ICONS: Record<string, Icon> = {
+    user_section: MainSettingsIcon,
+    equicord_section: EquicordIcon,
+    billing_section: CreditCardIcon,
+    app_section: AppsIcon,
+    activity_section: GameControllerIcon,
+    developer_section: DeveloperIcon,
+    staff_only_section: ShieldIcon,
+};
 
 const settings = definePluginSettings({
     disableFade: {
@@ -195,8 +207,14 @@ export default definePlugin({
                     </Menu.MenuItem>
                 );
             } else if (key.endsWith("_section") && props.label) {
+                const iconLeft = SECTION_ICONS[key];
                 items.push(
-                    <Menu.MenuItem key={key} label={props.label} id={props.label}>
+                    <Menu.MenuItem
+                        key={key}
+                        label={props.label}
+                        id={props.label}
+                        {...(iconLeft && { iconLeft })}
+                    >
                         {this.transformSettingsEntries(props.children)}
                     </Menu.MenuItem>
                 );
