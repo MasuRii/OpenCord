@@ -1074,7 +1074,7 @@ export function GameControllerIcon(props: IconProps) {
     );
 }
 
-export function DeveloperIcon(props: IconProps) {
+export function HammerAndChiselIcon(props: IconProps) {
     return (
         <Icon
             {...props}

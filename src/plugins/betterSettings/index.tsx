@@ -6,7 +6,7 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { disableStyle, enableStyle } from "@api/Styles";
-import { AchievementsIcon, AppsIcon, CreditCardIcon, DeveloperIcon, EquicordIcon, GameControllerIcon, HammerIcon, MainSettingsIcon, PencilSparkleIcon, UserIcon } from "@components/Icons";
+import { AchievementsIcon, AppsIcon, CreditCardIcon, EquicordIcon, GameControllerIcon, HammerAndChiselIcon, HammerIcon, MainSettingsIcon, PencilSparkleIcon, UserIcon } from "@components/Icons";
 import { buildPluginMenuEntries, buildThemeMenuEntries } from "@equicordplugins/equicordToolbox/menu";
 import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
@@ -30,7 +30,7 @@ const SECTION_ICONS: Record<string, Icon> = {
     billing_section: CreditCardIcon,
     app_section: AppsIcon,
     activity_section: GameControllerIcon,
-    developer_section: DeveloperIcon,
+    developer_section: HammerAndChiselIcon,
     utility_section: MainSettingsIcon,
     playgrounds_section: AchievementsIcon,
     build_overrides_section: HammerIcon,
