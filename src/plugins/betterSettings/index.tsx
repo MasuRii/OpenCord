@@ -208,7 +208,7 @@ export default definePlugin({
     transformSettingsEntries(list) {
         const items: ReactNode[] = [];
         const SECTION_NAMES: Record<string, string> = {
-            user_section: getIntlMessage("ACCOUNT_SETTINGS"),
+            user_section: getIntlMessage("USER_SETTINGS"),
             utility_section: getIntlMessage("USER_SETTINGS_KEYBINDS_MISCELLANEOUS_SECTION_TITLE")
         };
 
