@@ -134,14 +134,15 @@ export function removeFromArray<T>(arr: T[], predicate: (e: T) => boolean) {
 
 export function getUserAvatarUrl(user: User, guildId?: string, canAnimate?: boolean, size?: number): string {
     const memberAvatar = guildId ? GuildMemberStore.getMember(guildId, user.id)?.avatar || null : null;
-
-    return memberAvatar
-        ? IconUtils.getGuildMemberAvatarURLSimple({
+    if (memberAvatar) {
+        return IconUtils.getGuildMemberAvatarURLSimple({
             guildId: guildId!,
             userId: user.id,
             avatar: memberAvatar,
             canAnimate,
             size
-        })
-        : IconUtils.getUserAvatarURL(user, canAnimate, size);
+        });
+    }
+
+    return IconUtils.getUserAvatarURL(user, canAnimate, size) ?? IconUtils.getDefaultAvatarURL(user.id, user?.discriminator);
 }
