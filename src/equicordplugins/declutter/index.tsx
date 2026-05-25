@@ -147,7 +147,6 @@ export default definePlugin({
                 title: "Declutter",
                 body: "Avatar decoration removal has been disabled to prevent conflicts with Decor plugin.",
                 confirmText: "OK",
-                // @ts-expect-error not typed
                 confirmVariant: "critical-primary"
             });
         }
@@ -169,6 +168,14 @@ export default definePlugin({
             replacement: {
                 match: /null==\i\|\|\i\?null:\(0,\i\.jsxs?\)\("img",\{className:\i\.\i,src:\i,alt:" ","aria-hidden":!0\}\)/,
                 replace: "null"
+            },
+            predicate: () => settings.store.removeAvatarDecoration && !isPluginEnabled(decor.name),
+        },
+        {
+            find: ".DISPLAY_NAME_STYLES_COACHMARK)",
+            replacement: {
+                match: /((\i)=\i\?\.avatarDecoration,\i=)\(0,\i\.\i\)\(\2\)/,
+                replace: "$1null"
             },
             predicate: () => settings.store.removeAvatarDecoration && !isPluginEnabled(decor.name),
         },
