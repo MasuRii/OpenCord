@@ -130,22 +130,8 @@ export default definePlugin({
                 style={{ cursor: "unset" }}
                 selected={false}
                 lowerBadge={
-                    <div
-                        style={{
-                            width: "20px",
-                            height: "20px",
-
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            overflow: "hidden",
-
-                            borderRadius: "50%",
-                            backgroundColor: "var(--interactive-icon-default)",
-                            color: "var(--background-base-lower)",
-                        }}
-                    >
-                        <PlatformIcon width={14} height={14} style={{ display: "block" }} />
+                    <div className={cl("lowerBadge")}>
+                        <PlatformIcon width={14} height={14} className={cl("lowerBadge-icon")} />
                     </div>
                 }
                 lowerBadgeSize={{
