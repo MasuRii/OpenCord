@@ -45,7 +45,7 @@ export default definePlugin({
         {
             find: '"ChannelAttachmentUpload"',
             replacement: {
-                match: /(,\{children:\[)(?=.{0,80}#{intl::CLIPS_ATTACHMENT_UTILITIES_SPOILER})/,
+                match: /(?<=description:\i,spoiler:\i.{0,160},\{children:\[)/,
                 replace: "$&$self.UploadClipFileButton(arguments[0]),"
             }
         }
