@@ -30,7 +30,7 @@ let clicked = false;
 
 const SafetyHubStore = findStoreLazy("SafetyHubStore");
 const fetchSafetyHub: () => Promise<void> = findByCodeLazy("SAFETY_HUB_FETCH_START");
-const requireSafetyHub = extractAndLoadChunksLazy(["USER_SETTINGS_MODAL_KEY"]);
+const requireSettingsMenu = extractAndLoadChunksLazy(['type:"USER_SETTINGS_MODAL_OPEN"']);
 
 const StandingConfig: Record<number, { label: string; hoverColor: string; Icon: ComponentType<any>; }> = {
     [StandingState.ALL_GOOD]: { label: "All good!", hoverColor: "var(--status-positive)", Icon: ShieldIcon },
@@ -43,7 +43,7 @@ const StandingConfig: Record<number, { label: string; hoverColor: string; Icon: 
 function StandingButton() {
     const [loaded, setLoaded] = React.useState(false);
 
-    React.useEffect(() => { requireSafetyHub().then(() => setLoaded(true)).catch(() => { }); }, []);
+    React.useEffect(() => { requireSettingsMenu().then(() => setLoaded(true)).catch(() => { }); }, []);
 
     return loaded ? <AccountStandingButton /> : null;
 }
