@@ -34,7 +34,7 @@ import { CONTRIB_ROLE_ID, Devs, DONOR_ROLE_ID, EQUICORD_TEAM, GUILD_ID, SUPPORT_
 import { sendMessage } from "@utils/discord";
 import { Logger } from "@utils/Logger";
 import { Margins } from "@utils/margins";
-import { isAnyPluginDev, isEquicordGuild, isEquicordSupport, isSupportChannel, tryOrElse } from "@utils/misc";
+import { isAnyPluginDev, isEquicordGuild, isEquicordSupport, isKnownIssuesCategory, isSupportChannel, tryOrElse } from "@utils/misc";
 import { relaunch } from "@utils/native";
 import { onlyOnce } from "@utils/onlyOnce";
 import { makeCodeblock } from "@utils/text";
@@ -462,7 +462,7 @@ export default definePlugin({
             );
         }
 
-        if (isSupportChannel(props.channel.id) && PermissionStore.can(PermissionsBits.SEND_MESSAGES, props.channel) && equicordSupport) {
+        if (equicordSupport && isSupportChannel(props.channel.id) && PermissionStore.can(PermissionsBits.SEND_MESSAGES, props.channel)) {
             if (props.message.content.includes("/equicord-debug") || props.message.content.includes("/equicord-plugins")) {
                 buttons.push(
                     <Button
@@ -494,34 +494,34 @@ export default definePlugin({
                     </Button>
                 );
             }
+        }
 
-            if (equicordSupport || props.channel.parent_id === SUPPORT_CHANNEL_ID) {
-                const match = CodeBlockRe.exec(props.message.content || props.message.embeds[0]?.rawDescription || "");
-                if (match) {
-                    buttons.push(
-                        <Button
-                            key="vc-run-snippet"
-                            onClick={async () => {
-                                try {
-                                    const result = await AsyncFunction(match[1])();
-                                    const stringed = String(result);
-                                    if (stringed) {
-                                        await sendBotMessage(SelectedChannelStore.getChannelId(), {
-                                            content: stringed
-                                        });
-                                    }
-
-                                    showToast("Success!", Toasts.Type.SUCCESS);
-                                } catch (e) {
-                                    new Logger(this.name).error("Error while running snippet:", e);
-                                    showToast("Failed to run snippet :(", Toasts.Type.FAILURE);
+        if (equicordSupport || (isSupportChannel(props.channel.id) || isKnownIssuesCategory(props.channel.parent_id))) {
+            const match = CodeBlockRe.exec(props.message.content || props.message.embeds[0]?.rawDescription || "");
+            if (match) {
+                buttons.push(
+                    <Button
+                        key="vc-run-snippet"
+                        onClick={async () => {
+                            try {
+                                const result = await AsyncFunction(match[1])();
+                                const stringed = String(result);
+                                if (stringed) {
+                                    await sendBotMessage(SelectedChannelStore.getChannelId(), {
+                                        content: stringed
+                                    });
                                 }
-                            }}
-                        >
-                            Run Snippet
-                        </Button>
-                    );
-                }
+
+                                showToast("Success!", Toasts.Type.SUCCESS);
+                            } catch (e) {
+                                new Logger(this.name).error("Error while running snippet:", e);
+                                showToast("Failed to run snippet :(", Toasts.Type.FAILURE);
+                            }
+                        }}
+                    >
+                        Run Snippet
+                    </Button>
+                );
             }
         }
 
