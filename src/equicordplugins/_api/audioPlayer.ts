@@ -31,8 +31,8 @@ export default definePlugin({
                     // Adds an optional persistent boolean as well as a callback and error handler to the
                     // audio player which is called after the audio finishes playing and when an error occurs.
                     // Also processes the audio before playing to apply override functions set by plugins.
-                    match: /(?<=constructor\(([^)]+))\)[^}]+/,
-                    replace: ",options){$self.buildPlayer(this,options,$1);"
+                    match: /constructor\(((?:\i,){3}\i)([^)]*)\)\{[^}]+}/,
+                    replace: "constructor(options,$1$2){$self.buildPlayer(this,options,$1);}"
                 },
                 {
                     // Prevents an error from the source being cleared during destroyAudio().
@@ -65,6 +65,14 @@ export default definePlugin({
                     replace: "$self.playAudio($1)"
                 }
             ]
+        },
+        {
+            // Pass undefined for options in default Discord calls to the audio constructor.
+            find: "SoundUtils",
+            replacement: {
+                match: /return new (\i)\((.{0,50}?)(?=}function)/,
+                replace: "return new $1(undefined,$2"
+            }
         },
         {
             // Prevents Discord from forcing full volume for the "discodo" effect on client load.
