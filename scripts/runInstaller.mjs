@@ -73,7 +73,7 @@ async function ensureBinary() {
 
     const res = await fetch(BASE_URL + filename, {
         headers: {
-            "User-Agent": "Equicord (https://github.com/Equicord/Equicord)",
+            "User-Agent": "OpenCord (https://github.com/OpenCord/OpenCord)",
             "If-None-Match": etag
         }
     });
@@ -133,6 +133,9 @@ try {
         stdio: "inherit",
         env: {
             ...process.env,
+            OPENCORD_USER_DATA_DIR: BASE_DIR,
+            OPENCORD_DIRECTORY: join(BASE_DIR, "dist/desktop"),
+            OPENCORD_DEV_INSTALL: "1",
             EQUICORD_USER_DATA_DIR: BASE_DIR,
             EQUICORD_DIRECTORY: join(BASE_DIR, "dist/desktop"),
             EQUICORD_DEV_INSTALL: "1"
