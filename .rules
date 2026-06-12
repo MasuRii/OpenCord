@@ -1,4 +1,4 @@
-# Equicord Rules
+# OpenCord Rules
 
 ## Philosophy
 
@@ -52,9 +52,9 @@ Does NOT get merged:
    * SPDX-License-Identifier: GPL-3.0-or-later
    */
   ```
-  Header says `Vencord, a Discord client mod` even on new Equicord-only files. Equicord is a Vencord fork, upstream attribution is kept across the whole tree. Don't change it to "Equicord".
+  Header says `Vencord, a Discord client mod` even on new OpenCord-only files. OpenCord is a Vencord fork, upstream attribution is kept across the whole tree. Don't change it to "OpenCord" or "Equicord".
   Older files carry the full GPL preamble. Leave existing headers alone, don't rewrite them.
-- Folder per plugin. `src/plugins/<name>/index.tsx` or `src/equicordplugins/<name>/index.tsx`. Single-file plugins still get a folder.
+- Folder per plugin. `src/plugins/<name>/index.tsx`, `src/equicordplugins/<name>/index.tsx`, or `src/opencordplugins/<name>/index.tsx`. Single-file plugins still get a folder.
 - Folder suffixes the build filters on: `.desktop`, `.web`, `.dev`, `.discordDesktop`, `.vesktop`, `.equibop`.
 - `export default definePlugin({ ... })`. Never named.
 - Required fields: `name`, `description`, `authors`. Use `Devs` or `EquicordDevs`, never inline.
@@ -64,7 +64,7 @@ Does NOT get merged:
 - `startAt?: StartAt` overrides default `WebpackReady`. Values: `Init`, `DOMContentLoaded`, `WebpackReady`.
 - `settingsAboutComponent?: React.ComponentType` renders above settings UI.
 - `reporterTestable?: ReporterTestable` flags parts the auto-reporter exercises (`Start`, `Patches`, `FluxEvents`, `None`).
-- `isModified?: true` marks an upstream Vencord plugin Equicord modified.
+- `isModified?: true` marks an upstream Vencord plugin OpenCord modified.
 - Optional: `tags?: PluginTag[]` (closed list in `src/utils/types.ts`), `required` (forced on, hidden toggle), `enabledByDefault` (on at first run, toggleable), `hidden` (off the UI), `searchTerms?: string[]`.
 
 ### Declarative over imperative
@@ -166,7 +166,7 @@ Declarative fields auto-enable these. Imperative doesn't.
 - Never depend on argument names or object-key order. Use `arguments[i]` — minifiers rename params and reorder destructured keys.
 - Prefer multiple small patches over one with broad find and many replacements.
 - In DEV, failing replacements auto-diff 200 chars around the match site. Read it before retrying.
-- Never reference build flags literally inside `replace`. They only exist in Equicord's bundle. Interpolate outside:
+- Never reference build flags literally inside `replace`. They only exist in OpenCord's bundle. Interpolate outside:
   ```js
   // BAD
   replace: "IS_WEB?foo:bar"
@@ -412,7 +412,7 @@ Replaced at build time. Reference only in plugin TS, never literally inside `rep
 | `IS_DISCORD_DESKTOP` | Discord desktop injection |
 | `IS_VESKTOP` | Vesktop |
 | `IS_EQUIBOP` | Equibop |
-| `VERSION` | Equicord version string |
+| `VERSION` | OpenCord version string |
 | `BUILD_TIMESTAMP` | Build epoch ms |
 
 ## Reference
