@@ -28,8 +28,8 @@ import { installExt } from "./utils/extensions";
 
 if (!IS_VANILLA && !IS_EXTENSION) {
     app.whenReady().then(() => {
-        protocol.handle("vencord", ({ url: unsafeUrl }) => {
-            let url = decodeURI(unsafeUrl).slice("vencord://".length).replace(/\?v=\d+$/, "");
+        const handleProtocol = (scheme: string) => ({ url: unsafeUrl }: { url: string; }) => {
+            let url = decodeURI(unsafeUrl).slice(`${scheme}://`.length).replace(/\?v=\d+$/, "");
 
             if (url.endsWith("/")) url = url.slice(0, -1);
 
@@ -60,47 +60,17 @@ if (!IS_VANILLA && !IS_EXTENSION) {
                         status: 404
                     });
             }
-        });
+        };
 
-        protocol.handle("equicord", ({ url: unsafeUrl }) => {
-            let url = decodeURI(unsafeUrl).slice("equicord://".length).replace(/\?v=\d+$/, "");
-
-            if (url.endsWith("/")) url = url.slice(0, -1);
-
-            if (url.startsWith("/themes/")) {
-                const theme = url.slice("/themes/".length);
-
-                const safeUrl = ensureSafePath(THEMES_DIR, theme);
-                if (!safeUrl) {
-                    return new Response(null, {
-                        status: 404
-                    });
-                }
-
-                return net.fetch(pathToFileURL(safeUrl).toString());
-            }
-
-            // Source Maps! Maybe there's a better way but since the renderer is executed
-            // from a string I don't think any other form of sourcemaps would work
-
-            switch (url) {
-                case "renderer.js.map":
-                case "preload.js.map":
-                case "patcher.js.map":
-                case "main.js.map":
-                    return net.fetch(pathToFileURL(join(__dirname, url)).toString());
-                default:
-                    return new Response(null, {
-                        status: 404
-                    });
-            }
-        });
+        protocol.handle("vencord", handleProtocol("vencord"));
+        protocol.handle("opencord", handleProtocol("opencord"));
+        protocol.handle("equicord", handleProtocol("equicord"));
 
         try {
             if (RendererSettings.store.enableReactDevtools)
                 installExt("fmkadmapgofadopljbjfkapdkoienihi")
-                    .then(() => console.info("[Equicord] Installed React Developer Tools"))
-                    .catch(err => console.error("[Equicord] Failed to install React Developer Tools", err));
+                    .then(() => console.info("[OpenCord] Installed React Developer Tools"))
+                    .catch(err => console.error("[OpenCord] Failed to install React Developer Tools", err));
         } catch { }
 
         initCsp();
