@@ -11,15 +11,17 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { EquicordDevs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import definePlugin, { type IconComponent } from "@utils/types";
-import { showToast, Toasts } from "@webpack/common";
+import { showToast, Toasts, useEffect, useState } from "@webpack/common";
 
 import { getAutoTranslateToggleLabel, getTranslationStatusMessage, shouldTranslateOutgoingContent } from "./helpers";
 import { settings } from "./settings";
-import { abortActiveTranslations, clearContentTranslationCache, getTranslationRateLimitMs, translateText } from "./utils";
+import { abortActiveTranslations, clearContentTranslationCache, getTranslationGeneration, getTranslationRateLimitMs, isTranslationGenerationCurrent, translateText } from "./utils";
 
 const cl = classNameFactory("vc-aitrans-");
-const AUTO_TRANSLATE_KEYS: Array<"autoTranslate"> = ["autoTranslate"];
+const AUTO_TRANSLATE_KEYS = ["autoTranslate"] satisfies Array<"autoTranslate">;
 let lastRateLimitToast = 0;
+let activeTranslationCount = 0;
+const translationStateListeners = new Set<() => void>();
 
 const AITranslateIcon: IconComponent = ({ height = 20, width = 20, className }) => (
     <svg
@@ -32,6 +34,19 @@ const AITranslateIcon: IconComponent = ({ height = 20, width = 20, className }) 
     </svg>
 );
 
+const AITranslateSpinnerIcon: IconComponent = ({ height = 20, width = 20, className }) => (
+    <svg
+        viewBox="0 0 24 24"
+        height={height}
+        width={width}
+        className={className}
+        aria-hidden="true"
+    >
+        <circle className={cl("spinner-track")} cx="12" cy="12" r="8" />
+        <circle className={cl("spinner-ring")} cx="12" cy="12" r="8" />
+    </svg>
+);
+
 function showRateLimitToast(rateLimitMs: number) {
     const now = Date.now();
     if (now - lastRateLimitToast < 5_000) return;
@@ -40,8 +55,34 @@ function showRateLimitToast(rateLimitMs: number) {
     showToast(getTranslationStatusMessage("rateLimited", rateLimitMs), Toasts.Type.FAILURE);
 }
 
+function emitTranslationStateChange() {
+    for (const listener of translationStateListeners) listener();
+}
+
+function setTranslationLoading(loading: boolean) {
+    activeTranslationCount = Math.max(0, activeTranslationCount + (loading ? 1 : -1));
+    emitTranslationStateChange();
+}
+
+function useIsTranslating() {
+    const [isTranslating, setIsTranslating] = useState(activeTranslationCount > 0);
+
+    useEffect(() => {
+        function update() {
+            setIsTranslating(activeTranslationCount > 0);
+        }
+
+        translationStateListeners.add(update);
+        update();
+        return () => void translationStateListeners.delete(update);
+    }, []);
+
+    return isTranslating;
+}
+
 const AITranslateChatButtonComponent: ChatBarButtonFactory = ({ isMainChat }) => {
     const { autoTranslate } = settings.use(AUTO_TRANSLATE_KEYS);
+    const isTranslating = useIsTranslating();
     if (!isMainChat) return null;
 
     function toggle() {
@@ -54,11 +95,11 @@ const AITranslateChatButtonComponent: ChatBarButtonFactory = ({ isMainChat }) =>
 
     return (
         <ChatBarButton
-            tooltip={autoTranslate ? "Turn off AI outgoing translate" : "Turn on AI outgoing translate"}
+            tooltip={isTranslating ? "Translating message" : autoTranslate ? "Turn off AI outgoing translate" : "Turn on AI outgoing translate"}
             onClick={toggle}
             onContextMenu={toggle}
         >
-            <AITranslateIcon className={cl({ enabled: autoTranslate })} />
+            {isTranslating ? <AITranslateSpinnerIcon className={cl("spinner", { enabled: autoTranslate })} /> : <AITranslateIcon className={cl({ enabled: autoTranslate })} />}
         </ChatBarButton>
     );
 };
@@ -87,21 +128,29 @@ export default definePlugin({
             return { cancel: true };
         }
 
-        showToast(getTranslationStatusMessage("translating"), Toasts.Type.CLOCK);
-        const translation = await translateText(message.content, targetLanguage);
-        if (translation) {
-            message.content = translation.translated;
-            showToast(getTranslationStatusMessage("sent"), Toasts.Type.SUCCESS);
-            return;
-        }
+        const translationGeneration = getTranslationGeneration();
+        setTranslationLoading(true);
+        try {
+            const translation = await translateText(message.content, targetLanguage);
+            if (!isTranslationGenerationCurrent(translationGeneration)) return { cancel: true };
+            if (translation) {
+                message.content = translation.translated;
+                showToast(getTranslationStatusMessage("sent"), Toasts.Type.SUCCESS);
+                return;
+            }
 
-        rateLimitMs = getTranslationRateLimitMs(targetLanguage);
-        if (rateLimitMs > 0) showRateLimitToast(rateLimitMs);
-        else showToast(getTranslationStatusMessage("failed"), Toasts.Type.FAILURE);
-        return { cancel: true };
+            rateLimitMs = getTranslationRateLimitMs(targetLanguage);
+            if (rateLimitMs > 0) showRateLimitToast(rateLimitMs);
+            else showToast(getTranslationStatusMessage("failed"), Toasts.Type.FAILURE);
+            return { cancel: true };
+        } finally {
+            setTranslationLoading(false);
+        }
     },
 
     stop() {
+        activeTranslationCount = 0;
+        emitTranslationStateChange();
         abortActiveTranslations();
         clearContentTranslationCache();
     },
