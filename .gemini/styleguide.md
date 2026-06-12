@@ -1,6 +1,6 @@
-# Equicord Code Review Style Guide
+# OpenCord Code Review Style Guide
 
-You are reviewing PRs for **Equicord**, a Discord client mod built on Vencord. It uses TypeScript, React, and webpack patching to inject into Discord. The codebase has extensive built-in utilities that contributors MUST use. Be direct, actionable, no pleasantries. Use natural, human language. Be blunt when code is bad.
+You are reviewing PRs for **OpenCord**, a Discord client mod built on Vencord. It uses TypeScript, React, and webpack patching to inject into Discord. The codebase has extensive built-in utilities that contributors MUST use. Be direct, actionable, no pleasantries. Use natural, human language. Be blunt when code is bad.
 
 ---
 
@@ -33,7 +33,7 @@ import { EquicordDevs } from "@utils/constants";
 export default definePlugin({
     name: "PluginName",            // PascalCase, matches directory name
     description: "Does something", // Capital first
-    authors: [EquicordDevs.Name],   // EquicordDevs for new, Devs for upstream
+    authors: [EquicordDevs.Name],   // EquicordDevs for Equicord-origin plugins, Devs for Vencord-upstream
 });
 ```
 
@@ -217,7 +217,7 @@ patches: [{
 ```typescript
 // GOOD
 import { isPluginEnabled } from "@api/PluginManager";
-import otherPlugin from "@equicordplugins/otherPlugin";
+import otherPlugin from "@equicordplugins/otherPlugin";  // Vencord-upstream plugins: import from "@plugins/"
 if (!isPluginEnabled(otherPlugin.name)) return null;
 otherPlugin.someFunction();
 
