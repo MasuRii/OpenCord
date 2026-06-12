@@ -27,7 +27,7 @@ permissions:
 
 jobs:
     Build:
-        name: Build Equicord
+        name: Build OpenCord
         runs-on: ubuntu-latest
         if: github.repository == 'Equicord/Equicord'
 
@@ -111,7 +111,7 @@ jobs:
                   find . -size 0 -delete
 
                   mkdir -p userscript
-                  mv Equicord.user.* userscript/
+                  mv OpenCord.user.* userscript/
                   mv desktop.asar desktop/
                   mv equibop.asar equibop/
                   mv extension-*.zip browser/
