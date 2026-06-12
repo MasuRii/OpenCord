@@ -123,13 +123,19 @@ window.VencordNative = {
     settings: {
         get: () => {
             try {
-                return JSON.parse(localStorage.getItem("EquicordSettings") || "{}");
+                const openCord = localStorage.getItem("OpenCordSettings");
+                if (openCord != null) return JSON.parse(openCord);
+                const equicord = localStorage.getItem("EquicordSettings");
+                return JSON.parse(equicord || "{}");
             } catch (e) {
                 console.error("Failed to parse settings from localStorage: ", e);
                 return {};
             }
         },
-        set: async (s: Settings) => localStorage.setItem("EquicordSettings", JSON.stringify(s)),
+        set: async (s: Settings) => {
+            localStorage.setItem("OpenCordSettings", JSON.stringify(s));
+            localStorage.removeItem("EquicordSettings");
+        },
         getSettingsDir: async () => "LocalStorage",
         openFolder: async () => Promise.reject("settings:openFolder is not supported on web"),
     },
