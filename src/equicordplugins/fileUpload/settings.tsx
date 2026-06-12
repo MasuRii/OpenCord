@@ -338,6 +338,28 @@ export const settings = definePluginSettings({
         default: "",
         hidden: true
     },
+    webdavServerType: {
+        type: OptionType.SELECT,
+        description: "WebDAV server type",
+        options: [
+            { label: "Nextcloud", value: "nextcloud", default: true },
+            { label: "ownCloud", value: "owncloud" },
+            { label: "Generic WebDAV", value: "generic" }
+        ],
+        default: "nextcloud",
+        hidden: true
+    },
+    webdavShareType: {
+        type: OptionType.SELECT,
+        description: "WebDAV share link format",
+        options: [
+            { label: "Share Page", value: "share-page", default: true },
+            { label: "Direct Download", value: "direct-download" },
+            { label: "Markdown Link", value: "markdown" }
+        ],
+        default: "share-page",
+        hidden: true
+    },
     uploadAllowedFileTypes: {
         type: OptionType.STRING,
         description: "Comma-separated list of allowed file extensions (e.g. png,jpg,gif,mp4). Leave empty to allow all files.",
@@ -847,6 +869,40 @@ export function SettingsComponent() {
                         onChange={v => store.webdavDirectory = v}
                         placeholder="Leave empty for root directory"
                     />
+                    <SettingsSection name="Server Type" description="Select your WebDAV server type. Nextcloud and ownCloud will create a public share link. Generic returns the raw file URL.">
+                        <Select
+                            options={[
+                                { label: "Nextcloud", value: "nextcloud", default: true },
+                                { label: "ownCloud", value: "owncloud" },
+                                { label: "Generic WebDAV", value: "generic" }
+                            ]}
+                            isSelected={v => v === store.webdavServerType}
+                            select={v => {
+                                store.webdavServerType = v;
+                                update();
+                            }}
+                            serialize={v => v}
+                            placeholder="Select server type"
+                        />
+                    </SettingsSection>
+                    {store.webdavServerType !== "generic" && (
+                        <SettingsSection name="Share Link Format" description="How to return the public share link. Share Page links to a web page; Direct Download links straight to the file; Markdown Link wraps the share page in a clickable filename.">
+                            <Select
+                                options={[
+                                    { label: "Share Page", value: "share-page", default: true },
+                                    { label: "Direct Download", value: "direct-download" },
+                                    { label: "Markdown Link", value: "markdown" }
+                                ]}
+                                isSelected={v => v === store.webdavShareType}
+                                select={v => {
+                                    store.webdavShareType = v;
+                                    update();
+                                }}
+                                serialize={v => v}
+                                placeholder="Select share link format"
+                            />
+                        </SettingsSection>
+                    )}
                 </SettingGroup>
             )}
 
