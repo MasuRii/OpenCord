@@ -56,7 +56,7 @@ export default definePlugin({
     description: "Install userplugins with a simple button click",
     settingsAboutComponent: () => (
         <Notice.Warning>
-            Equicord does not moderate userplugins and takes no responsibility for anything that may result from installing them.
+            OpenCord does not moderate userplugins and takes no responsibility for anything that may result from installing them.
             Only install userplugins from developers you trust. Doing so is entirely at your own risk.
         </Notice.Warning>
     ),
