@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { readdirSync, writeFileSync } from "fs";
+import { existsSync, readdirSync, writeFileSync } from "fs";
 import { getEntryPoint, isPluginFile, parseDevs, parseEquicordDevs, parseFile, PluginData } from "./utils";
 
 (async () => {
@@ -26,17 +26,22 @@ import { getEntryPoint, isPluginFile, parseDevs, parseEquicordDevs, parseFile, P
     const args = process.argv.slice(2);
 
     const equicordFlag = args.includes("--equicord");
+    const opencordFlag = args.includes("--opencord");
     const vencordFlag = args.includes("--vencord");
 
     let dirs: string[];
 
     if (equicordFlag) {
         dirs = ["src/equicordplugins/_core", "src/equicordplugins"];
+    } else if (opencordFlag) {
+        dirs = ["src/opencordplugins/_core", "src/opencordplugins"];
     } else if (vencordFlag) {
         dirs = ["src/plugins", "src/plugins/_core"];
     } else {
-        dirs = ["src/plugins", "src/plugins/_core", "src/equicordplugins/_core", "src/equicordplugins"];
+        dirs = ["src/plugins", "src/plugins/_core", "src/equicordplugins/_core", "src/equicordplugins", "src/opencordplugins/_core", "src/opencordplugins"];
     }
+
+    dirs = dirs.filter(existsSync);
 
     const outputPath = args.find(a => !a.startsWith("--")) ?? null;
 
