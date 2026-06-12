@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+    <style>
+        .light-letter { fill: #0A0A0F; }
+        .light-shadow { fill: #1A1A24; fill-opacity: 0.15; }
+        .accent { stroke: #00D4FF; stroke-width: 5; stroke-linecap: butt; }
+    </style>
+
+    <defs>
+        <mask id="mask_O_right" maskUnits="userSpaceOnUse">
+            <rect width="500" height="500" fill="#FFFFFF" />
+            <polygon points="250,406 291.4,364.6 250,323.3 208.6,364.6" fill="#000000" />
+        </mask>
+        <mask id="mask_C_right" maskUnits="userSpaceOnUse">
+            <rect width="500" height="500" fill="#FFFFFF" />
+            <polygon points="250,94 291.4,135.4 250,176.7 208.6,135.4" fill="#000000" />
+        </mask>
+        <mask id="mask_O_shadow_right" maskUnits="userSpaceOnUse">
+            <rect width="500" height="500" fill="#FFFFFF" />
+            <polygon points="260,416 301.4,374.6 260,333.3 218.6,374.6" fill="#000000" />
+        </mask>
+        <mask id="mask_C_shadow_right" maskUnits="userSpaceOnUse">
+            <rect width="500" height="500" fill="#FFFFFF" />
+            <polygon points="260,104 301.4,145.4 260,186.7 218.6,145.4" fill="#000000" />
+        </mask>
+    </defs>
+
+    <g>
+        <g transform="translate(10, 10)">
+            <path class="light-shadow" mask="url(#mask_O_shadow_right)" fill-rule="evenodd" d="M 150,100 L 250,100 L 350,200 L 350,300 L 250,400 L 150,400 L 50,300 L 50,200 Z M 170.7,150 L 229.3,150 L 300,220.7 L 300,279.3 L 229.3,350 L 170.7,350 L 100,279.3 L 100,220.7 Z" />
+            <path class="light-shadow" mask="url(#mask_C_shadow_right)" d="M 250,100 L 350,100 L 450,200 L 400,225 L 400,220.7 L 329.3,150 L 270.7,150 L 200,220.7 L 200,279.3 L 270.7,350 L 329.3,350 L 400,279.3 L 400,275 L 450,300 L 350,400 L 250,400 L 150,300 L 150,200 Z" />
+        </g>
+
+        <g>
+            <path class="light-letter" mask="url(#mask_O_right)" fill-rule="evenodd" d="M 150,100 L 250,100 L 350,200 L 350,300 L 250,400 L 150,400 L 50,300 L 50,200 Z M 170.7,150 L 229.3,150 L 300,220.7 L 300,279.3 L 229.3,350 L 170.7,350 L 100,279.3 L 100,220.7 Z" />
+            <path class="light-letter" mask="url(#mask_C_right)" d="M 250,100 L 350,100 L 450,200 L 400,225 L 400,220.7 L 329.3,150 L 270.7,150 L 200,220.7 L 200,279.3 L 270.7,350 L 329.3,350 L 400,279.3 L 400,275 L 450,300 L 350,400 L 250,400 L 150,300 L 150,200 Z" />
+
+            <line class="accent" x1="211.7" y1="138.4" x2="247" y2="173.7" />
+            <line class="accent" x1="253" y1="97" x2="288.4" y2="132.4" />
+            <line class="accent" x1="288.4" y1="361.7" x2="253" y2="326.3" />
+            <line class="accent" x1="247" y1="403" x2="211.7" y2="367.7" />
+        </g>
+    </g>
+</svg>
