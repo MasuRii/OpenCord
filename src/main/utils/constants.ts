@@ -22,11 +22,26 @@ import { join } from "path";
 
 const suffix = IS_DEV ? "dev" : "";
 
-export const DATA_DIR = process.env.EQUICORD_USER_DATA_DIR ?? (
-    process.env.DISCORD_USER_DATA_DIR
-        ? join(process.env.DISCORD_USER_DATA_DIR, "..", "EquicordData", suffix)
-        : join(app.getPath("userData"), "..", "Equicord", suffix)
-);
+const getOpenCordDataDir = () => process.env.DISCORD_USER_DATA_DIR
+    ? join(process.env.DISCORD_USER_DATA_DIR, "..", "OpenCordData", suffix)
+    : join(app.getPath("userData"), "..", "OpenCord", suffix);
+
+const getLegacyEquicordDataDir = () => process.env.DISCORD_USER_DATA_DIR
+    ? join(process.env.DISCORD_USER_DATA_DIR, "..", "EquicordData", suffix)
+    : join(app.getPath("userData"), "..", "Equicord", suffix);
+
+const resolveDataDir = () => {
+    if (process.env.OPENCORD_USER_DATA_DIR) return process.env.OPENCORD_USER_DATA_DIR;
+    if (process.env.EQUICORD_USER_DATA_DIR) return process.env.EQUICORD_USER_DATA_DIR;
+
+    const openCordDir = getOpenCordDataDir();
+    const legacyEquicordDir = getLegacyEquicordDataDir();
+    return existsSync(legacyEquicordDir) && !existsSync(openCordDir)
+        ? legacyEquicordDir
+        : openCordDir;
+};
+
+export const DATA_DIR = resolveDataDir();
 
 export const SETTINGS_DIR = join(DATA_DIR, "settings");
 export const THEMES_DIR = join(DATA_DIR, "themes");
@@ -68,7 +83,7 @@ if (IS_DEV) {
                 app.relaunch();
                 app.exit(0);
             } catch (err) {
-                console.error("[Equicord] Failed to copy prod data:", err);
+                console.error("[OpenCord] Failed to copy prod data:", err);
             }
         }, 5000);
     }

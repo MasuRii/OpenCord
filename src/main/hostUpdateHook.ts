@@ -5,7 +5,7 @@
  */
 
 /**
- * re-applies the equicord patch to a freshly installed discord host
+ * re-applies the OpenCord patch to a freshly installed discord host
  * version at the moment the native updater finishes writing it.
  *
  * hooks `discord_desktop_core.startup({ updater })` to capture the live
@@ -52,7 +52,7 @@ interface DiscordHostUpdater {
 interface DiscordUpdaterModule {
     getUpdater?(): DiscordHostUpdater | null | undefined;
     tryInitUpdater?(buildInfo: DiscordBuildInfo, repositoryUrl: string, useRustBspatch: boolean): boolean;
-    __equicordTryInitWrapped?: boolean;
+    __openCordTryInitWrapped?: boolean;
 }
 
 interface DiscordDesktopCoreStartupOpts {
@@ -62,10 +62,10 @@ interface DiscordDesktopCoreStartupOpts {
 
 interface DiscordDesktopCore {
     startup?(opts: DiscordDesktopCoreStartupOpts): void;
-    __equicordStartupWrapped?: boolean;
+    __openCordStartupWrapped?: boolean;
 }
 
-const error = (...args: unknown[]) => console.error("[Equicord:HostUpdate]", ...args);
+const error = (...args: unknown[]) => console.error("[OpenCord:HostUpdate]", ...args);
 
 const hookedUpdaters = new WeakSet<DiscordHostUpdater>();
 let hooked = false;
@@ -123,7 +123,7 @@ const resolveCommittedVersion = (updater: DiscordHostUpdater): number[] | undefi
     return undefined;
 };
 
-const retainEquicord = (updater: DiscordHostUpdater, reason: string) => {
+const retainOpenCord = (updater: DiscordHostUpdater, reason: string) => {
     try {
         const committed = resolveCommittedVersion(updater);
         const { rootPath } = updater;
@@ -158,7 +158,7 @@ const attachToUpdater = (updater: DiscordHostUpdater | null | undefined) => {
         return;
     }
 
-    updater.on?.("host-updated", () => retainEquicord(updater, "host-updated"));
+    updater.on?.("host-updated", () => retainOpenCord(updater, "host-updated"));
 
     /*
      * wrap the post-update relaunch entrypoints. retain runs after the
@@ -172,7 +172,7 @@ const attachToUpdater = (updater: DiscordHostUpdater | null | undefined) => {
         const bound = sync.bind(updater);
         updater.startCurrentVersionSync = (options?: StartCurrentVersionOptions) => {
             bound(options);
-            try { retainEquicord(updater, "startCurrentVersionSync"); } catch (e) { error(e); }
+            try { retainOpenCord(updater, "startCurrentVersionSync"); } catch (e) { error(e); }
         };
     }
     const async_ = updater.startCurrentVersion;
@@ -180,14 +180,14 @@ const attachToUpdater = (updater: DiscordHostUpdater | null | undefined) => {
         const bound = async_.bind(updater);
         updater.startCurrentVersion = async (queryOptions?: object, options?: StartCurrentVersionOptions) => {
             await bound(queryOptions, options);
-            try { retainEquicord(updater, "startCurrentVersion"); } catch (e) { error(e); }
+            try { retainOpenCord(updater, "startCurrentVersion"); } catch (e) { error(e); }
         };
     }
 };
 
 const wrapStartup = (coreExports: DiscordDesktopCore | null | undefined) => {
-    if (!coreExports?.startup || coreExports.__equicordStartupWrapped) return;
-    coreExports.__equicordStartupWrapped = true;
+    if (!coreExports?.startup || coreExports.__openCordStartupWrapped) return;
+    coreExports.__openCordStartupWrapped = true;
 
     const origStartup = coreExports.startup;
     coreExports.startup = function (opts, ...rest) {
@@ -196,12 +196,12 @@ const wrapStartup = (coreExports: DiscordDesktopCore | null | undefined) => {
             const inst = updaterModule?.getUpdater?.();
             if (inst) {
                 attachToUpdater(inst);
-            } else if (typeof updaterModule?.tryInitUpdater === "function" && !updaterModule.__equicordTryInitWrapped) {
+            } else if (typeof updaterModule?.tryInitUpdater === "function" && !updaterModule.__openCordTryInitWrapped) {
                 /*
                  * updater not yet constructed at startup time. wrap the
                  * factory so we attach once vanilla creates it.
                  */
-                updaterModule.__equicordTryInitWrapped = true;
+                updaterModule.__openCordTryInitWrapped = true;
                 const origTry = updaterModule.tryInitUpdater.bind(updaterModule);
                 updaterModule.tryInitUpdater = (buildInfo, repositoryUrl, useRustBspatch) => {
                     const ok = origTry(buildInfo, repositoryUrl, useRustBspatch);
