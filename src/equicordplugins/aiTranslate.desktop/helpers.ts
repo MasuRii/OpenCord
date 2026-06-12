@@ -26,7 +26,7 @@ export interface ContentCacheKeySettings {
     systemPrompt?: string;
 }
 
-export type TranslationStatus = "translating" | "sent" | "failed" | "rateLimited";
+export type TranslationStatus = "sent" | "failed" | "rateLimited";
 
 export const DEFAULT_OPENCODE_ZEN_MODEL = "big-pickle";
 export const OPENCODE_ZEN_CHAT_COMPLETIONS_ENDPOINT = "https://opencode.ai/zen/v1/chat/completions";
@@ -36,17 +36,15 @@ const GENERATION_CONTROLS = {
     temperature: 1,
     reasoning_effort: "none",
 } as const;
+const FREE_MODEL_TOKEN = /(?:^|[-_/:.])free(?:$|[-_/:.])/;
+const NOT_FREE_MODEL_TOKEN = /(?:^|[-_/:.])not[-_/:.]?free(?:$|[-_/:.])/;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function applyTargetLanguage(systemPrompt: string, targetLanguage: string): string {
     return systemPrompt.replace(/{{target_language}}/g, targetLanguage);
-}
-
-function normalizeCacheContent(content: string): string {
-    return content.trim().replace(/\s+/g, " ");
 }
 
 function normalizeScriptLanguage(language: string): string {
@@ -65,19 +63,46 @@ function normalizeScriptLanguage(language: string): string {
     return "Unknown";
 }
 
-function detectLanguageScript(content: string): string {
-    if (/\p{Script=Hiragana}|\p{Script=Katakana}/u.test(content)) return "Japanese";
-    if (/\p{Script=Hangul}/u.test(content)) return "Korean";
-    if (/\p{Script=Han}/u.test(content)) return "Chinese";
-    if (/\p{Script=Cyrillic}/u.test(content)) return "Cyrillic";
-    if (/\p{Script=Arabic}/u.test(content)) return "Arabic";
-    if (/\p{Script=Hebrew}/u.test(content)) return "Hebrew";
-    if (/\p{Script=Thai}/u.test(content)) return "Thai";
-    if (/\p{Script=Devanagari}/u.test(content)) return "Devanagari";
-    if (/\p{Script=Bengali}/u.test(content)) return "Bengali";
-    if (/\p{Script=Greek}/u.test(content)) return "Greek";
+function stripIgnoredContent(content: string): string {
+    return content
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/```[\s\S]*$/g, " ")
+        .replace(/`[^`\n]*`/g, " ")
+        .replace(/<a?:[A-Za-z0-9_]+:\d+>/g, " ")
+        .replace(/<(?:@!?|@&|#)\d+>/g, " ")
+        .replace(/<t:\d+(?::[tTdDfFR])?>/g, " ")
+        .replace(/\b(?:https?:\/\/|discord:\/\/|(?:cdn|media)\.discordapp\.(?:com|net)\/)\S+/gi, " ")
+        .replace(/\p{Extended_Pictographic}/gu, " ")
+        .replace(/\p{Regional_Indicator}/gu, " ")
+        .replace(/\p{Emoji_Modifier}/gu, " ")
+        .replace(/\u200D/g, " ")
+        .replace(/\u20E3/g, " ")
+        .replace(/[\uFE0E\uFE0F]/g, " ")
+        .replace(/[`*_~|>#[\](){}.,!?;:'"\\/@$%^&+=…—–-]/g, " ")
+        .trim();
+}
 
-    return "Unknown";
+function isLetterInTargetScript(char: string, targetScript: string): boolean {
+    if (targetScript === "Chinese") return /\p{Script=Han}/u.test(char);
+    if (targetScript === "Japanese") return /\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Han}/u.test(char);
+    if (targetScript === "Korean") return /\p{Script=Hangul}/u.test(char);
+    if (targetScript === "Cyrillic") return /\p{Script=Cyrillic}/u.test(char);
+    if (targetScript === "Arabic") return /\p{Script=Arabic}/u.test(char);
+    if (targetScript === "Hebrew") return /\p{Script=Hebrew}/u.test(char);
+    if (targetScript === "Thai") return /\p{Script=Thai}/u.test(char);
+    if (targetScript === "Devanagari") return /\p{Script=Devanagari}/u.test(char);
+    if (targetScript === "Bengali") return /\p{Script=Bengali}/u.test(char);
+    if (targetScript === "Greek") return /\p{Script=Greek}/u.test(char);
+
+    return false;
+}
+
+function hasLetterOutsideTargetScript(content: string, targetScript: string): boolean {
+    for (const char of content) {
+        if (/\p{L}/u.test(char) && !isLetterInTargetScript(char, targetScript)) return true;
+    }
+
+    return false;
 }
 
 function getResponseDetail(responseBody: string): string {
@@ -101,7 +126,9 @@ function getResponseDetail(responseBody: string): string {
 
 export function isOpenCodeFreeModel(model: string): boolean {
     const normalized = model.trim().toLowerCase();
-    return normalized === DEFAULT_OPENCODE_ZEN_MODEL || normalized.includes("free");
+    if (!normalized || NOT_FREE_MODEL_TOKEN.test(normalized)) return false;
+
+    return normalized === DEFAULT_OPENCODE_ZEN_MODEL || FREE_MODEL_TOKEN.test(normalized);
 }
 
 export function parseOpenCodeFreeModelsResponse(responseBody: string): string[] {
@@ -127,44 +154,21 @@ export function parseOpenCodeFreeModelsResponse(responseBody: string): string[] 
     });
 }
 
-export function hasTranslatableContent(content: string): boolean {
-    const text = content
-        .replace(/<a?:[A-Za-z0-9_]+:\d+>/g, " ")
-        .replace(/<(?:@!?|@&|#)\d+>/g, " ")
-        .replace(/<t:\d+(?::[tTdDfFR])?>/g, " ")
-        .replace(/<\/[^:>]+:\d+>/g, " ")
-        .replace(/\b(?:https?:\/\/|discord:\/\/|(?:cdn|media)\.discordapp\.(?:com|net)\/)\S+/gi, " ")
-        .replace(/\p{Extended_Pictographic}/gu, " ")
-        .replace(/\p{Regional_Indicator}/gu, " ")
-        .replace(/\p{Emoji_Modifier}/gu, " ")
-        .replace(/\u200D/g, " ")
-        .replace(/\u20E3/g, " ")
-        .replace(/[\uFE0E\uFE0F]/g, " ")
-        .replace(/[`*_~|>#[\](){}.,!?;:'"\\/@$%^&+=…—–-]/g, " ")
-        .trim();
-
-    return /\p{L}/u.test(text);
-}
-
 export function shouldTranslateOutgoingContent(content: string, targetLanguage: string, enabled = true): boolean {
-    if (!enabled || !hasTranslatableContent(content)) return false;
+    const text = stripIgnoredContent(content);
+    if (!enabled || !/\p{L}/u.test(text)) return false;
 
     const targetScript = normalizeScriptLanguage(targetLanguage);
     if (targetScript === "Unknown") return true;
 
-    return detectLanguageScript(content) !== targetScript;
-}
-
-export function buildJsonHeaders(): Record<string, string> {
-    return { "Content-Type": "application/json" };
+    return hasLetterOutsideTargetScript(text, targetScript);
 }
 
 export function getAutoTranslateToggleLabel(enabled: boolean): string {
-    return enabled ? "AI outgoing translate is on." : "AI outgoing translate is off.";
+    return enabled ? "AI outgoing translate is on. Messages will be sent to OpenCode Zen." : "AI outgoing translate is off.";
 }
 
 export function getTranslationStatusMessage(status: TranslationStatus, retryMs = 0): string {
-    if (status === "translating") return "Translating your message.";
     if (status === "sent") return "Translated message sent.";
     if (status === "failed") return "Translation failed, so the message was not sent.";
 
@@ -174,7 +178,7 @@ export function getTranslationStatusMessage(status: TranslationStatus, retryMs =
 export function getContentCacheKey(content: string, settings: ContentCacheKeySettings): string {
     return JSON.stringify([
         "ai-translate-outgoing-v1",
-        normalizeCacheContent(content),
+        content,
         settings.model.trim(),
         settings.targetLanguage.trim(),
         settings.systemPrompt ?? "",
@@ -239,7 +243,7 @@ export function getGenerationControlsRetryPayload(responseBody: string, payload:
     return JSON.stringify(retryPayload);
 }
 
-export function stripReasoningText(text: string): string {
+function stripReasoningText(text: string): string {
     return text
         .replace(/^\s*<(thought|thinking|think|analysis)>[\s\S]*?<\/\1>\s*/i, "")
         .replace(/^\s*<(thought|thinking|think|analysis)>[\s\S]*?$/i, "")

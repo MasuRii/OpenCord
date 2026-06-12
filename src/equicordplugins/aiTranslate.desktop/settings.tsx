@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings, SettingsStore } from "@api/Settings";
+import { definePluginSettings } from "@api/Settings";
 import { Logger } from "@utils/Logger";
 import { classes } from "@utils/misc";
 import { OptionType, type PluginNative, type PluginSettingComponentProps } from "@utils/types";
@@ -13,10 +13,9 @@ import { React, Select, useEffect, useState } from "@webpack/common";
 import { DEFAULT_OPENCODE_ZEN_MODEL, DEFAULT_SYSTEM_PROMPT, isOpenCodeFreeModel, parseOpenCodeFreeModelsResponse } from "./helpers";
 
 const DEFAULT_TARGET_LANGUAGE = "Chinese (Simplified)";
-const MODEL_KEYS: Array<"model"> = ["model"];
+const MODEL_KEYS = ["model"] satisfies Array<"model">;
 const logger = new Logger("AITranslate");
 const Native = VencordNative.pluginHelpers.AITranslate as PluginNative<typeof import("./native")>;
-const removedSettings = ["endpoint", "apiKey", "modelDiscovery", "endpointTest"] as const;
 
 type ModelDiscoveryState = "loading" | "success" | "failure";
 
@@ -138,49 +137,30 @@ function OpenCodeModelSelector({ setValue }: PluginSettingComponentProps) {
         return () => { mounted = false; };
     }, [setValue]);
 
-    return React.createElement(
-        "div",
-        { className: "vc-aitrans-model-select" },
-        React.createElement(
-            "div",
-            { className: "vc-aitrans-settings-label" },
-            React.createElement("div", { className: "vc-aitrans-settings-title" }, "OpenCode Zen model"),
-            React.createElement("div", { className: "vc-aitrans-settings-description" }, "Automatically fetches free OpenCode Zen models. Messages are sent to OpenCode Zen for translation.")
-        ),
-        React.createElement(Select, {
-            placeholder: "Select a free model",
-            options: state.models.map((freeModel: string) => ({ label: freeModel, value: freeModel })),
-            maxVisibleItems: 5,
-            closeOnSelect: true,
-            select: (value: string) => setValue(value),
-            isSelected: (value: string) => value === selectedModel,
-            serialize: (value: string) => value,
-        }),
-        state.message && React.createElement(
-            "div",
-            { "aria-live": "polite", className: getSettingsResultClassName(state.type) },
-            state.message
-        )
+    return (
+        <div className="vc-aitrans-model-select">
+            <div className="vc-aitrans-settings-label">
+                <div className="vc-aitrans-settings-title">OpenCode Zen model</div>
+                <div className="vc-aitrans-settings-description">
+                    Automatically fetches free OpenCode Zen models. Messages are sent to OpenCode Zen for translation.
+                </div>
+            </div>
+            <Select
+                placeholder="Select a free model"
+                options={state.models.map((freeModel: string) => ({ label: freeModel, value: freeModel }))}
+                maxVisibleItems={5}
+                closeOnSelect={true}
+                select={(value: string) => setValue(value)}
+                isSelected={(value: string) => value === selectedModel}
+                serialize={(value: string) => value}
+            />
+            {state.message ? (
+                <div aria-live="polite" className={getSettingsResultClassName(state.type)}>
+                    {state.message}
+                </div>
+            ) : null}
+        </div>
     );
-}
-
-const pluginSettings = SettingsStore.plain.plugins.AITranslate;
-if (pluginSettings) {
-    let changed = false;
-
-    for (const setting of removedSettings) {
-        if (Object.hasOwn(pluginSettings, setting)) {
-            delete pluginSettings[setting];
-            changed = true;
-        }
-    }
-
-    if (typeof pluginSettings.model !== "string" || !isOpenCodeFreeModel(pluginSettings.model)) {
-        pluginSettings.model = DEFAULT_OPENCODE_ZEN_MODEL;
-        changed = true;
-    }
-
-    if (changed) SettingsStore.markAsChanged();
 }
 
 export const settings = definePluginSettings({
@@ -191,7 +171,7 @@ export const settings = definePluginSettings({
     },
     autoTranslate: {
         type: OptionType.BOOLEAN,
-        description: "Translate your messages before Discord sends them.",
+        description: "Send your message content to OpenCode Zen and translate it before Discord sends it.",
         default: false,
     },
     targetLanguage: {
