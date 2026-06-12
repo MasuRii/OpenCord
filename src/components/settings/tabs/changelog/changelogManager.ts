@@ -30,12 +30,31 @@ export interface UpdateSession {
 
 export type ChangelogHistory = UpdateSession[];
 
-const CHANGELOG_HISTORY_KEY = "EquicordChangelog_History";
-const LAST_SEEN_HASH_KEY = "EquicordChangelog_LastSeenHash";
-const KNOWN_PLUGINS_KEY = "EquicordChangelog_KnownPlugins";
-const KNOWN_SETTINGS_KEY = "EquicordChangelog_KnownSettings";
-const LAST_REPO_CHECK_KEY = "EquicordChangelog_LastRepoCheck";
+const CHANGELOG_HISTORY_KEY = "OpenCordChangelog_History";
+const LAST_SEEN_HASH_KEY = "OpenCordChangelog_LastSeenHash";
+const KNOWN_PLUGINS_KEY = "OpenCordChangelog_KnownPlugins";
+const KNOWN_SETTINGS_KEY = "OpenCordChangelog_KnownSettings";
+const LAST_REPO_CHECK_KEY = "OpenCordChangelog_LastRepoCheck";
+const LEGACY_CHANGELOG_HISTORY_KEY = "EquicordChangelog_History";
+const LEGACY_LAST_SEEN_HASH_KEY = "EquicordChangelog_LastSeenHash";
+const LEGACY_KNOWN_PLUGINS_KEY = "EquicordChangelog_KnownPlugins";
+const LEGACY_KNOWN_SETTINGS_KEY = "EquicordChangelog_KnownSettings";
+const LEGACY_LAST_REPO_CHECK_KEY = "EquicordChangelog_LastRepoCheck";
 const GITHUB_COMPARE_ENDPOINT = "https://api.github.com/repos";
+
+async function getWithLegacyKey<T>(key: string, legacyKey: string): Promise<T | undefined> {
+    const value = await DataStore.get<T>(key);
+    if (value !== undefined) return value;
+
+    const legacyValue = await DataStore.get<T>(legacyKey);
+    if (legacyValue !== undefined) await DataStore.set(key, legacyValue);
+    return legacyValue;
+}
+
+async function deleteWithLegacyKey(key: string, legacyKey: string): Promise<void> {
+    await DataStore.del(key);
+    await DataStore.del(legacyKey);
+}
 
 type KnownPluginSettingsMap = Map<string, Set<string>>;
 
@@ -198,9 +217,10 @@ export function getNewSettingsEntries(
 }
 
 export async function getChangelogHistory(): Promise<ChangelogHistory> {
-    const history = (await DataStore.get(
+    const history = await getWithLegacyKey<ChangelogHistory>(
         CHANGELOG_HISTORY_KEY,
-    )) as ChangelogHistory;
+        LEGACY_CHANGELOG_HISTORY_KEY,
+    );
 
     if (history) {
         history.forEach(session => {
@@ -307,7 +327,7 @@ export async function saveUpdateSession(
 }
 
 export async function getLastSeenHash(): Promise<string | null> {
-    return (await DataStore.get(LAST_SEEN_HASH_KEY)) as string | null;
+    return (await getWithLegacyKey<string>(LAST_SEEN_HASH_KEY, LEGACY_LAST_SEEN_HASH_KEY)) ?? null;
 }
 
 export async function setLastSeenHash(hash: string): Promise<void> {
@@ -315,7 +335,7 @@ export async function setLastSeenHash(hash: string): Promise<void> {
 }
 
 export async function getKnownPlugins(): Promise<Set<string>> {
-    const known = (await DataStore.get(KNOWN_PLUGINS_KEY)) as string[];
+    const known = await getWithLegacyKey<string[]>(KNOWN_PLUGINS_KEY, LEGACY_KNOWN_PLUGINS_KEY);
     return new Set(known || []);
 }
 
@@ -338,7 +358,7 @@ function getCurrentSettings(pluginList: string[]): KnownPluginSettingsMap {
 }
 
 export async function getKnownSettings(): Promise<KnownPluginSettingsMap> {
-    const mapData = (await DataStore.get(KNOWN_SETTINGS_KEY)) as any;
+    const mapData = await getWithLegacyKey<any>(KNOWN_SETTINGS_KEY, LEGACY_KNOWN_SETTINGS_KEY);
     if (mapData === undefined) {
         const knownPlugins = await getKnownPlugins();
         const pluginNames = [
@@ -441,9 +461,9 @@ export async function getUpdatedPlugins(): Promise<string[]> {
 }
 
 export async function clearChangelogHistory(): Promise<void> {
-    await DataStore.del(CHANGELOG_HISTORY_KEY);
-    await DataStore.del(LAST_SEEN_HASH_KEY);
-    await DataStore.del(KNOWN_SETTINGS_KEY);
+    await deleteWithLegacyKey(CHANGELOG_HISTORY_KEY, LEGACY_CHANGELOG_HISTORY_KEY);
+    await deleteWithLegacyKey(LAST_SEEN_HASH_KEY, LEGACY_LAST_SEEN_HASH_KEY);
+    await deleteWithLegacyKey(KNOWN_SETTINGS_KEY, LEGACY_KNOWN_SETTINGS_KEY);
 }
 
 export async function clearIndividualLog(logId: string): Promise<void> {
@@ -463,7 +483,7 @@ export async function initializeChangelog(): Promise<void> {
 }
 
 export async function getLastRepositoryCheckHash(): Promise<string | null> {
-    return (await DataStore.get(LAST_REPO_CHECK_KEY)) as string | null;
+    return (await getWithLegacyKey<string>(LAST_REPO_CHECK_KEY, LEGACY_LAST_REPO_CHECK_KEY)) ?? null;
 }
 
 export async function setLastRepositoryCheckHash(hash: string): Promise<void> {
