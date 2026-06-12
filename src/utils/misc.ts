@@ -19,7 +19,7 @@
 import { User } from "@vencord/discord-types";
 import { ChannelStore, GuildMemberStore, IconUtils } from "@webpack/common";
 
-import { EQUICORD_HELPERS, EquicordDevsById, GUILD_ID, KNOWN_ISSUES_CHANNEL_ID, SUPPORT_CHANNEL_ID, VencordDevsById } from "./constants";
+import { EquicordDevsById, GUILD_ID, KNOWN_ISSUES_CHANNEL_ID, OPENCORD_HELPERS, SUPPORT_CHANNEL_ID, VencordDevsById } from "./constants";
 
 /**
  * Calls .join(" ") on the arguments
@@ -106,13 +106,16 @@ export function tryOrElse<T>(func: () => T, fallback: T): T {
     }
 }
 
-export function isEquicordGuild(id: string | null | undefined, isGuildId: boolean = false): boolean {
+export function isOpenCordGuild(id: string | null | undefined, isGuildId: boolean = false): boolean {
     if (!id) return false;
     if (isGuildId) return id === GUILD_ID;
     const channel = ChannelStore.getChannel(id);
     if (!channel) return false;
     return channel.guild_id === GUILD_ID;
 }
+
+/** @deprecated Use {@link isOpenCordGuild}. */
+export const isEquicordGuild = isOpenCordGuild;
 
 export function isSupportChannel(channelId: string | null | undefined): boolean {
     if (!channelId) return false;
@@ -124,13 +127,16 @@ export function isKnownIssuesCategory(channelId: string | null | undefined): boo
     return channelId === KNOWN_ISSUES_CHANNEL_ID;
 }
 
-export function isEquicordSupport(userId: string | null | undefined): boolean {
+export function isOpenCordSupport(userId: string | null | undefined): boolean {
     if (!userId) return false;
 
     const member = GuildMemberStore.getMember(GUILD_ID, userId);
     if (!member) return false;
-    return member.roles.includes(EQUICORD_HELPERS) || false;
+    return member.roles.includes(OPENCORD_HELPERS) || false;
 }
+
+/** @deprecated Use {@link isOpenCordSupport}. */
+export const isEquicordSupport = isOpenCordSupport;
 
 export function removeFromArray<T>(arr: T[], predicate: (e: T) => boolean) {
     const idx = arr.findIndex(predicate);
