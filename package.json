@@ -3,13 +3,13 @@
     "private": "true",
     "version": "1.14.13.3",
     "description": "The other cutest Discord client mod",
-    "homepage": "https://github.com/OpenCord/OpenCord#readme",
+    "homepage": "https://github.com/MasuRii/OpenCord#readme",
     "bugs": {
-        "url": "https://github.com/OpenCord/OpenCord/issues"
+        "url": "https://github.com/MasuRii/OpenCord/issues"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/OpenCord/OpenCord.git"
+        "url": "git+https://github.com/MasuRii/OpenCord.git"
     },
     "license": "GPL-3.0-or-later",
     "author": "OpenCord",

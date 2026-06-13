@@ -50,14 +50,6 @@ jobs:
                   echo "No new version to release (package.json ${{ steps.pkg.outputs.version }} <= latest tag ${{ steps.tag.outputs.latest }})"
                   exit 0
 
-            - name: Create Tag
-              if: steps.check.outputs.release == 'true'
-              uses: butlerlogic/action-autotag@1.1.2
-              env:
-                  GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-              with:
-                  tag_prefix: "v"
-
             - name: Setup PNPM
               if: steps.check.outputs.release == 'true'
               uses: pnpm/action-setup@v6
