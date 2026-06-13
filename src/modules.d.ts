@@ -22,6 +22,9 @@ declare module "~plugins" {
     export const PluginMeta: Record<string, {
         folderName: string;
         userPlugin: boolean;
+        sourceRepo?: string;
+        sourceBranch?: string;
+        sourceFolder?: string;
     }>;
     export const ExcludedPlugins: Record<string, "web" | "discordDesktop" | "vesktop" | "equibop" | "desktop" | "dev">;
 }
@@ -36,6 +39,11 @@ declare module "~git-remote" {
 }
 
 declare module "file://*" {
+    const content: string;
+    export default content;
+}
+
+declare module "file://*.png?base64" {
     const content: string;
     export default content;
 }
