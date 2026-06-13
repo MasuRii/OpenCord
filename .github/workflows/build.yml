@@ -6,7 +6,6 @@ on:
 
 env:
     FORCE_COLOR: true
-    GITHUB_TOKEN: ${{ secrets.ETOKEN }}
     REPO: Equicord/Equibored
     USERNAME: GitHub-Actions
 
@@ -52,6 +51,7 @@ jobs:
 
                   cp browser/browser.* release
                   cp OpenCord.user.{js,js.LEGAL.txt} release
+                  cp ../misc/install.sh release/install.sh
 
                   # copy the plugin data jsons, the extension zips and the desktop/equibop asars
                   cp *.{json,zip,asar} release
@@ -67,13 +67,32 @@ jobs:
                   rm release/package.json
                   rm release/*.map
 
-            - name: Upload OpenCord Stable
-              if: ${{ vars.ACT == 'false' }}
+            - name: Generate release notes
+              run: node scripts/generateReleaseNotes.mjs > dist/release-notes.md
+
+            - name: Publish GitHub release
+              env:
+                  GH_TOKEN: ${{ github.token }}
               run: |
-                  gh release upload latest --clobber dist/release/*
+                  VERSION="v$(jq -r .version < package.json)"
+
+                  if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+                      git tag "$VERSION"
+                      git push origin "$VERSION"
+                  fi
+
+                  if gh release view "$VERSION" >/dev/null 2>&1; then
+                      gh release edit "$VERSION" --title "$VERSION" --notes-file dist/release-notes.md --latest
+                  else
+                      gh release create "$VERSION" --title "$VERSION" --notes-file dist/release-notes.md --latest
+                  fi
+
+                  gh release upload "$VERSION" --clobber dist/release/*
 
             - name: Upload Plugin JSONs to Equibored repo
               if: github.repository == 'Equicord/Equicord' && vars.ACT == 'false'
+              env:
+                  GITHUB_TOKEN: ${{ secrets.ETOKEN }}
               run: |
                   git config --global user.name "GitHub-Actions"
                   git config --global user.email actions@github.com
