@@ -76,7 +76,9 @@ jobs:
               run: |
                   VERSION="v$(jq -r .version < package.json)"
 
-                  if ! git rev-parse "$VERSION" >/dev/null 2>&1; then
+                  git fetch --tags origin
+
+                  if ! git ls-remote --exit-code --tags origin "refs/tags/$VERSION" >/dev/null 2>&1; then
                       git tag "$VERSION"
                       git push origin "$VERSION"
                   fi
