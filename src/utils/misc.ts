@@ -19,7 +19,7 @@
 import { User } from "@vencord/discord-types";
 import { ChannelStore, GuildMemberStore, IconUtils } from "@webpack/common";
 
-import { EquicordDevsById, GUILD_ID, KNOWN_ISSUES_CHANNEL_ID, OPENCORD_HELPERS, SUPPORT_CHANNEL_ID, VencordDevsById } from "./constants";
+import { EquicordDevsById, EquicordPlusDevsById, EsharqDevsById, GUILD_ID, IllegalcordDevsById, KNOWN_ISSUES_CHANNEL_ID, MallCordDevsById, OPENCORD_HELPERS, SUPPORT_CHANNEL_ID, TestCordDevsById, VencordDevsById } from "./constants";
 
 /**
  * Calls .join(" ") on the arguments
@@ -78,13 +78,15 @@ export function identity<T>(value: T): T {
     return value;
 }
 
+const SourceDevsById = [VencordDevsById, EquicordDevsById, IllegalcordDevsById, TestCordDevsById, EsharqDevsById, EquicordPlusDevsById, MallCordDevsById];
+
 export const isPluginDev = (id: string) => Object.hasOwn(VencordDevsById, id);
 export const shouldShowContributorBadge = (id: string) => isPluginDev(id) && VencordDevsById[id].badge !== false;
 
 export const isEquicordPluginDev = (id: string) => Object.hasOwn(EquicordDevsById, id);
 export const shouldShowEquicordContributorBadge = (id: string) => isEquicordPluginDev(id) && EquicordDevsById[id].badge !== false;
 
-export const isAnyPluginDev = (id: string) => Object.hasOwn(VencordDevsById, id) || Object.hasOwn(EquicordDevsById, id);
+export const isAnyPluginDev = (id: string) => SourceDevsById.some(devs => Object.hasOwn(devs, id));
 
 export function pluralise(amount: number, singular: string, plural = singular + "s") {
     return amount === 1 ? `${amount} ${singular}` : `${amount} ${plural}`;
