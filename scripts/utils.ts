@@ -18,11 +18,18 @@
 
 import { Dirent, readdirSync, readFileSync, writeFileSync } from "fs";
 import { access, readFile } from "fs/promises";
-import { join, sep } from "path";
+import { dirname, join, sep } from "path";
 import { normalize as posixNormalize, sep as posixSep } from "path/posix";
-import { BigIntLiteral, createSourceFile, Identifier, isArrayLiteralExpression, isCallExpression, isExportAssignment, isIdentifier, isObjectLiteralExpression, isPropertyAccessExpression, isPropertyAssignment, isSatisfiesExpression, isStringLiteral, isVariableStatement, NamedDeclaration, NodeArray, ObjectLiteralExpression, PropertyAssignment, ScriptTarget, StringLiteral, SyntaxKind } from "typescript";
+import { BigIntLiteral, CallExpression, createSourceFile, ExportDeclaration, Expression, Identifier, isArrayLiteralExpression, isAsExpression, isBigIntLiteral, isCallExpression, isExportAssignment, isExportDeclaration, isIdentifier, isNamedExports, isNoSubstitutionTemplateLiteral, isNumericLiteral, isObjectLiteralExpression, isParenthesizedExpression, isPropertyAccessExpression, isPropertyAssignment, isSatisfiesExpression, isStringLiteral, isVariableStatement, NamedDeclaration, NodeArray, ObjectLiteralExpression, PropertyAssignment, ScriptTarget, StringLiteral, SyntaxKind } from "typescript";
 
 import { getPluginTarget } from "./utils.mjs";
+
+let syncConfig: { sources: Array<{ local_dir: string; repo: string; branch: string; upstream_dirs: string[]; }>; } | null = null;
+try {
+    syncConfig = JSON.parse(readFileSync(".github/plugin-sync-config.json", "utf8"));
+} catch {
+    syncConfig = null;
+}
 
 export interface Dev {
     name: string;
@@ -50,13 +57,34 @@ export interface PluginData {
     filePath: string;
     dirName: string;
     isModified: boolean;
+    sourceRepo?: string;
+    sourceBranch?: string;
+    sourceFolder?: string;
 }
 
 export const devs = {} as Record<string, Dev>;
 export const equicordDevs = {} as Record<string, Dev>;
+export const illegalcordDevs = {} as Record<string, Dev>;
+export const testCordDevs = {} as Record<string, Dev>;
+export const esharqDevs = {} as Record<string, Dev>;
+export const equicordPlusDevs = {} as Record<string, Dev>;
+export const mallCordDevs = {} as Record<string, Dev>;
+
+const devGroups = {
+    Devs: devs,
+    EquicordDevs: equicordDevs,
+    IllegalcordDevs: illegalcordDevs,
+    TestCordDevs: testCordDevs,
+    TestcordDevs: testCordDevs,
+    EsharqDevs: esharqDevs,
+    EquicordPlusDevs: equicordPlusDevs,
+    MallCordDevs: mallCordDevs,
+};
 
 export function getName(node: NamedDeclaration) {
-    return node.name && isIdentifier(node.name) ? node.name.text : undefined;
+    if (!node.name) return undefined;
+    if (isIdentifier(node.name) || isStringLiteral(node.name)) return node.name.text;
+    return undefined;
 }
 
 export function hasName(node: NamedDeclaration, name: string) {
@@ -69,26 +97,109 @@ export function getObjectProp(node: ObjectLiteralExpression, name: string) {
     return prop;
 }
 
-export function parseDevs() {
+function getObjectPropInitializer(node: ObjectLiteralExpression, name: string) {
+    const prop = node.properties.find(p => hasName(p, name));
+    return prop && isPropertyAssignment(prop) ? prop.initializer : undefined;
+}
+
+function unwrapExpression(node: Expression): Expression {
+    let value = node;
+
+    while (isParenthesizedExpression(value) || isAsExpression(value) || isSatisfiesExpression(value)) {
+        value = value.expression;
+    }
+
+    return value;
+}
+
+function readStaticString(node: Expression | undefined, stringConstants: Map<string, string>): string | undefined {
+    if (!node) return undefined;
+
+    const value = unwrapExpression(node);
+
+    if (isStringLiteral(value) || isNoSubstitutionTemplateLiteral(value)) return value.text;
+    if (isIdentifier(value)) return stringConstants.get(value.text);
+
+    if (isCallExpression(value)) {
+        const literalArgs = value.arguments
+            .map(arg => readStaticString(arg, stringConstants))
+            .filter((arg): arg is string => typeof arg === "string");
+
+        return literalArgs.at(-1);
+    }
+
+    return undefined;
+}
+
+function readStaticId(node: Expression | undefined): string | undefined {
+    if (!node) return undefined;
+
+    const value = unwrapExpression(node);
+
+    if (isBigIntLiteral(value)) return value.text.slice(0, -1);
+    if (isNumericLiteral(value) || isStringLiteral(value)) return value.text;
+
+    return undefined;
+}
+
+function getDefinePluginCall(node: Expression): CallExpression | undefined {
+    const value = unwrapExpression(node);
+    if (!isCallExpression(value) || !isIdentifier(value.expression) || value.expression.text !== "definePlugin") return undefined;
+    return value;
+}
+
+function getDefaultReExportModule(node: ExportDeclaration) {
+    if (!node.moduleSpecifier || !isStringLiteral(node.moduleSpecifier) || !node.exportClause || !isNamedExports(node.exportClause)) return undefined;
+
+    const exportsDefault = node.exportClause.elements.some(e => (e.propertyName ?? e.name).text === "default");
+    return exportsDefault ? node.moduleSpecifier.text : undefined;
+}
+
+async function resolveDefaultReExport(fileName: string, modulePath: string) {
+    if (!modulePath.startsWith(".")) return undefined;
+
+    const base = join(dirname(fileName), modulePath);
+    const candidates = [
+        base,
+        `${base}.ts`,
+        `${base}.tsx`,
+        `${base}.js`,
+        `${base}.jsx`,
+        join(base, "index.ts"),
+        join(base, "index.tsx")
+    ];
+
+    for (const candidate of candidates) {
+        try {
+            await access(candidate);
+            return candidate;
+        } catch { }
+    }
+
+    return undefined;
+}
+
+function parseDevGroup(groupName: keyof typeof devGroups) {
     const file = createSourceFile("constants.ts", readFileSync("src/utils/constants.ts", "utf8"), ScriptTarget.Latest);
+    const target = devGroups[groupName];
 
     for (const child of file.getChildAt(0).getChildren()) {
         if (!isVariableStatement(child)) continue;
 
-        const devsDeclaration = child.declarationList.declarations.find(d => hasName(d, "Devs"));
+        const devsDeclaration = child.declarationList.declarations.find(d => hasName(d, groupName));
         if (!devsDeclaration?.initializer || !isCallExpression(devsDeclaration.initializer)) continue;
 
         const value = devsDeclaration.initializer.arguments[0];
 
-        if (!isSatisfiesExpression(value) || !isObjectLiteralExpression(value.expression)) throw new Error("Failed to parse devs: not an object literal");
+        if (!isSatisfiesExpression(value) || !isObjectLiteralExpression(value.expression)) throw new Error(`Failed to parse ${groupName}: not an object literal`);
 
         for (const prop of value.expression.properties) {
             const name = (prop.name as Identifier).text;
             const value = isPropertyAssignment(prop) ? prop.initializer : prop;
 
-            if (!isObjectLiteralExpression(value)) throw new Error(`Failed to parse devs: ${name} is not an object literal`);
+            if (!isObjectLiteralExpression(value)) throw new Error(`Failed to parse ${groupName}: ${name} is not an object literal`);
 
-            devs[name] = {
+            target[name] = {
                 name: (getObjectProp(value, "name") as StringLiteral).text,
                 id: (getObjectProp(value, "id") as BigIntLiteral).text.slice(0, -1)
             };
@@ -97,54 +208,85 @@ export function parseDevs() {
         return;
     }
 
-    throw new Error("Could not find Devs constant");
+    throw new Error(`Could not find ${groupName} constant`);
+}
+
+export function parseDevs() {
+    parseDevGroup("Devs");
 }
 
 export function parseEquicordDevs() {
-    const file = createSourceFile("constants.ts", readFileSync("src/utils/constants.ts", "utf8"), ScriptTarget.Latest);
-
-    for (const child of file.getChildAt(0).getChildren()) {
-        if (!isVariableStatement(child)) continue;
-
-        const devsDeclaration = child.declarationList.declarations.find(d => hasName(d, "EquicordDevs"));
-        if (!devsDeclaration?.initializer || !isCallExpression(devsDeclaration.initializer)) continue;
-
-        const value = devsDeclaration.initializer.arguments[0];
-
-        if (!isSatisfiesExpression(value) || !isObjectLiteralExpression(value.expression)) throw new Error("Failed to parse EquicordDevs: not an object literal");
-
-        for (const prop of value.expression.properties) {
-            const name = (prop.name as Identifier).text;
-            const value = isPropertyAssignment(prop) ? prop.initializer : prop;
-
-            if (!isObjectLiteralExpression(value)) throw new Error(`Failed to parse EquicordDevs: ${name} is not an object literal`);
-
-            equicordDevs[name] = {
-                name: (getObjectProp(value, "name") as StringLiteral).text,
-                id: (getObjectProp(value, "id") as BigIntLiteral).text.slice(0, -1)
-            };
-        }
-
-        return;
-    }
-
-    throw new Error("Could not find EquicordDevs constant");
+    parseDevGroup("EquicordDevs");
 }
 
-export async function parseFile(fileName: string) {
+export function parseIllegalcordDevs() {
+    parseDevGroup("IllegalcordDevs");
+}
+
+export function parseTestCordDevs() {
+    parseDevGroup("TestCordDevs");
+}
+
+export function parseEsharqDevs() {
+    parseDevGroup("EsharqDevs");
+}
+
+export function parseEquicordPlusDevs() {
+    parseDevGroup("EquicordPlusDevs");
+}
+
+export function parseMallCordDevs() {
+    parseDevGroup("MallCordDevs");
+}
+
+export async function parseFile(fileName: string, seen = new Set<string>(), entryFileName = fileName) {
     const file = createSourceFile(fileName, await readFile(fileName, "utf8"), ScriptTarget.Latest);
 
     const fail = (reason: string) => {
-        return new Error(`Invalid plugin ${fileName}, because ${reason}`);
+        return new Error(`Invalid plugin ${entryFileName}, because ${reason}`);
     };
 
+    if (seen.has(fileName)) throw fail("default re-export cycle detected");
+    seen.add(fileName);
+
+    const stringConstants = new Map<string, string>();
+    const pluginDefinitions = new Map<string, CallExpression>();
+
     for (const node of file.getChildAt(0).getChildren()) {
-        if (!isExportAssignment(node) || !isCallExpression(node.expression)) continue;
+        if (!isVariableStatement(node)) continue;
 
-        const call = node.expression;
-        if (!isIdentifier(call.expression) || call.expression.text !== "definePlugin") continue;
+        for (const declaration of node.declarationList.declarations) {
+            if (!isIdentifier(declaration.name) || !declaration.initializer) continue;
 
-        const pluginObj = node.expression.arguments[0];
+            const stringValue = readStaticString(declaration.initializer, stringConstants);
+            if (stringValue !== undefined) stringConstants.set(declaration.name.text, stringValue);
+
+            const pluginCall = getDefinePluginCall(declaration.initializer);
+            if (pluginCall) pluginDefinitions.set(declaration.name.text, pluginCall);
+        }
+    }
+
+    for (const node of file.getChildAt(0).getChildren()) {
+        if (isExportDeclaration(node)) {
+            const modulePath = getDefaultReExportModule(node);
+            if (!modulePath) continue;
+
+            const resolved = await resolveDefaultReExport(fileName, modulePath);
+            if (!resolved) throw fail(`default re-export target ${modulePath} could not be resolved`);
+
+            return parseFile(resolved, seen, entryFileName);
+        }
+
+        if (!isExportAssignment(node)) continue;
+
+        const exportExpression = unwrapExpression(node.expression);
+        const call = getDefinePluginCall(exportExpression) ?? (isIdentifier(exportExpression) ? pluginDefinitions.get(exportExpression.text) : undefined);
+        if (!call) continue;
+
+        const pluginArg = call.arguments[0];
+        if (!pluginArg) throw fail("no object literal passed to definePlugin");
+
+        const pluginObj = unwrapExpression(pluginArg);
         if (!isObjectLiteralExpression(pluginObj)) throw fail("no object literal passed to definePlugin");
 
         const data = {
@@ -159,14 +301,16 @@ export async function parseFile(fileName: string) {
 
         for (const prop of pluginObj.properties) {
             const key = getName(prop);
-            const value = isPropertyAssignment(prop) ? prop.initializer : prop;
+            const value = isPropertyAssignment(prop) ? prop.initializer : prop as unknown as Expression;
 
             switch (key) {
                 case "name":
-                case "description":
-                    if (!isStringLiteral(value)) throw fail(`${key} is not a string literal`);
-                    data[key] = value.text;
+                case "description": {
+                    const stringValue = readStaticString(value, stringConstants);
+                    if (stringValue === undefined) throw fail(`${key} is not a static string`);
+                    data[key] = stringValue;
                     break;
+                }
                 case "patches":
                     data.hasPatches = true;
                     break;
@@ -182,13 +326,14 @@ export async function parseFile(fileName: string) {
                                     isPropertyAssignment(p) && isIdentifier(p.name) && p.name.escapedText === "description"
                                 );
                                 if (!nameProperty || !descriptionProperty) throw fail("command missing required properties");
-                                const name = isStringLiteral(nameProperty.initializer) ? nameProperty.initializer.text : "";
-                                const description = isStringLiteral(descriptionProperty.initializer) ? descriptionProperty.initializer.text : "";
+                                const name = readStaticString(nameProperty.initializer, stringConstants) ?? "";
+                                const description = readStaticString(descriptionProperty.initializer, stringConstants) ?? "";
                                 return { name, description };
                             } else if (isCallExpression(e) && isIdentifier(e.expression)) {
                                 const [nameArg] = e.arguments;
-                                if (!isStringLiteral(nameArg)) throw fail("first argument must be a string");
-                                return { name: nameArg.text, description: "" };
+                                const name = readStaticString(nameArg, stringConstants);
+                                if (name === undefined) throw fail("first argument must be a string");
+                                return { name, description: "" };
                             } else if (e.kind === SyntaxKind.SpreadElement) {
                                 return undefined;
                             }
@@ -203,25 +348,42 @@ export async function parseFile(fileName: string) {
                 case "authors":
                     if (!isArrayLiteralExpression(value)) throw fail("authors is not an array literal");
                     data.authors = value.elements.map(e => {
-                        if (!isPropertyAccessExpression(e)) throw fail("authors array contains non-property access expressions");
-                        const d = devs[getName(e)!] || equicordDevs[getName(e)!];
-                        if (!d) throw fail(`couldn't look up author ${getName(e)}`);
-                        return d;
+                        const authorValue = unwrapExpression(e);
+
+                        if (isPropertyAccessExpression(authorValue)) {
+                            const authorName = getName(authorValue)!;
+                            const groupName = isIdentifier(authorValue.expression) ? authorValue.expression.text : undefined;
+                            const sourceGroup = groupName ? devGroups[groupName as keyof typeof devGroups] : undefined;
+                            const d = sourceGroup?.[authorName] ?? Object.values(devGroups).find(group => group[authorName])?.[authorName];
+
+                            if (!d) throw fail(`couldn't look up author ${authorName}`);
+                            return d;
+                        }
+
+                        if (isObjectLiteralExpression(authorValue)) {
+                            const name = readStaticString(getObjectPropInitializer(authorValue, "name"), stringConstants);
+                            const id = readStaticId(getObjectPropInitializer(authorValue, "id"));
+                            if (!name || id === undefined) throw fail("author object is missing static name or id");
+                            return { name, id };
+                        }
+
+                        throw fail("authors array contains invalid elements");
                     });
                     break;
                 case "tags":
                 case "searchTerms":
                     if (!isArrayLiteralExpression(value)) throw fail(`${key} is not an array literal`);
                     data[key] = value.elements.map(e => {
-                        if (!isStringLiteral(e)) throw fail(`${key} array contains non-string literals`);
-                        return e.text;
+                        const stringValue = readStaticString(e, stringConstants);
+                        if (stringValue === undefined) throw fail(`${key} array contains non-string literals`);
+                        return stringValue;
                     });
                     break;
                 case "dependencies":
                     if (!isArrayLiteralExpression(value)) throw fail("dependencies is not an array literal");
                     const { elements } = value;
-                    if (elements.some(e => !isStringLiteral(e))) throw fail("dependencies array contains non-string elements");
-                    data.dependencies = (elements as NodeArray<StringLiteral>).map(e => e.text);
+                    if (elements.some(e => readStaticString(e, stringConstants) === undefined)) throw fail("dependencies array contains non-string elements");
+                    data.dependencies = (elements as NodeArray<StringLiteral>).map(e => readStaticString(e, stringConstants)!);
                     break;
                 case "required":
                 case "isModified":
@@ -233,24 +395,32 @@ export async function parseFile(fileName: string) {
 
         if (!data.name || !data.description || !data.authors) throw fail("name, description or authors are missing");
 
-        const target = getPluginTarget(fileName);
+        const target = getPluginTarget(entryFileName);
         if (target) {
             if (!["web", "discordDesktop", "vesktop", "equibop", "desktop", "dev"].includes(target)) throw fail(`invalid target ${target}`);
             data.target = target as any;
         }
 
-        data.filePath = posixNormalize(fileName)
+        data.filePath = posixNormalize(entryFileName)
             .split(sep)
             .join(posixSep)
             .replace(/\/index\.([jt]sx?)$/, "");
 
-        data.dirName = posixNormalize(fileName)
+        data.dirName = posixNormalize(entryFileName)
             .split(sep)
             .join(posixSep)
             .replace(/\/index\.([jt]sx?)$/, "")
-            .replace(/^src\/plugins\//, "")
-            .replace(/^src\/equicordplugins\//, "")
-            .replace(/^src\/opencordplugins\//, "");
+            .replace(/^src\/(?:plugins|equicordplugins|opencordplugins|illegalcordplugins|testcordplugins|esharqplugins|equicordplusplugins|mallcordplugins)\//, "");
+
+        if (syncConfig) {
+            const normalizedPath = posixNormalize(entryFileName).replace(/\\/g, "/");
+            const source = syncConfig.sources.find(s => normalizedPath.startsWith(s.local_dir + "/"));
+            if (source) {
+                data.sourceRepo = source.repo;
+                data.sourceBranch = source.branch;
+                data.sourceFolder = source.upstream_dirs[0];
+            }
+        }
 
         return [data] as const;
     }
