@@ -16,18 +16,32 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { existsSync, readdirSync, writeFileSync } from "fs";
-import { getEntryPoint, isPluginFile, parseDevs, parseEquicordDevs, parseFile, PluginData } from "./utils";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { getEntryPoint, isPluginFile, parseDevs, parseEquicordDevs, parseEquicordPlusDevs, parseEsharqDevs, parseFile, parseIllegalcordDevs, parseMallCordDevs, parseTestCordDevs, PluginData } from "./utils";
 
 (async () => {
+    // Load plugin sync config so provider metadata is preserved in generated JSON
+    const syncConfig = JSON.parse(readFileSync(".github/plugin-sync-config.json", "utf-8"));
+    if (!syncConfig.sources) throw new Error("Invalid plugin-sync-config.json");
+
     parseDevs();
     parseEquicordDevs();
+    parseIllegalcordDevs();
+    parseTestCordDevs();
+    parseEsharqDevs();
+    parseEquicordPlusDevs();
+    parseMallCordDevs();
 
     const args = process.argv.slice(2);
 
     const equicordFlag = args.includes("--equicord");
     const opencordFlag = args.includes("--opencord");
     const vencordFlag = args.includes("--vencord");
+    const illegalcordFlag = args.includes("--illegalcord");
+    const testCordFlag = args.includes("--testcord");
+    const esharqFlag = args.includes("--esharq");
+    const equicordPlusFlag = args.includes("--equicordplus");
+    const mallCordFlag = args.includes("--mallcord");
 
     let dirs: string[];
 
@@ -37,8 +51,27 @@ import { getEntryPoint, isPluginFile, parseDevs, parseEquicordDevs, parseFile, P
         dirs = ["src/opencordplugins/_core", "src/opencordplugins"];
     } else if (vencordFlag) {
         dirs = ["src/plugins", "src/plugins/_core"];
+    } else if (illegalcordFlag) {
+        dirs = ["src/illegalcordplugins/_core", "src/illegalcordplugins"];
+    } else if (testCordFlag) {
+        dirs = ["src/testcordplugins/_core", "src/testcordplugins"];
+    } else if (esharqFlag) {
+        dirs = ["src/esharqplugins/_core", "src/esharqplugins"];
+    } else if (equicordPlusFlag) {
+        dirs = ["src/equicordplusplugins/_core", "src/equicordplusplugins"];
+    } else if (mallCordFlag) {
+        dirs = ["src/mallcordplugins/_core", "src/mallcordplugins"];
     } else {
-        dirs = ["src/plugins", "src/plugins/_core", "src/equicordplugins/_core", "src/equicordplugins", "src/opencordplugins/_core", "src/opencordplugins"];
+        dirs = [
+            "src/plugins", "src/plugins/_core",
+            "src/equicordplugins/_core", "src/equicordplugins",
+            "src/opencordplugins/_core", "src/opencordplugins",
+            "src/illegalcordplugins/_core", "src/illegalcordplugins",
+            "src/testcordplugins/_core", "src/testcordplugins",
+            "src/esharqplugins/_core", "src/esharqplugins",
+            "src/equicordplusplugins/_core", "src/equicordplusplugins",
+            "src/mallcordplugins/_core", "src/mallcordplugins"
+        ];
     }
 
     dirs = dirs.filter(existsSync);
