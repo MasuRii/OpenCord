@@ -43,6 +43,8 @@ jobs:
 
             - name: Update README metrics
               run: node scripts/updateReadmeMetrics.mjs
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
 
             - name: Detect changes
               id: diff
