@@ -104,6 +104,11 @@ const enum SearchStatus {
     OPENCORD,
     EQUICORD,
     VENCORD,
+    ILLEGALCORD,
+    TESTCORD,
+    ESHARQ,
+    EQUICORDPLUS,
+    MALLCORD,
     NEW,
     USER_PLUGINS,
     API_PLUGINS
@@ -226,6 +231,21 @@ export default function PluginSettings() {
                 break;
             case SearchStatus.VENCORD:
                 if (!PluginMeta[plugin.name].folderName.startsWith("src/plugins/")) return false;
+                break;
+            case SearchStatus.ILLEGALCORD:
+                if (!PluginMeta[plugin.name].folderName.startsWith("src/illegalcordplugins/")) return false;
+                break;
+            case SearchStatus.TESTCORD:
+                if (!PluginMeta[plugin.name].folderName.startsWith("src/testcordplugins/")) return false;
+                break;
+            case SearchStatus.ESHARQ:
+                if (!PluginMeta[plugin.name].folderName.startsWith("src/esharqplugins/")) return false;
+                break;
+            case SearchStatus.EQUICORDPLUS:
+                if (!PluginMeta[plugin.name].folderName.startsWith("src/equicordplusplugins/")) return false;
+                break;
+            case SearchStatus.MALLCORD:
+                if (!PluginMeta[plugin.name].folderName.startsWith("src/mallcordplugins/")) return false;
                 break;
             case SearchStatus.NEW:
                 if (!newPluginsSet?.has(plugin.name)) return false;
@@ -428,6 +448,11 @@ export default function PluginSettings() {
                             { label: "Show OpenCord", value: SearchStatus.OPENCORD },
                             { label: "Show Equicord", value: SearchStatus.EQUICORD },
                             { label: "Show Vencord", value: SearchStatus.VENCORD },
+                            { label: "Show Illegalcord", value: SearchStatus.ILLEGALCORD },
+                            { label: "Show TestCord", value: SearchStatus.TESTCORD },
+                            { label: "Show Esharq", value: SearchStatus.ESHARQ },
+                            { label: "Show EquicordPlus", value: SearchStatus.EQUICORDPLUS },
+                            { label: "Show MallCord", value: SearchStatus.MALLCORD },
                             { label: "Show New", value: SearchStatus.NEW },
                             hasUserPlugins && { label: "Show UserPlugins", value: SearchStatus.USER_PLUGINS },
                             { label: "Show API Plugins", value: SearchStatus.API_PLUGINS },
