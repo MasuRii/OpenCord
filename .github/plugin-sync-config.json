@@ -1,0 +1,48 @@
+{
+    "sources": [
+        {
+            "name": "illegalcord",
+            "repo": "ImHisako/Illegalcord",
+            "branch": "main",
+            "upstream_dirs": ["src/userplugins"],
+            "local_dir": "src/illegalcordplugins"
+        },
+        {
+            "name": "testcord",
+            "repo": "TestcordDev/TestCord",
+            "branch": "main",
+            "upstream_dirs": ["src/testcordplugins"],
+            "local_dir": "src/testcordplugins"
+        },
+        {
+            "name": "esharq",
+            "repo": "LOSTSTR/Esharq",
+            "branch": "main",
+            "upstream_dirs": [
+                "src/userplugins",
+                "src/equicordplugins/arabicAutoUpdater",
+                "src/equicordplugins/messageBookmarks",
+                "src/equicordplugins/personalAnalytics",
+                "src/equicordplugins/rpcStats"
+            ],
+            "local_dir": "src/esharqplugins"
+        },
+        {
+            "name": "equicordplus",
+            "repo": "Chaython/EquicordPlus",
+            "branch": "main",
+            "upstream_dirs": [
+                "src/userplugins",
+                "src/equicordplugins/viewRawVariant"
+            ],
+            "local_dir": "src/equicordplusplugins"
+        },
+        {
+            "name": "mallcord",
+            "repo": "MallCord/MallCord",
+            "branch": "main",
+            "upstream_dirs": ["src/mallcordplugins"],
+            "local_dir": "src/mallcordplugins"
+        }
+    ]
+}
