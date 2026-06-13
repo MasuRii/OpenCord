@@ -1,0 +1,63 @@
+name: Update README Metrics
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - "README.md"
+            - "package.json"
+            - "scripts/updateReadmeMetrics.mjs"
+            - "src/plugins/**"
+            - "src/equicordplugins/**"
+            - "src/testcordplugins/**"
+            - "src/illegalcordplugins/**"
+            - "src/mallcordplugins/**"
+            - "src/equicordplusplugins/**"
+            - "src/esharqplugins/**"
+            - "src/opencordplugins/**"
+            - ".github/workflows/update-readme-metrics.yml"
+    schedule:
+        - cron: "0 7 * * 1"
+    workflow_dispatch:
+
+permissions:
+    contents: write
+
+concurrency:
+    group: update-readme-metrics-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    update:
+        name: Update README plugin counts
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v6
+
+            - name: Use Node.js 24
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+
+            - name: Update README metrics
+              run: node scripts/updateReadmeMetrics.mjs
+
+            - name: Detect changes
+              id: diff
+              run: |
+                  if git diff --quiet -- README.md; then
+                      echo "changed=false" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "changed=true" >> "$GITHUB_OUTPUT"
+                  fi
+
+            - name: Commit README metrics
+              if: steps.diff.outputs.changed == 'true'
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                  git add README.md
+                  git commit -m "docs: update README metrics"
+                  git push
