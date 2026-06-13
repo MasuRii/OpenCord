@@ -1,0 +1,183 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-multi-instance-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: min(900px, calc(100vw - 96px));
+    max-width: 100%;
+}
+
+.vc-multi-instance-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: var(--status-danger);
+}
+
+.vc-multi-instance-dot-open {
+    background: var(--status-positive);
+}
+
+.vc-multi-instance-text {
+    flex: 1 1 320px;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 18px;
+}
+
+.vc-multi-instance-explainer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.vc-multi-instance-explainer > div {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-height: 58px;
+    padding: 14px;
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.vc-multi-instance-explainer strong {
+    color: var(--text-normal);
+}
+
+.vc-multi-instance-explainer span {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 16px;
+}
+
+.vc-multi-instance-warning {
+    padding: 12px 14px;
+    border: 1px solid var(--status-warning);
+    border-radius: 8px;
+    color: var(--text-normal);
+    background: var(--background-secondary);
+}
+
+.vc-multi-instance-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.vc-multi-instance-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.vc-multi-instance-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: 76px;
+    padding: 16px;
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.vc-multi-instance-row-info,
+.vc-multi-instance-actions,
+.vc-multi-instance-add,
+.vc-multi-instance-rename {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vc-multi-instance-row-info {
+    flex: 1 1 280px;
+    min-width: 0;
+    padding-top: 2px;
+}
+
+.vc-multi-instance-profile {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vc-multi-instance-actions {
+    flex: 0 1 470px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.vc-multi-instance-actions button,
+.vc-multi-instance-add button,
+.vc-multi-instance-rename button {
+    min-height: 34px;
+}
+
+.vc-multi-instance-actions button {
+    min-width: 84px;
+}
+
+.vc-multi-instance-name,
+.vc-multi-instance-id {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vc-multi-instance-name {
+    color: var(--text-normal);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+}
+
+.vc-multi-instance-id {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 17px;
+}
+
+.vc-multi-instance-add {
+    align-items: stretch;
+    gap: 10px;
+}
+
+.vc-multi-instance-add > div,
+.vc-multi-instance-rename > div {
+    flex: 1 1 auto;
+    min-width: 240px;
+}
+
+.vc-multi-instance-add button {
+    min-width: 122px;
+}
+
+@media (max-width: 760px) {
+    .vc-multi-instance-body {
+        width: min(900px, calc(100vw - 48px));
+    }
+
+    .vc-multi-instance-explainer {
+        grid-template-columns: 1fr;
+    }
+
+    .vc-multi-instance-row {
+        flex-direction: column;
+    }
+
+    .vc-multi-instance-actions {
+        justify-content: flex-start;
+    }
+}
