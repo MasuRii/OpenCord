@@ -27,12 +27,12 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { Flex } from "@components/Flex";
 import { Paragraph } from "@components/Paragraph";
 import { debounce } from "@shared/debounce";
-import { gitRemote } from "@shared/vencordUserAgent";
 import { classNameFactory } from "@utils/css";
 import { proxyLazy } from "@utils/lazy";
 import { Margins } from "@utils/margins";
 import { classes, isObjectEmpty } from "@utils/misc";
 import { OptionType, Plugin, PluginTag } from "@utils/types";
+import { upstreamRemote } from "@utils/upstreamRemote";
 import { RenderModalProps, User } from "@vencord/discord-types";
 import { findComponentByCodeLazy, findCssClassesLazy } from "@webpack";
 import { Clickable, FluxDispatcher, Modal, openModal, React, Text, Toasts, Tooltip, useEffect, useMemo, UserStore, UserSummaryItem, UserUtils, useState } from "@webpack/common";
@@ -173,8 +173,21 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
     }
 
     const pluginMeta = PluginMeta[plugin.name];
-    const isOpenCordPlugin = pluginMeta.folderName.startsWith("src/opencordplugins/") ?? false;
+    const isVencordPlugin = pluginMeta.folderName.startsWith("src/plugins/") ?? false;
     const isEquicordPlugin = pluginMeta.folderName.startsWith("src/equicordplugins/") ?? false;
+    const isOpenCordPlugin = pluginMeta.folderName.startsWith("src/opencordplugins/") ?? false;
+
+    const websiteHref = isVencordPlugin
+        ? `https://vencord.dev/plugins/${plugin.name}`
+        : isEquicordPlugin || isOpenCordPlugin
+            ? `https://equicord.org/plugins/${encodeURIComponent(plugin.name)}`
+            : null;
+
+    const pluginDirName = pluginMeta.folderName.split("/").pop() ?? "";
+    const upstreamDir = pluginMeta.sourceFolder ?? "";
+    const sourceHref = pluginMeta.sourceRepo
+        ? `https://github.com/${pluginMeta.sourceRepo}/tree/${pluginMeta.sourceBranch}/${upstreamDir}/${pluginDirName}`
+        : `https://github.com/${upstreamRemote}/tree/main/${pluginMeta.folderName}`;
 
     return (
         <Modal
@@ -218,7 +231,7 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
                                 renderUser={(user: User) => (
                                     <Clickable
                                         className={AvatarStyles.clickableAvatar}
-                                        onClick={() => isEquicordPlugin ? openContributorModal(user) : openContributorModal(user)}
+                                        onClick={() => openContributorModal(user)}
                                     >
                                         <img
                                             className={AvatarStyles.avatar}
@@ -259,13 +272,15 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
                         ) : <div />}
                         {!pluginMeta.userPlugin && (
                             <div className={cl("links")}>
-                                <WebsiteButton
-                                    text="Website"
-                                    href={isOpenCordPlugin || isEquicordPlugin ? `https://equicord.org/plugins/${plugin.name}` : `https://vencord.dev/plugins/${plugin.name}`}
-                                />
+                                {websiteHref && (
+                                    <WebsiteButton
+                                        text="Website"
+                                        href={websiteHref}
+                                    />
+                                )}
                                 <GithubButton
                                     text="Source Code"
-                                    href={`https://github.com/${gitRemote}/tree/main/${pluginMeta.folderName}`}
+                                    href={sourceHref}
                                 />
                             </div>
                         )}
