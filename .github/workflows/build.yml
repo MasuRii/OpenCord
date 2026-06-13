@@ -53,6 +53,13 @@ jobs:
                   cp OpenCord.user.{js,js.LEGAL.txt} release
                   cp ../misc/install.sh release/install.sh
 
+                  curl -fL -o release/Equilotl.exe https://github.com/Equicord/Equilotl/releases/latest/download/Equilotl.exe
+                  curl -fL -o release/EquilotlCli.exe https://github.com/Equicord/Equilotl/releases/latest/download/EquilotlCli.exe
+                  curl -fL -o release/Equilotl-darwin-x64.zip https://github.com/Equicord/Equilotl/releases/latest/download/Equilotl-darwin-x64.zip
+                  curl -fL -o release/Equilotl-darwin-arm64.zip https://github.com/Equicord/Equilotl/releases/latest/download/Equilotl-darwin-arm64.zip
+                  curl -fL -o release/Equilotl-x11 https://github.com/Equicord/Equilotl/releases/latest/download/Equilotl-x11
+                  curl -fL -o release/EquilotlCli-linux https://github.com/Equicord/Equilotl/releases/latest/download/EquilotlCli-linux
+
                   # copy the plugin data jsons, the extension zips and the desktop/equibop asars
                   cp *.{json,zip,asar} release
 

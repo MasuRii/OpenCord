@@ -40,7 +40,7 @@ Install OpenCord with the installer script:
 bash -c "$(curl -sS https://github.com/MasuRii/OpenCord/releases/latest/download/install.sh)"
 ```
 
-Or download the latest release assets for your platform below.
+Or download the installer for your platform below.
 
 > [!NOTE]
 > OpenCord is a client modification. Read the [disclaimer](#disclaimer) before installing it on an account you cannot risk.
@@ -81,29 +81,30 @@ src/opencordplugins/         OpenCord plugins
 ## Installing / Uninstalling
 
 > [!NOTE]
-> OpenCord currently uses Equilotl as its desktop installer backend, but the install script and release assets are published from OpenCord releases.
+> OpenCord currently uses Equilotl as its desktop installer backend, but these downloads are mirrored through OpenCord releases.
 
 <details open>
 <summary><strong>Windows</strong></summary>
 
-- [Latest OpenCord release](https://github.com/MasuRii/OpenCord/releases/latest)
-- [Browser extension assets](https://github.com/MasuRii/OpenCord/releases/latest)
+- [GUI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/Equilotl.exe)
+- [CLI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/EquilotlCli.exe)
 
 </details>
 
 <details>
 <summary><strong>macOS</strong></summary>
 
-- [Latest OpenCord release](https://github.com/MasuRii/OpenCord/releases/latest)
-- [Browser extension assets](https://github.com/MasuRii/OpenCord/releases/latest)
+- [X64 GUI](https://github.com/MasuRii/OpenCord/releases/latest/download/Equilotl-darwin-x64.zip)
+- [ARM64 GUI](https://github.com/MasuRii/OpenCord/releases/latest/download/Equilotl-darwin-arm64.zip)
 
 </details>
 
 <details>
 <summary><strong>Linux</strong></summary>
 
+- [GUI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/Equilotl-x11)
+- [CLI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/EquilotlCli-linux)
 - [Install script](https://github.com/MasuRii/OpenCord/releases/latest/download/install.sh)
-- [Latest OpenCord release](https://github.com/MasuRii/OpenCord/releases/latest)
 
 </details>
 
