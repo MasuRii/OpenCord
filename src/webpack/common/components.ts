@@ -27,6 +27,7 @@ import { TooltipFallback } from "@components/TooltipFallback";
 import { LazyComponent } from "@utils/lazyReact";
 import * as t from "@vencord/discord-types";
 import { filters, find, findCssClassesLazy, mapMangledCssClasses, mapMangledModuleLazy, proxyLazyWebpack, waitFor } from "@webpack";
+import type { ComponentPropsWithoutRef, ComponentType } from "react";
 
 import { waitForComponent } from "./internal";
 
@@ -37,9 +38,9 @@ export const Forms = {
     /** @deprecated use Paragraph from Vencord */
     FormText: Paragraph,
     /** @deprecated don't use this */
-    FormSection: "section" as never, // Backwards compat since Vesktop uses this
+    FormSection: "section" as unknown as ComponentType<ComponentPropsWithoutRef<"section">>, // Backwards compat since Vesktop uses this
     /** @deprecated use `@components/Divider` */
-    FormDivider: Divider as never, // Backwards compat since Vesktop uses this
+    FormDivider: Divider as ComponentType<any>, // Backwards compat since Vesktop uses this
 };
 
 // TODO: Stop using this and use Paragraph/Span directly
