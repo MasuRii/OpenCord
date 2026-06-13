@@ -32,7 +32,7 @@
         "uninject": "node scripts/runInstaller.mjs -- --uninstall",
         "repair": "node scripts/runInstaller.mjs -- --repair",
         "lint": "eslint",
-        "lint-styles": "stylelint \"src/**/*.css\" --ignore-pattern src/userplugins",
+        "lint-styles": "stylelint \"src/**/*.css\" --ignore-pattern src/userplugins --ignore-pattern \"src/illegalcordplugins/**/*.css\" --ignore-pattern \"src/testcordplugins/**/*.css\" --ignore-pattern \"src/esharqplugins/**/*.css\" --ignore-pattern \"src/equicordplusplugins/**/*.css\" --ignore-pattern \"src/mallcordplugins/**/*.css\"",
         "lint-styles:fix": "pnpm lint-styles --fix",
         "lint:fix": "pnpm lint --fix",
         "lint:intl": "node scripts/lintIntl.mjs",
