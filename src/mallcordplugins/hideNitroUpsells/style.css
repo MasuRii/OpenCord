@@ -1,0 +1,17 @@
+/* MallCord HideNitroUpsells — strip Nitro/boost nag UI */
+
+/* Nitro tab in user settings sidebar */
+[class*="side"] [aria-label*="Nitro" i],
+div[class*="item"][aria-label*="Nitro" i],
+
+/* gift button in the chat bar */
+button[aria-label*="gift" i],
+
+/* "Boost this server" / premium upsell cards */
+[class*="premiumUpsell"],
+[class*="nitroUpsell"],
+[class*="upsellBanner"],
+[class*="boostButton"],
+[class*="premiumPromo"] {
+    display: none !important;
+}
