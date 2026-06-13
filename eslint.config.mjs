@@ -13,7 +13,18 @@ import unusedImports from "eslint-plugin-unused-imports";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-    { ignores: ["dist", "browser", "packages/vencord-types"] },
+    {
+        ignores: [
+            "dist",
+            "browser",
+            "packages/vencord-types",
+            "src/illegalcordplugins/**",
+            "src/testcordplugins/**",
+            "src/esharqplugins/**",
+            "src/equicordplusplugins/**",
+            "src/mallcordplugins/**"
+        ]
+    },
     {
         files: ["src/**/*.{tsx,ts,mts,mjs,js,jsx}", "eslint.config.mjs"],
         settings: {
