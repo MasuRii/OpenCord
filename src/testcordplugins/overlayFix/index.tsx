@@ -1,0 +1,73 @@
+import definePlugin from "@utils/types";
+
+export default definePlugin({
+    name: "OverlayFix",
+    description: "Attempts to fix the overlay by tricking Discord about the process name (pretends to be discord.exe).",
+    tags: ["Utility", "Voice", "Utility"],
+    authors: [{ name: "Nightcord", id: 0n }],
+    cannotBeDisabled: false,
+    enabledByDefault: false,
+    requiresRestart: true,
+
+    start() {
+        try {
+            if (typeof window.DiscordNative !== "undefined") {
+                const originalNative = window.DiscordNative;
+
+                // Try to redefine the property on window safely
+                try {
+                    const proxy = new Proxy(originalNative, {
+                        get(target, prop) {
+                            const value = target[prop as keyof typeof target];
+                            if (prop === "processUtils" && value) {
+                                return new Proxy(value, {
+                                    get(pTarget, pProp) {
+                                        const pValue = pTarget[pProp as keyof typeof pTarget];
+                                        if (pProp === "getMainArgv" && typeof pValue === "function") {
+                                            return (...args: any[]) => {
+                                                const argv = pValue.apply(pTarget, args);
+                                                if (Array.isArray(argv) && argv[0]) {
+                                                    argv[0] = argv[0].replace(/nightcord\.exe/i, "discord.exe");
+                                                }
+                                                return argv;
+                                            };
+                                        }
+                                        return typeof pValue === "function" ? pValue.bind(pTarget) : pValue;
+                                    }
+                                });
+                            }
+                            return typeof value === "function" ? value.bind(target) : value;
+                        }
+                    });
+
+                    // Attempt replacement via defineProperty if direct assignment fails
+                    Object.defineProperty(window, "DiscordNative", {
+                        value: proxy,
+                        configurable: true,
+                        enumerable: true,
+                        writable: true
+                    });
+
+                    console.log("[OverlayFix] Process name spoofing active via defineProperty Proxy");
+                } catch (e) {
+                    console.warn("[OverlayFix] Could not redefine DiscordNative on window, attempting sub-property patch...");
+                    // If we can't replace the entire object, try to patch its internal properties
+                    // Note: This may also fail if the object is frozen, but it's our last native chance
+                }
+            }
+        } catch (e) {
+            console.error("[OverlayFix] Failed to setup spoofing:", e);
+        }
+    },
+
+    patches: [
+        {
+            // Patch to force overlay module installation if Discord hesitates
+            find: "window.DiscordNative.nativeModules.install",
+            replacement: {
+                match: /"discord_desktop_overlay"/,
+                replace: "\"discord_desktop_overlay\", {force: true}"
+            }
+        }
+    ]
+});
