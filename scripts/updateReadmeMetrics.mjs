@@ -69,7 +69,7 @@ const collections = [
         dir: "src/opencordplugins",
         source: "[MasuRii/OpenCord](https://github.com/MasuRii/OpenCord)",
         url: "https://github.com/MasuRii/OpenCord",
-        logo: "assets/branding/opencord-symbol-light.svg",
+        logo: "assets/branding/opencord-symbol-dark.svg",
         color: "0F172A"
     }
 ];
@@ -80,6 +80,35 @@ function countPluginDirs(dir) {
 
 function cleanVersion(version) {
     return version.replace(/^[~^]/, "");
+}
+
+function badgeValue(value) {
+    return encodeURIComponent(value).replace(/-/g, "--");
+}
+
+function getCurrentStaticStars(readme) {
+    return readme.match(/img\.shields\.io\/badge\/Stars-(\d+)-/)?.[1] ?? "1";
+}
+
+async function getStarCount(fallback) {
+    const token = process.env.GITHUB_TOKEN;
+    if (!token) return fallback;
+
+    const repo = process.env.GITHUB_REPOSITORY ?? "MasuRii/OpenCord";
+    const res = await fetch(`https://api.github.com/repos/${repo}`, {
+        headers: {
+            "Accept": "application/vnd.github+json",
+            "Authorization": `Bearer ${token}`,
+            "User-Agent": "OpenCord README metrics"
+        }
+    });
+
+    if (!res.ok) return fallback;
+
+    const data = await res.json();
+    return typeof data.stargazers_count === "number"
+        ? String(data.stargazers_count)
+        : fallback;
 }
 
 function replaceOne(content, pattern, replacement, label) {
@@ -99,8 +128,12 @@ const totalPlugins = metrics.reduce((total, collection) => total + collection.co
 const typeScriptVersion = cleanVersion(packageJson.devDependencies.typescript);
 const packageManagerVersion = packageJson.packageManager.replace("@", "-");
 const readmePath = "README.md";
+let readme = readFileSync(readmePath, "utf8");
+const starCount = await getStarCount(getCurrentStaticStars(readme));
+const license = packageJson.license;
+const version = packageJson.version;
 
-const mainBadgeRow = `<p><a href="https://github.com/MasuRii/OpenCord/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/MasuRii/OpenCord?style=flat&logo=github&label=Stars"></a>&nbsp;&nbsp;<a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/MasuRii/OpenCord?style=flat&label=License"></a>&nbsp;&nbsp;<a href="package.json"><img alt="Version" src="https://img.shields.io/github/package-json/v/MasuRii/OpenCord?style=flat&label=Version"></a>&nbsp;&nbsp;<a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-${typeScriptVersion}-3178C6?style=flat&logo=typescript&logoColor=white"></a>&nbsp;&nbsp;<a href="https://pnpm.io/"><img alt="pnpm" src="https://img.shields.io/badge/${packageManagerVersion}-F69220?style=flat&logo=pnpm&logoColor=white"></a>&nbsp;&nbsp;<a href="https://equicord.org/discord"><img alt="Discord" src="https://img.shields.io/discord/1173279886065029291.svg?color=5865F2&label=Discord&logo=discord&logoColor=white"></a></p>`;
+const mainBadgeRow = `<p><a href="https://github.com/MasuRii/OpenCord/stargazers"><img alt="Stars" src="https://img.shields.io/badge/Stars-${badgeValue(starCount)}-181717?style=flat&logo=github&logoColor=white"></a>&nbsp;&nbsp;<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-${badgeValue(license)}-blue?style=flat"></a>&nbsp;&nbsp;<a href="package.json"><img alt="Version" src="https://img.shields.io/badge/Version-${badgeValue(version)}-blue?style=flat"></a>&nbsp;&nbsp;<a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-${typeScriptVersion}-3178C6?style=flat&logo=typescript&logoColor=white"></a>&nbsp;&nbsp;<a href="https://pnpm.io/"><img alt="pnpm" src="https://img.shields.io/badge/${packageManagerVersion}-F69220?style=flat&logo=pnpm&logoColor=white"></a>&nbsp;&nbsp;<a href="https://equicord.org/discord"><img alt="Discord" src="https://img.shields.io/discord/1173279886065029291.svg?color=5865F2&label=Discord&logo=discord&logoColor=white"></a></p>`;
 
 const pluginBadgeRow = `<strong>Plugin collections</strong><br>\n<p>${metrics.map(collection => {
     const label = encodeURIComponent(collection.name).replace(/%20/g, "%20");
@@ -109,7 +142,6 @@ const pluginBadgeRow = `<strong>Plugin collections</strong><br>\n<p>${metrics.ma
 
 const collectionRows = metrics.map(collection => `| ${collection.name} | ${collection.count} | ${collection.source} |`).join("\n");
 
-let readme = readFileSync(readmePath, "utf8");
 readme = replaceOne(
     readme,
     /OpenCord is an open source Discord client mod forked from \[Equicord\]\(https:\/\/github\.com\/Equicord\/Equicord\) and \[Vencord\]\(https:\/\/github\.com\/Vendicated\/Vencord\), focused on a massive cross-community plugin catalog with \d+\+? plugin folders\./,
