@@ -26,6 +26,21 @@ interface Dev {
 
 const devs = {} as Record<string, Dev>;
 const equicordDevs = {} as Record<string, Dev>;
+const illegalcordDevs = {} as Record<string, Dev>;
+const testCordDevs = {} as Record<string, Dev>;
+const esharqDevs = {} as Record<string, Dev>;
+const equicordPlusDevs = {} as Record<string, Dev>;
+const mallCordDevs = {} as Record<string, Dev>;
+
+const devGroups = {
+    Devs: devs,
+    EquicordDevs: equicordDevs,
+    IllegalcordDevs: illegalcordDevs,
+    TestCordDevs: testCordDevs,
+    EsharqDevs: esharqDevs,
+    EquicordPlusDevs: equicordPlusDevs,
+    MallCordDevs: mallCordDevs,
+};
 
 function getName(node: NamedDeclaration) {
     return node.name && isIdentifier(node.name) ? node.name.text : undefined;
@@ -41,26 +56,27 @@ function getObjectProp(node: ObjectLiteralExpression, name: string) {
     return prop;
 }
 
-function parseDevs() {
+function parseDevGroup(groupName: keyof typeof devGroups) {
     const file = createSourceFile("constants.ts", readFileSync("src/utils/constants.ts", "utf8"), ScriptTarget.Latest);
+    const target = devGroups[groupName];
 
     for (const child of file.getChildAt(0).getChildren()) {
         if (!isVariableStatement(child)) continue;
 
-        const devsDeclaration = child.declarationList.declarations.find(d => hasName(d, "Devs"));
+        const devsDeclaration = child.declarationList.declarations.find(d => hasName(d, groupName));
         if (!devsDeclaration?.initializer || !isCallExpression(devsDeclaration.initializer)) continue;
 
         const value = devsDeclaration.initializer.arguments[0];
 
-        if (!isSatisfiesExpression(value) || !isObjectLiteralExpression(value.expression)) throw new Error("Failed to parse devs: not an object literal");
+        if (!isSatisfiesExpression(value) || !isObjectLiteralExpression(value.expression)) throw new Error(`Failed to parse ${groupName}: not an object literal`);
 
         for (const prop of value.expression.properties) {
             const name = (prop.name as Identifier).text;
             const value = isPropertyAssignment(prop) ? prop.initializer : prop;
 
-            if (!isObjectLiteralExpression(value)) throw new Error(`Failed to parse devs: ${name} is not an object literal`);
+            if (!isObjectLiteralExpression(value)) throw new Error(`Failed to parse ${groupName}: ${name} is not an object literal`);
 
-            devs[name] = {
+            target[name] = {
                 name: (getObjectProp(value, "name") as StringLiteral).text,
                 id: (getObjectProp(value, "id") as BigIntLiteral).text.slice(0, -1)
             };
@@ -69,47 +85,26 @@ function parseDevs() {
         return;
     }
 
-    throw new Error("Could not find Devs constant");
-}
-
-function parseEquicordDevs() {
-    const file = createSourceFile("constants.ts", readFileSync("src/utils/constants.ts", "utf8"), ScriptTarget.Latest);
-
-    for (const child of file.getChildAt(0).getChildren()) {
-        if (!isVariableStatement(child)) continue;
-
-        const devsDeclaration = child.declarationList.declarations.find(d => hasName(d, "EquicordDevs"));
-        if (!devsDeclaration?.initializer || !isCallExpression(devsDeclaration.initializer)) continue;
-
-        const value = devsDeclaration.initializer.arguments[0];
-
-        if (!isSatisfiesExpression(value) || !isObjectLiteralExpression(value.expression)) throw new Error("Failed to parse EquicordDevs: not an object literal");
-
-        for (const prop of value.expression.properties) {
-            const name = (prop.name as Identifier).text;
-            const value = isPropertyAssignment(prop) ? prop.initializer : prop;
-
-            if (!isObjectLiteralExpression(value)) throw new Error(`Failed to parse EquicordDevs: ${name} is not an object literal`);
-
-            equicordDevs[name] = {
-                name: (getObjectProp(value, "name") as StringLiteral).text,
-                id: (getObjectProp(value, "id") as BigIntLiteral).text.slice(0, -1)
-            };
-        }
-
-        return;
-    }
-
-    throw new Error("Could not find EquicordDevs constant");
+    throw new Error(`Could not find ${groupName} constant`);
 }
 
 (async () => {
-    parseDevs();
-    parseEquicordDevs();
+    parseDevGroup("Devs");
+    parseDevGroup("EquicordDevs");
+    parseDevGroup("IllegalcordDevs");
+    parseDevGroup("TestCordDevs");
+    parseDevGroup("EsharqDevs");
+    parseDevGroup("EquicordPlusDevs");
+    parseDevGroup("MallCordDevs");
 
     const allDevs = {
         vencord: devs,
         equicord: equicordDevs,
+        illegalcord: illegalcordDevs,
+        testcord: testCordDevs,
+        esharq: esharqDevs,
+        equicordplus: equicordPlusDevs,
+        mallcord: mallCordDevs,
     };
 
     const data = JSON.stringify(allDevs, null, 2);
