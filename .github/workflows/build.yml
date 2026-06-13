@@ -13,9 +13,202 @@ permissions:
     contents: write
 
 jobs:
+    InstallerLinux:
+        name: Build Linux installer
+        runs-on: ubuntu-24.04
+
+        steps:
+            - name: Checkout Equilotl
+              uses: actions/checkout@v6
+              with:
+                  repository: Equicord/Equilotl
+                  path: Equilotl
+
+            - name: Patch installer source
+              working-directory: Equilotl
+              run: |
+                  python3 - <<'PY'
+                  from pathlib import Path
+                  replacements = {
+                      "https://api.github.com/repos/Equicord/Equicord/releases/latest": "https://api.github.com/repos/MasuRii/OpenCord/releases/latest",
+                      "https://equicord.org/releases/equicord": "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json",
+                      "https://api.github.com/repos/Equicord/Equilotl/releases/latest": "https://api.github.com/repos/MasuRii/OpenCord/releases/latest",
+                      "https://equicord.org/releases/equilotl": "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json",
+                      "https://github.com/Equicord/Equilotl/releases/latest/download/": "https://github.com/MasuRii/OpenCord/releases/latest/download/",
+                      "https://github.com/Equicord/Equilotl": "https://github.com/MasuRii/OpenCord"
+                  }
+                  for path in Path('.').glob('*.go'):
+                      text = path.read_text()
+                      for old, new in replacements.items():
+                          text = text.replace(old, new)
+                      path.write_text(text)
+                  PY
+
+            - name: Install Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version: "1.26.2"
+                  cache-dependency-path: Equilotl/go.sum
+
+            - name: Install Linux dependencies
+              run: |
+                  sudo apt update
+                  sudo apt install -y pkg-config libsdl2-dev libx11-dev libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev libglx-dev libgl1-mesa-dev libxxf86vm-dev libglfw3-dev libwayland-dev libwayland-egl1 libegl-dev libxkbcommon-dev wayland-protocols extra-cmake-modules
+
+            - name: Build Linux installers
+              working-directory: Equilotl
+              run: |
+                  go get -v
+                  go mod vendor
+                  git apply patches/wayland.patch
+                  CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -v -tags static -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o Equilotl-x11
+                  CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -v -tags "cli" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o EquilotlCli-linux
+                  chmod +x Equilotl-x11 EquilotlCli-linux
+
+            - name: Upload Linux installer artifacts
+              uses: actions/upload-artifact@v7
+              with:
+                  name: opencord-installers-linux
+                  path: |
+                      Equilotl/Equilotl-x11
+                      Equilotl/EquilotlCli-linux
+
+    InstallerWindows:
+        name: Build Windows installer
+        runs-on: windows-latest
+
+        steps:
+            - name: Checkout Equilotl
+              uses: actions/checkout@v6
+              with:
+                  repository: Equicord/Equilotl
+                  path: Equilotl
+
+            - name: Patch installer source
+              working-directory: Equilotl
+              shell: pwsh
+              run: |
+                  $replacements = @{
+                      "https://api.github.com/repos/Equicord/Equicord/releases/latest" = "https://api.github.com/repos/MasuRii/OpenCord/releases/latest"
+                      "https://equicord.org/releases/equicord" = "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json"
+                      "https://api.github.com/repos/Equicord/Equilotl/releases/latest" = "https://api.github.com/repos/MasuRii/OpenCord/releases/latest"
+                      "https://equicord.org/releases/equilotl" = "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json"
+                      "https://github.com/Equicord/Equilotl/releases/latest/download/" = "https://github.com/MasuRii/OpenCord/releases/latest/download/"
+                      "https://github.com/Equicord/Equilotl" = "https://github.com/MasuRii/OpenCord"
+                  }
+                  Get-ChildItem -Filter *.go | ForEach-Object {
+                      $text = Get-Content $_ -Raw
+                      foreach ($key in $replacements.Keys) {
+                          $text = $text.Replace($key, $replacements[$key])
+                      }
+                      Set-Content $_ $text -NoNewline
+                  }
+
+            - name: Install Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version: "1.26.2"
+                  cache-dependency-path: Equilotl/go.sum
+
+            - name: Setup MSYS2
+              uses: msys2/setup-msys2@v2
+              with:
+                  path-type: inherit
+
+            - name: Build Windows installers
+              shell: msys2 {0}
+              working-directory: Equilotl
+              run: |
+                  pacman -S --noconfirm git mingw-w64-x86_64-gcc mingw-w64-x86_64-SDL2
+                  go get -v
+                  go install github.com/tc-hib/go-winres@latest
+                  go-winres make --product-version "git-tag"
+                  CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -v -tags "static gui" -ldflags "-s -w -H=windowsgui -extldflags=-static -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o Equilotl.exe
+                  CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -v -tags "cli" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o EquilotlCli.exe
+
+            - name: Upload Windows installer artifacts
+              uses: actions/upload-artifact@v7
+              with:
+                  name: opencord-installers-windows
+                  path: |
+                      Equilotl/Equilotl.exe
+                      Equilotl/EquilotlCli.exe
+
+    InstallerMac:
+        name: Build macOS installer
+        runs-on: ${{ matrix.runner }}
+        strategy:
+            matrix:
+                include:
+                    - arch: amd64
+                      runner: macos-15-intel
+                      gui_name: Equilotl-darwin-x64.zip
+                      cli_name: EquilotlCli-darwin-x64
+                    - arch: arm64
+                      runner: macos-latest
+                      gui_name: Equilotl-darwin-arm64.zip
+                      cli_name: EquilotlCli-darwin-arm64
+
+        steps:
+            - name: Checkout Equilotl
+              uses: actions/checkout@v6
+              with:
+                  repository: Equicord/Equilotl
+                  path: Equilotl
+
+            - name: Patch installer source
+              working-directory: Equilotl
+              run: |
+                  python3 - <<'PY'
+                  from pathlib import Path
+                  replacements = {
+                      "https://api.github.com/repos/Equicord/Equicord/releases/latest": "https://api.github.com/repos/MasuRii/OpenCord/releases/latest",
+                      "https://equicord.org/releases/equicord": "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json",
+                      "https://api.github.com/repos/Equicord/Equilotl/releases/latest": "https://api.github.com/repos/MasuRii/OpenCord/releases/latest",
+                      "https://equicord.org/releases/equilotl": "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json",
+                      "https://github.com/Equicord/Equilotl/releases/latest/download/": "https://github.com/MasuRii/OpenCord/releases/latest/download/",
+                      "https://github.com/Equicord/Equilotl": "https://github.com/MasuRii/OpenCord"
+                  }
+                  for path in Path('.').glob('*.go'):
+                      text = path.read_text()
+                      for old, new in replacements.items():
+                          text = text.replace(old, new)
+                      path.write_text(text)
+                  PY
+
+            - name: Install Go
+              uses: actions/setup-go@v6
+              with:
+                  go-version: "1.26.2"
+                  cache-dependency-path: Equilotl/go.sum
+
+            - name: Install dependencies
+              run: brew install sdl2
+
+            - name: Build macOS installers
+              working-directory: Equilotl
+              run: |
+                  go get -v
+                  CGO_CFLAGS="-mmacosx-version-min=10.15" CGO_LDFLAGS="-mmacosx-version-min=10.15" CGO_ENABLED=1 GOOS=darwin GOARCH=${{ matrix.arch }} go build -v -tags "static gui" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o Equilotl
+                  CGO_CFLAGS="-mmacosx-version-min=10.15" CGO_LDFLAGS="-mmacosx-version-min=10.15" CGO_ENABLED=1 GOOS=darwin GOARCH=${{ matrix.arch }} go build -v -tags "cli" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o ${{ matrix.cli_name }}
+                  mkdir -p Equilotl.app/Contents/MacOS Equilotl.app/Contents/Resources
+                  cp macos/Info.plist Equilotl.app/Contents/Info.plist
+                  mv Equilotl Equilotl.app/Contents/MacOS/Equilotl
+                  cp macos/icon.icns Equilotl.app/Contents/Resources/icon.icns
+                  zip -r ${{ matrix.gui_name }} Equilotl.app
+
+            - name: Upload macOS installer artifacts
+              uses: actions/upload-artifact@v7
+              with:
+                  name: opencord-installers-macos-${{ matrix.arch }}
+                  path: |
+                      Equilotl/${{ matrix.gui_name }}
+                      Equilotl/${{ matrix.cli_name }}
+
     Build:
         name: Build OpenCord
         runs-on: ubuntu-latest
+        needs: [InstallerLinux, InstallerWindows, InstallerMac]
 
         steps:
             - uses: actions/checkout@v6
@@ -44,6 +237,13 @@ jobs:
                   pnpm generateVencordPluginJson dist/vencordplugins.json
                   pnpm generateDevsList dist/devs.json
 
+            - name: Download installer artifacts
+              uses: actions/download-artifact@v8
+              with:
+                  pattern: opencord-installers-*
+                  path: dist/installer-assets
+                  merge-multiple: true
+
             - name: Collect files to be released
               run: |
                   cd dist
@@ -52,13 +252,7 @@ jobs:
                   cp browser/browser.* release
                   cp OpenCord.user.{js,js.LEGAL.txt} release
                   cp ../misc/install.sh release/install.sh
-
-                  curl -fL -o release/Equilotl.exe https://github.com/Equicord/Equilotl/releases/latest/download/Equilotl.exe
-                  curl -fL -o release/EquilotlCli.exe https://github.com/Equicord/Equilotl/releases/latest/download/EquilotlCli.exe
-                  curl -fL -o release/Equilotl-darwin-x64.zip https://github.com/Equicord/Equilotl/releases/latest/download/Equilotl-darwin-x64.zip
-                  curl -fL -o release/Equilotl-darwin-arm64.zip https://github.com/Equicord/Equilotl/releases/latest/download/Equilotl-darwin-arm64.zip
-                  curl -fL -o release/Equilotl-x11 https://github.com/Equicord/Equilotl/releases/latest/download/Equilotl-x11
-                  curl -fL -o release/EquilotlCli-linux https://github.com/Equicord/Equilotl/releases/latest/download/EquilotlCli-linux
+                  cp installer-assets/* release
 
                   # copy the plugin data jsons, the extension zips and the desktop/equibop asars
                   cp *.{json,zip,asar} release

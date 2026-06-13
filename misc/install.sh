@@ -3,6 +3,9 @@
 # Configuration
 INSTALLER_PATH="$HOME/.equilotl"
 GITHUB_URL="https://github.com/MasuRii/OpenCord/releases/latest/download/EquilotlCli-linux"
+OPENCORD_ASAR_URL="https://github.com/MasuRii/OpenCord/releases/latest/download/desktop.asar"
+OPENCORD_DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/OpenCord"
+OPENCORD_ASAR_PATH="$OPENCORD_DATA_DIR/opencord.asar"
 PRIVILEGE_CMDS=("sudo" "doas")
 DEBUG=false
 LOG_FILE="$(dirname "$(realpath "$0")")/equicordinstalldebug.log"
@@ -77,6 +80,15 @@ check_for_updates() {
     fi
 }
 
+# Download OpenCord build
+install_opencord_build() {
+    echo -e "${YELLOW}Downloading latest OpenCord build...${NC}"
+    mkdir -p "$OPENCORD_DATA_DIR" || error "Failed to create OpenCord data directory"
+    if ! curl -sSL "$OPENCORD_ASAR_URL" --output "$OPENCORD_ASAR_PATH"; then
+        error "Failed to download OpenCord build from GitHub"
+    fi
+}
+
 # Find privilege escalation command
 find_privilege_cmd() {
     for cmd in "${PRIVILEGE_CMDS[@]}"; do
@@ -100,14 +112,19 @@ main() {
     debug_log "Starting installation process"
     check_root
     check_for_updates
+    install_opencord_build
 
     local priv_cmd
     priv_cmd=$(find_privilege_cmd)
     debug_log "Using privilege command: $priv_cmd"
 
     echo -e "${YELLOW}Running installer with $priv_cmd...${NC}"
-    debug_log "Executing installer: $priv_cmd $INSTALLER_PATH"
-    if ! "$priv_cmd" "$INSTALLER_PATH"; then
+    debug_log "Executing installer: $priv_cmd env EQUICORD_USER_DATA_DIR=$OPENCORD_DATA_DIR EQUICORD_DIRECTORY=$OPENCORD_ASAR_PATH EQUICORD_DEV_INSTALL=1 $INSTALLER_PATH --install"
+    if ! "$priv_cmd" env \
+        EQUICORD_USER_DATA_DIR="$OPENCORD_DATA_DIR" \
+        EQUICORD_DIRECTORY="$OPENCORD_ASAR_PATH" \
+        EQUICORD_DEV_INSTALL=1 \
+        "$INSTALLER_PATH" --install; then
         debug_log "Installer failed"
         error "Installer failed to run"
     fi
