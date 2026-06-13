@@ -16,8 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import type { ModalAPI as DiscordModalAPI, RenderModalProps as DiscordRenderModalProps } from "@vencord/discord-types";
 import { filters, findComponentByCodeLazy, mapMangledModuleLazy } from "@webpack";
 import { closeAllModals, closeModal, openMediaModal, openModal, openModalLazy } from "@webpack/common";
+import type { ComponentType, PropsWithChildren } from "react";
 
 import { LazyComponent } from "./react";
 
@@ -30,24 +32,37 @@ export const enum ModalSize {
 }
 
 /** @deprecated Migrate to new Modals */
+export type RenderModalProps = DiscordRenderModalProps;
+export type ModalProps = PropsWithChildren<Record<string, unknown>> & Partial<RenderModalProps> & { onClose(): void; };
+
+type LegacyModalProps = PropsWithChildren<Record<string, unknown>> & Partial<RenderModalProps>;
+type ModalComponent = ComponentType<LegacyModalProps>;
+interface LegacyModals {
+    ModalRoot: ModalComponent;
+    ModalHeader: ModalComponent;
+    ModalContent: ModalComponent;
+    ModalFooter: ModalComponent;
+    ModalCloseButton: ModalComponent;
+}
+
 export const Modals = mapMangledModuleLazy(".MODAL_ROOT_LEGACY,", {
     ModalRoot: filters.componentByCode('.MODAL,"aria-labelledby":'),
     ModalHeader: filters.componentByCode(",id:"),
     ModalContent: filters.componentByCode("scrollbarType:"),
     ModalFooter: filters.componentByCode(".HORIZONTAL_REVERSE,"),
     ModalCloseButton: filters.componentByCode(".withCircleBackground")
-}) as never;
+}) as LegacyModals;
 
 /** @deprecated Migrate to new Modals */
-export const ModalRoot = LazyComponent(() => (Modals as any).ModalRoot) as never;
+export const ModalRoot = LazyComponent<LegacyModalProps>(() => Modals.ModalRoot);
 /** @deprecated Migrate to new Modals */
-export const ModalHeader = LazyComponent(() => (Modals as any).ModalHeader) as never;
+export const ModalHeader = LazyComponent<LegacyModalProps>(() => Modals.ModalHeader);
 /** @deprecated Migrate to new Modals */
-export const ModalContent = LazyComponent(() => (Modals as any).ModalContent) as never;
+export const ModalContent = LazyComponent<LegacyModalProps>(() => Modals.ModalContent);
 /** @deprecated Migrate to new Modals */
-export const ModalFooter = LazyComponent(() => (Modals as any).ModalFooter) as never;
+export const ModalFooter = LazyComponent<LegacyModalProps>(() => Modals.ModalFooter);
 /** @deprecated Migrate to new Modals */
-export const ModalCloseButton = LazyComponent(() => (Modals as any).ModalCloseButton) as never;
+export const ModalCloseButton = LazyComponent<LegacyModalProps>(() => Modals.ModalCloseButton);
 export const CloseButton = findComponentByCodeLazy("CLOSE_BUTTON_LABEL");
 
 /** @deprecated Migrate to new Modals */
@@ -56,7 +71,7 @@ export const ModalAPI = {
     openModalLazy,
     closeModal,
     closeAllModals
-} as never;
+} as DiscordModalAPI;
 
 export {
     /** @deprecated Migrate to new Modals */
