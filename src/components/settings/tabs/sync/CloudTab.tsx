@@ -35,9 +35,10 @@ import { Margins } from "@utils/margins";
 import { useForceUpdater } from "@utils/react";
 import { findComponentByCodeLazy } from "@webpack";
 import { Alerts, SearchableSelect, Select, useState } from "@webpack/common";
+import opencordSymbol from "file://../../../../../assets/branding/opencord-symbol-dark.svg?base64";
 
 const ICON_STYLE: React.CSSProperties = { width: 20, height: 20, borderRadius: 4, verticalAlign: "middle" };
-const OPENCORD_SYMBOL_URL = "https://raw.githubusercontent.com/Equicord/Equicord/refs/heads/main/assets/branding/opencord-symbol-dark.svg";
+const OPENCORD_SYMBOL_URL = `data:image/svg+xml;base64,${opencordSymbol}`;
 
 function OpenCordIcon() {
     return <img src={OPENCORD_SYMBOL_URL} alt="OpenCord" style={ICON_STYLE} />;
