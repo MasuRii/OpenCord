@@ -50,6 +50,22 @@ if (!IS_COMPANION_TEST && process.argv.includes("--companion-test"))
 export const IS_UPDATER_DISABLED = process.argv.includes("--disable-updater");
 export const gitHash = process.env.OPENCORD_HASH || process.env.EQUICORD_HASH || execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
 
+const syncConfigPath = join(dirname(fileURLToPath(import.meta.url)), "../../.github/plugin-sync-config.json");
+/** @type {Record<string, { sourceRepo: string; sourceBranch: string; sourceFolder: string }>} */
+let providerMetaMap = {};
+try {
+    const syncConfig = JSON.parse(readFileSync(syncConfigPath, "utf-8"));
+    providerMetaMap = Object.fromEntries(
+        syncConfig.sources.map(s => [s.local_dir, {
+            sourceRepo: s.repo,
+            sourceBranch: s.branch,
+            sourceFolder: s.upstream_dirs[0]
+        }])
+    );
+} catch {
+    // ignore missing or invalid sync config
+}
+
 export const banner = {
     js: `
 // OpenCord ${gitHash}
@@ -147,7 +163,17 @@ export const globPlugins = kind => ({
         });
 
         build.onLoad({ filter, namespace: "import-plugins" }, async () => {
-            const pluginDirs = ["plugins/_api", "plugins/_core", "plugins", "equicordplugins/_api", "equicordplugins/_core", "equicordplugins", "opencordplugins/_api", "opencordplugins/_core", "opencordplugins", "userplugins"];
+            const pluginDirs = [
+                "plugins/_api", "plugins/_core", "plugins",
+                "equicordplugins/_api", "equicordplugins/_core", "equicordplugins",
+                "opencordplugins/_api", "opencordplugins/_core", "opencordplugins",
+                "illegalcordplugins/_api", "illegalcordplugins/_core", "illegalcordplugins",
+                "testcordplugins/_api", "testcordplugins/_core", "testcordplugins",
+                "esharqplugins/_api", "esharqplugins/_core", "esharqplugins",
+                "equicordplusplugins/_api", "equicordplusplugins/_core", "equicordplusplugins",
+                "mallcordplugins/_api", "mallcordplugins/_core", "mallcordplugins",
+                "userplugins"
+            ];
             let code = "";
             let pluginsCode = "\n";
             let metaCode = "\n";
@@ -184,11 +210,12 @@ export const globPlugins = kind => ({
                     }
 
                     const folderName = `src/${dir}/${fileName}`;
+                    const providerMeta = providerMetaMap[`src/${dir}`];
 
                     const mod = `p${i}`;
                     code += `import ${mod} from "./${dir}/${fileName.replace(/\.tsx?$/, "")}";\n`;
                     pluginsCode += `[${mod}.name]:${mod},\n`;
-                    metaCode += `[${mod}.name]:${JSON.stringify({ folderName, userPlugin })},\n`;
+                    metaCode += `[${mod}.name]:${JSON.stringify({ folderName, userPlugin, ...providerMeta })},\n`;
                     i++;
                 }
             }
