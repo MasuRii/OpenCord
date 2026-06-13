@@ -1,0 +1,307 @@
+name: Plugin Sync
+
+on:
+    schedule:
+        - cron: "0 6 * * 1"
+    workflow_dispatch:
+        inputs:
+            source:
+                description: "Source to sync"
+                required: true
+                default: "all"
+                type: choice
+                options:
+                    - all
+                    - illegalcord
+                    - testcord
+                    - esharq
+                    - equicordplus
+                    - mallcord
+            force_resync:
+                description: "Force full resync of tracked plugins"
+                required: false
+                default: false
+                type: boolean
+
+env:
+    FORCE_COLOR: true
+
+permissions:
+    contents: write
+    pull-requests: write
+
+jobs:
+    sync:
+        name: Sync ${{ matrix.source }}
+        runs-on: ubuntu-latest
+        concurrency:
+            group: plugin-sync-${{ matrix.source }}
+            cancel-in-progress: true
+        strategy:
+            fail-fast: false
+            matrix:
+                source: [illegalcord, testcord, esharq, equicordplus, mallcord]
+
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - name: Check if source should run
+              id: should_run
+              run: |
+                  if [ "${{ github.event_name }}" = "schedule" ]; then
+                      echo "should_run=true" >> $GITHUB_OUTPUT
+                  elif [ "${{ github.event.inputs.source }}" = "all" ] || [ "${{ github.event.inputs.source }}" = "${{ matrix.source }}" ]; then
+                      echo "should_run=true" >> $GITHUB_OUTPUT
+                  else
+                      echo "should_run=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Read source config
+              id: config
+              if: steps.should_run.outputs.should_run == 'true'
+              run: |
+                  NAME="${{ matrix.source }}"
+                  CONFIG_FILE=".github/plugin-sync-config.json"
+                  REPO=$(jq -r --arg name "$NAME" '.sources[] | select(.name == $name) | .repo' "$CONFIG_FILE")
+                  BRANCH=$(jq -r --arg name "$NAME" '.sources[] | select(.name == $name) | .branch' "$CONFIG_FILE")
+                  LOCAL_DIR=$(jq -r --arg name "$NAME" '.sources[] | select(.name == $name) | .local_dir' "$CONFIG_FILE")
+                  UPSTREAM_DIRS_JSON=$(jq -c --arg name "$NAME" '.sources[] | select(.name == $name) | .upstream_dirs' "$CONFIG_FILE")
+                  echo "repo=$REPO" >> $GITHUB_OUTPUT
+                  echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+                  echo "local_dir=$LOCAL_DIR" >> $GITHUB_OUTPUT
+                  echo "upstream_dirs_json=$UPSTREAM_DIRS_JSON" >> $GITHUB_OUTPUT
+
+            - name: Read local sync state
+              id: local_state
+              if: steps.should_run.outputs.should_run == 'true'
+              run: |
+                  STATE_FILE=".github/sync-state/${{ matrix.source }}.sha"
+                  if [ -f "$STATE_FILE" ]; then
+                      echo "sha=$(cat "$STATE_FILE")" >> $GITHUB_OUTPUT
+                  else
+                      echo "sha=" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Fetch upstream HEAD
+              id: upstream
+              if: steps.should_run.outputs.should_run == 'true'
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  SHA=$(curl -sSL --fail \
+                      -H "Authorization: Bearer $GH_TOKEN" \
+                      -H "Accept: application/vnd.github+json" \
+                      "https://api.github.com/repos/${{ steps.config.outputs.repo }}/git/refs/heads/${{ steps.config.outputs.branch }}" \
+                      | jq -r '.object.sha // empty')
+                  if [ -z "$SHA" ]; then
+                      echo "Failed to fetch upstream HEAD" >&2
+                      exit 1
+                  fi
+                  echo "sha=$SHA" >> $GITHUB_OUTPUT
+
+            - name: Detect changes
+              id: detect
+              if: steps.should_run.outputs.should_run == 'true'
+              run: |
+                  LOCAL_SHA="${{ steps.local_state.outputs.sha }}"
+                  UPSTREAM_SHA="${{ steps.upstream.outputs.sha }}"
+                  FORCE="${{ github.event.inputs.force_resync || 'false' }}"
+
+                  if [ "$FORCE" = "true" ]; then
+                      echo "has_changes=true" >> $GITHUB_OUTPUT
+                      echo "upstream_sha=$UPSTREAM_SHA" >> $GITHUB_OUTPUT
+                      exit 0
+                  fi
+
+                  if [ "$LOCAL_SHA" = "$UPSTREAM_SHA" ]; then
+                      echo "has_changes=false" >> $GITHUB_OUTPUT
+                      echo "upstream_sha=$UPSTREAM_SHA" >> $GITHUB_OUTPUT
+                  else
+                      echo "has_changes=true" >> $GITHUB_OUTPUT
+                      echo "upstream_sha=$UPSTREAM_SHA" >> $GITHUB_OUTPUT
+                  fi
+
+            - uses: pnpm/action-setup@v6
+              if: steps.detect.outputs.has_changes == 'true'
+
+            - name: Use Node.js 24
+              if: steps.detect.outputs.has_changes == 'true'
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: "pnpm"
+
+            - name: Install dependencies
+              if: steps.detect.outputs.has_changes == 'true'
+              run: pnpm install --frozen-lockfile
+
+            - name: Clone upstream
+              if: steps.detect.outputs.has_changes == 'true'
+              run: |
+                  git clone --depth 1 \
+                      "https://github.com/${{ steps.config.outputs.repo }}.git" \
+                      upstream-temp
+
+            - name: Stage plugins and check file types
+              id: stage
+              if: steps.detect.outputs.has_changes == 'true'
+              env:
+                  UPSTREAM_DIRS_JSON: ${{ steps.config.outputs.upstream_dirs_json }}
+                  LOCAL_DIR: ${{ steps.config.outputs.local_dir }}
+              run: |
+                  LOCAL="$LOCAL_DIR"
+                  mkdir -p "$LOCAL"
+                  CHANGED_FILE=$(mktemp)
+                  declare -A UPSTREAM_MAP
+                  shopt -s nullglob
+
+                  sync_plugin() {
+                      local plugin_dir="$1"
+                      local plugin_name="$2"
+                      UPSTREAM_MAP["$plugin_name"]=1
+                      dest="$LOCAL/$plugin_name"
+                      if [ -d "$dest" ]; then
+                          if ! diff -qr "$plugin_dir" "$dest" >/dev/null 2>&1; then
+                              rm -rf "$dest"
+                              cp -r "$plugin_dir" "$dest"
+                              echo "$plugin_name" >> "$CHANGED_FILE"
+                          fi
+                      else
+                          cp -r "$plugin_dir" "$dest"
+                          echo "+$plugin_name" >> "$CHANGED_FILE"
+                      fi
+                  }
+
+                  while IFS= read -r upstream_dir; do
+                      UPSTREAM="upstream-temp/$upstream_dir"
+                      if [ ! -d "$UPSTREAM" ]; then
+                          echo "Warning: upstream directory $upstream_dir not found" >&2
+                          continue
+                      fi
+
+                      # If the upstream path itself contains a plugin entry file,
+                      # treat it as a single plugin directory rather than a container.
+                      if [ -f "$UPSTREAM/index.ts" ] || [ -f "$UPSTREAM/index.tsx" ]; then
+                          plugin_name=$(basename "$UPSTREAM")
+                          sync_plugin "$UPSTREAM" "$plugin_name"
+                      else
+                          for plugin_dir in "$UPSTREAM"/*/; do
+                              [ -d "$plugin_dir" ] || continue
+                              plugin_name=$(basename "$plugin_dir")
+                              sync_plugin "$plugin_dir" "$plugin_name"
+                          done
+                      fi
+                  done < <(echo "$UPSTREAM_DIRS_JSON" | jq -r '.[]')
+
+                  for local_plugin in "$LOCAL"/*/; do
+                      [ -d "$local_plugin" ] || continue
+                      plugin_name=$(basename "$local_plugin")
+                      if [ -z "${UPSTREAM_MAP[$plugin_name]+x}" ]; then
+                          echo "-$plugin_name" >> "$CHANGED_FILE"
+                      fi
+                  done
+
+                  while read -r f; do
+                      fname=$(basename "$f")
+                      case "$fname" in
+                          *.ts|*.tsx|*.js|*.mjs|*.css|*.scss|*.less|*.styl|*.json|*.md|*.txt|*.html|*.yml|*.yaml) ;;
+                          *.png|*.jpg|*.jpeg|*.gif|*.svg|*.webp|*.ico) ;;
+                          *.ttf|*.woff|*.woff2|*.otf|*.eot) ;;
+                          *.mp3|*.wav|*.ogg|*.flac) ;;
+                          *.gitignore|*.gitattributes|*.prettierignore|*.eslintignore) ;;
+                          LICENSE|LICENCE|COPYING) ;;
+                          *)
+                              echo "Blocked unsafe file type: $f" >&2
+                              exit 1
+                              ;;
+                      esac
+                  done < <(find "$LOCAL" -type f)
+
+                  if find "$LOCAL" -type l | grep -q .; then
+                      echo "Blocked: symlinks are not allowed" >&2
+                      exit 1
+                  fi
+
+                  if [ ! -s "$CHANGED_FILE" ]; then
+                      echo "has_plugin_changes=false" >> $GITHUB_OUTPUT
+                  else
+                      echo "has_plugin_changes=true" >> $GITHUB_OUTPUT
+                      {
+                          echo "plugins<<EOF"
+                          sort -u "$CHANGED_FILE"
+                          echo "EOF"
+                      } >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Validation gate — TypeScript
+              if: steps.stage.outputs.has_plugin_changes == 'true'
+              run: pnpm testTsc
+
+            - name: Validation gate — Lint
+              if: steps.stage.outputs.has_plugin_changes == 'true'
+              run: |
+                  pnpm lint:fix || true
+                  pnpm lint
+
+            - name: Validation gate — Styles
+              if: steps.stage.outputs.has_plugin_changes == 'true'
+              run: pnpm lint-styles
+
+            - name: Validation gate — Plugin structure
+              if: steps.stage.outputs.has_plugin_changes == 'true'
+              run: |
+                  pnpm generatePluginJson /tmp/plugins.json
+                  pnpm generateEquicordPluginJson /tmp/equicordplugins.json
+                  pnpm generateVencordPluginJson /tmp/vencordplugins.json
+
+            - name: Validation gate — Build
+              if: steps.stage.outputs.has_plugin_changes == 'true'
+              run: pnpm buildStandalone
+
+            - name: Update sync state
+              if: steps.detect.outputs.has_changes == 'true'
+              run: |
+                  mkdir -p .github/sync-state
+                  echo "${{ steps.detect.outputs.upstream_sha }}" > ".github/sync-state/${{ matrix.source }}.sha"
+
+            - name: Create or update PR
+              if: steps.stage.outputs.has_plugin_changes == 'true'
+              uses: peter-evans/create-pull-request@v8
+              with:
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  commit-message: "chore(${{ matrix.source }}): sync plugins from ${{ steps.config.outputs.repo }} (${{ steps.detect.outputs.upstream_sha }})"
+                  branch: "sync/${{ matrix.source }}"
+                  delete-branch: true
+                  draft: true
+                  title: "[AutoUpdate] ${{ matrix.source }}: plugin sync (${{ steps.detect.outputs.upstream_sha }})"
+                  body: |
+                      ## Automated Plugin Sync — ${{ matrix.source }}
+
+                      **Upstream:** `${{ steps.config.outputs.repo }}`
+                      **Upstream SHA:** `${{ steps.detect.outputs.upstream_sha }}`
+                      **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+                      ### Plugins Affected
+                      ${{ steps.stage.outputs.plugins }}
+
+                      ### Validation Results
+                      | Gate | Status |
+                      |---|---|
+                      | TypeScript (`tsc --noEmit`) | ✅ Passed |
+                      | ESLint | ✅ Passed |
+                      | Stylelint | ✅ Passed |
+                      | Plugin JSON generation | ✅ Passed |
+                      | Standalone build | ✅ Passed |
+
+                      ### Important Notes
+                      - **Do not auto-merge.** Review plugin code for malicious patches, unauthorized network requests, or ToS violations.
+                      - Plugins prefixed with `-` were removed upstream but are preserved locally pending manual review.
+                      - If local modifications exist, they will appear in the diff and may need manual reconciliation.
+
+                      ### Review Checklist
+                      - [ ] No unexpected network endpoints added
+                      - [ ] No eval/new Function or arbitrary code execution
+                      - [ ] Patches target only Discord internals, not user data exfiltration
+                      - [ ] Deletions are intentional and safe
