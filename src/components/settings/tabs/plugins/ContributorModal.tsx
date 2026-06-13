@@ -10,12 +10,12 @@ import { useSettings } from "@api/Settings";
 import { Heading } from "@components/Heading";
 import { Link } from "@components/Link";
 import { Paragraph } from "@components/Paragraph";
-import { EquicordDevsById, VencordDevsById } from "@utils/constants";
+import { EquicordDevsById, EquicordPlusDevsById, EsharqDevsById, IllegalcordDevsById, MallCordDevsById, TestCordDevsById, VencordDevsById } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { fetchUserProfile } from "@utils/discord";
 import { pluralise } from "@utils/misc";
 import { RenderModalProps, User } from "@vencord/discord-types";
-import { Modal, openModal, showToast, useEffect, useMemo, UserProfileStore, useStateFromStores } from "@webpack/common";
+import { IconUtils, Modal, openModal, showToast, useEffect, useMemo, UserProfileStore, useStateFromStores } from "@webpack/common";
 
 import Plugins, { PluginMeta } from "~plugins";
 
@@ -23,6 +23,32 @@ import { GithubButton, WebsiteButton } from "./LinkIconButton";
 import { PluginCard } from "./PluginCard";
 
 const cl = classNameFactory("vc-author-modal-");
+const SourceDevsById = [VencordDevsById, EquicordDevsById, IllegalcordDevsById, TestCordDevsById, EsharqDevsById, EquicordPlusDevsById, MallCordDevsById];
+
+function getAuthorId(author: { id?: BigInt | string | number | bigint | null | undefined; }): string | null {
+    if (author == null || author.id == null) return null;
+    try {
+        const id = String(author.id);
+        if (!id || id === "0" || id === "0n") return null;
+        const n = BigInt(id);
+        if (n <= 0n) return null;
+        return id;
+    } catch {
+        return null;
+    }
+}
+
+function isRealDiscordUser(user: User): boolean {
+    if (!user.id || user.bot) return false;
+    if (user.id === "0" || user.id === "0n") return false;
+    try {
+        const id = BigInt(user.id);
+        if (id <= 0n) return false;
+    } catch {
+        return false;
+    }
+    return true;
+}
 
 export function openContributorModal(user: User) {
     openModal(modalProps => <ContributorModal user={user} modalProps={modalProps} />);
@@ -31,10 +57,13 @@ export function openContributorModal(user: User) {
 function ContributorModal({ user, modalProps }: { user: User; modalProps: RenderModalProps; }) {
     useSettings();
 
-    const profile = useStateFromStores([UserProfileStore], () => UserProfileStore.getUserProfile(user.id));
+    const profile = useStateFromStores([UserProfileStore], () => {
+        if (!isRealDiscordUser(user)) return null;
+        return UserProfileStore.getUserProfile(user.id as string);
+    });
 
     useEffect(() => {
-        if (!profile && !user.bot && user.id)
+        if (isRealDiscordUser(user) && !profile)
             fetchUserProfile(user.id);
     }, [user.id, user.bot, profile]);
 
@@ -43,10 +72,11 @@ function ContributorModal({ user, modalProps }: { user: User; modalProps: Render
 
     const plugins = useMemo(() => {
         const allPlugins = Object.values(Plugins);
-        const pluginsByAuthor = (VencordDevsById[user.id] || EquicordDevsById[user.id])
-            ? allPlugins.filter(p => p.authors.includes(VencordDevsById[user.id] || EquicordDevsById[user.id]))
+        const isKnownPluginDev = SourceDevsById.some(devs => Object.hasOwn(devs, user.id));
+        const pluginsByAuthor = isKnownPluginDev
+            ? allPlugins.filter(p => p.authors.some(a => getAuthorId(a) === user.id))
             : allPlugins.filter(p =>
-                PluginMeta[p.name]?.userPlugin && p.authors.some(a => a.id.toString() === user.id)
+                PluginMeta[p.name]?.userPlugin && p.authors.some(a => getAuthorId(a) === user.id)
                 || p.authors.some(a => a.name === user.username)
             );
 
@@ -66,7 +96,12 @@ function ContributorModal({ user, modalProps }: { user: User; modalProps: Render
                 <div className={cl("header")}>
                     <img
                         className={cl("avatar")}
-                        src={user.getAvatarURL(void 0, 512, true)}
+                        src={(() => {
+                            const fallbackAvatar = isRealDiscordUser(user)
+                                ? user.getAvatarURL(void 0, 512, true)
+                                : IconUtils.getDefaultAvatarURL(user.id);
+                            return fallbackAvatar;
+                        })()}
                         alt=""
                     />
                     <Heading tag="h2" className={cl("name")}>{user.username}</Heading>
