@@ -1257,6 +1257,10 @@ export const EquicordDevs = Object.freeze({
         name: "Benjii",
         id: 463702169443368970n
     },
+    Benjii: {
+        name: "Benjii",
+        id: 463702169443368970n
+    },
     keircn: {
         name: "Key",
         id: 1230319937155760131n
@@ -1357,6 +1361,268 @@ export const EquicordDevs = Object.freeze({
         name: "pandaptable",
         id: 97153209843335168n
     },
+    ExoDev: {
+        name: "ExoDev",
+        id: 0n
+    },
+} satisfies Record<string, Dev>);
+
+export const IllegalcordDevs = Object.freeze({
+    nobody: {
+        name: "nobody",
+        id: 0n
+    },
+    Hisako: {
+        name: "Hisako",
+        id: 0n
+    },
+    q1: {
+        name: ".q1",
+        id: 1263457746829705310n
+    },
+    appleflyer: {
+        name: "appleflyer",
+        id: 1209096766075703368n
+    },
+    Aurick: {
+        name: "Aurick",
+        id: 1348025017233047634n
+    },
+    clrxxo: {
+        name: "clrxxo",
+        id: 0n
+    },
+    Dadian1: {
+        name: "Dadian1",
+        id: 131825869302792192n
+    },
+    Death: {
+        name: "Death",
+        id: 1003477997728313405n
+    },
+    dxrx99: {
+        name: "dxrx99",
+        id: 1463629522359423152n
+    },
+    feelslove: {
+        name: "feelslove",
+        id: 0n
+    },
+    Irritably: {
+        name: "Irritably",
+        id: 928787166916640838n
+    },
+    irritably: {
+        name: "irritably",
+        id: 928787166916640838n
+    },
+    Jelly: {
+        name: "Jelly",
+        id: 1147940825330876538n
+    },
+    justjxke: {
+        name: "justjxke",
+        id: 852558183087472640n
+    },
+    Moret: {
+        name: "Moret",
+        id: 1449096170646536233n
+    },
+    neoarz: {
+        name: "neoarz",
+        id: 218675193592283137n
+    },
+    Nerdwave: {
+        name: "Nerdwave",
+        id: 0n
+    },
+    omaw: {
+        name: "omaw",
+        id: 1474576133088481351n
+    },
+    Raf: {
+        name: "Raf",
+        id: 121253596753952768n
+    },
+    Reycko: {
+        name: "Reycko",
+        id: 1123725368004726794n
+    },
+    rz30: {
+        name: "rz30",
+        id: 0n
+    },
+    sadie: {
+        name: "sadie",
+        id: 0n
+    },
+    Sami: {
+        name: "Sami",
+        id: 1403404140461297816n
+    },
+    seth: {
+        name: "S€th",
+        id: 1273447359417942128n
+    },
+    Solace: {
+        name: "Solace",
+        id: 1472732509241479218n
+    },
+    TopQ: {
+        name: "TopQ",
+        id: 523800559791374356n
+    },
+    unclide: {
+        name: "unclide",
+        id: 395504896817758210n
+    },
+    vejcowski: {
+        name: "vejcowski",
+        id: 1375544683908042862n
+    },
+    Xylen: {
+        name: "Xylen",
+        id: 0n
+    },
+    zastix: {
+        name: "zastix",
+        id: 253302259696271360n
+    },
+    zFrxncesck1: {
+        name: "zFrxncesck1",
+        id: 456195985404592149n
+    },
+} satisfies Record<string, Dev>);
+
+export const TestCordDevs = Object.freeze({
+    nobody: {
+        name: "nobody",
+        id: 0n
+    },
+    dot: {
+        name: "dot",
+        id: 0n
+    },
+    hyyven: {
+        name: "hyyven",
+        id: 0n
+    },
+    milo: {
+        name: "milo",
+        id: 0n
+    },
+    nerdful: {
+        name: "nerdful",
+        id: 0n
+    },
+    nnenaza: {
+        name: "nnenaza",
+        id: 0n
+    },
+    racify: {
+        name: "racify",
+        id: 0n
+    },
+    SirPhantom89: {
+        name: "SirPhantom89",
+        id: 0n
+    },
+    sirphantom89: {
+        name: "sirphantom89",
+        id: 0n
+    },
+    x2b: {
+        name: "x2b",
+        id: 0n
+    },
+} satisfies Record<string, Dev>);
+
+/** @deprecated Use {@link TestCordDevs}. */
+export const TestcordDevs = TestCordDevs;
+
+export const EsharqDevs = Object.freeze({
+    nobody: {
+        name: "nobody",
+        id: 0n
+    },
+    LOSTSTR: {
+        name: "LOSTSTR",
+        id: 0n
+    },
+    NRaymond: {
+        name: "NRaymond",
+        id: 0n
+    },
+    viciouscal: {
+        name: "viciouscal",
+        id: 0n
+    },
+    x2b: {
+        name: "x2b",
+        id: 996137713432530976n
+    },
+    nnenaza: {
+        name: "nnenaza",
+        id: 1501441039418785933n
+    },
+    neoarz: {
+        name: "neoarz",
+        id: 1015372540937502851n
+    },
+    irritably: {
+        name: "irritably",
+        id: 928787166916640838n
+    },
+} satisfies Record<string, Dev>);
+
+export const EquicordPlusDevs = Object.freeze({
+    nobody: {
+        name: "nobody",
+        id: 0n
+    },
+    Chaython: {
+        name: "Chaython",
+        id: 0n
+    },
+    Bash: {
+        name: "Bash",
+        id: 1327483363518582784n
+    },
+    ExoDev: {
+        name: "ExoDev",
+        id: 0n
+    },
+    x2b: {
+        name: "x2b",
+        id: 0n
+    },
+} satisfies Record<string, Dev>);
+
+export const MallCordDevs = Object.freeze({
+    nobody: {
+        name: "nobody",
+        id: 0n
+    },
+    Dann: {
+        name: "Dann",
+        id: 0n
+    },
+    lastclipped: {
+        name: "lastclipped",
+        id: 0n
+    },
+    pepsify: {
+        name: "pepsify",
+        id: 0n
+    },
+    Sharp: {
+        name: "Sharp",
+        id: 0n
+    },
+    SirPhantom89: {
+        name: "SirPhantom89",
+        id: 0n
+    },
 } satisfies Record<string, Dev>);
 
 // iife so #__PURE__ works correctly
@@ -1371,6 +1637,49 @@ export const VencordDevsById = /* #__PURE__*/ (() =>
 export const EquicordDevsById = /* #__PURE__*/ (() =>
     Object.freeze(Object.fromEntries(
         Object.entries(EquicordDevs)
+            .filter(d => d[1].id !== 0n)
+            .map(([_, v]) => [v.id, v] as const)
+    ))
+)() as Record<string, Dev>;
+
+export const IllegalcordDevsById = /* #__PURE__*/ (() =>
+    Object.freeze(Object.fromEntries(
+        Object.entries(IllegalcordDevs)
+            .filter(d => d[1].id !== 0n)
+            .map(([_, v]) => [v.id, v] as const)
+    ))
+)() as Record<string, Dev>;
+
+export const TestCordDevsById = /* #__PURE__*/ (() =>
+    Object.freeze(Object.fromEntries(
+        Object.entries(TestCordDevs)
+            .filter(d => d[1].id !== 0n)
+            .map(([_, v]) => [v.id, v] as const)
+    ))
+)() as Record<string, Dev>;
+
+/** @deprecated Use {@link TestCordDevsById}. */
+export const TestcordDevsById = TestCordDevsById;
+
+export const EsharqDevsById = /* #__PURE__*/ (() =>
+    Object.freeze(Object.fromEntries(
+        Object.entries(EsharqDevs)
+            .filter(d => d[1].id !== 0n)
+            .map(([_, v]) => [v.id, v] as const)
+    ))
+)() as Record<string, Dev>;
+
+export const EquicordPlusDevsById = /* #__PURE__*/ (() =>
+    Object.freeze(Object.fromEntries(
+        Object.entries(EquicordPlusDevs)
+            .filter(d => d[1].id !== 0n)
+            .map(([_, v]) => [v.id, v] as const)
+    ))
+)() as Record<string, Dev>;
+
+export const MallCordDevsById = /* #__PURE__*/ (() =>
+    Object.freeze(Object.fromEntries(
+        Object.entries(MallCordDevs)
             .filter(d => d[1].id !== 0n)
             .map(([_, v]) => [v.id, v] as const)
     ))
