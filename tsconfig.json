@@ -64,6 +64,21 @@
             ],
             "@opencordplugins/*": [
                 "./src/opencordplugins/*"
+            ],
+            "@illegalcordplugins/*": [
+                "./src/illegalcordplugins/*"
+            ],
+            "@testcordplugins/*": [
+                "./src/testcordplugins/*"
+            ],
+            "@esharqplugins/*": [
+                "./src/esharqplugins/*"
+            ],
+            "@equicordplusplugins/*": [
+                "./src/equicordplusplugins/*"
+            ],
+            "@mallcordplugins/*": [
+                "./src/mallcordplugins/*"
             ]
         },
         "plugins": [
