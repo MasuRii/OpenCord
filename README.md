@@ -4,7 +4,7 @@
 
 # OpenCord
 
-OpenCord is an open source Discord client mod forked from [Equicord](https://github.com/Equicord/Equicord) and [Vencord](https://github.com/Vendicated/Vencord), focused on a massive cross-community plugin catalog with 905 plugin folders.
+OpenCord is an open source Discord client mod forked from [Equicord](https://github.com/Equicord/Equicord) and [Vencord](https://github.com/Vendicated/Vencord), focused on a massive cross-community plugin catalog with 905 plugin source folders. The desktop settings list currently shows about 781 visible plugins after build filters.
 
 <p><a href="https://github.com/MasuRii/OpenCord/stargazers"><img alt="Stars" src="https://img.shields.io/badge/Stars-1-181717?style=flat&logo=github&logoColor=white"></a>&nbsp;&nbsp;<a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/License-GPL--3.0--or--later-blue?style=flat"></a>&nbsp;&nbsp;<a href="package.json"><img alt="Version" src="https://img.shields.io/badge/Version-1.14.13.3-blue?style=flat"></a>&nbsp;&nbsp;<a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6.0.2-3178C6?style=flat&logo=typescript&logoColor=white"></a>&nbsp;&nbsp;<a href="https://pnpm.io/"><img alt="pnpm" src="https://img.shields.io/badge/pnpm-11.0.9-F69220?style=flat&logo=pnpm&logoColor=white"></a>&nbsp;&nbsp;<a href="https://equicord.org/discord"><img alt="Discord" src="https://img.shields.io/discord/1173279886065029291.svg?color=5865F2&label=Discord&logo=discord&logoColor=white"></a></p>
 
@@ -23,7 +23,8 @@ OpenCord is an open source Discord client mod forked from [Equicord](https://git
 
 | Feature | Description |
 |---|---|
-| 905 plugin folders | Combines Vencord, Equicord, TestCord, Illegalcord, MallCord, Equicord+, Esharq, and OpenCord plugins. |
+| 905 plugin source folders | Combines Vencord, Equicord, TestCord, Illegalcord, MallCord, Equicord+, Esharq, and OpenCord plugins. |
+| About 781 visible plugins | Approximates the desktop in-app settings list; it can be lower because source folders include duplicate names, API/core helpers, and platform or dev-targeted entries filtered out at build time. |
 | Cross-platform builds | Supports desktop injection and browser extension builds for Windows, macOS, Linux, and web. |
 | Fast setup | Use the installer for normal usage or build from source with pnpm. |
 | Developer friendly | TypeScript, React, webpack utilities, hot watch builds, and plugin-specific folders. |
@@ -86,24 +87,24 @@ src/opencordplugins/         OpenCord plugins
 <details open>
 <summary><strong>Windows</strong></summary>
 
-- [GUI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/Equilotl.exe)
-- [CLI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/EquilotlCli.exe)
+- [GUI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCordInstaller.exe)
+- [CLI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCordInstallerCli.exe)
 
 </details>
 
 <details>
 <summary><strong>macOS</strong></summary>
 
-- [X64 GUI](https://github.com/MasuRii/OpenCord/releases/latest/download/Equilotl-darwin-x64.zip)
-- [ARM64 GUI](https://github.com/MasuRii/OpenCord/releases/latest/download/Equilotl-darwin-arm64.zip)
+- [X64 GUI](https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCord-darwin-x64.zip)
+- [ARM64 GUI](https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCord-darwin-arm64.zip)
 
 </details>
 
 <details>
 <summary><strong>Linux</strong></summary>
 
-- [GUI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/Equilotl-x11)
-- [CLI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/EquilotlCli-linux)
+- [GUI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCord-x11)
+- [CLI Installer](https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCordCli-linux)
 - [Install script](https://github.com/MasuRii/OpenCord/releases/latest/download/install.sh)
 
 </details>
