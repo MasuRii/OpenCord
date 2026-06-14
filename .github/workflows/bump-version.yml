@@ -1,0 +1,42 @@
+name: Bump version and tag
+
+on:
+    schedule:
+        - cron: "0 6 * * 1"
+    workflow_dispatch:
+
+env:
+    FORCE_COLOR: true
+
+permissions:
+    contents: write
+
+concurrency:
+    group: bump-version-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    bump:
+        name: Bump package.json and push tag
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - name: Configure Git
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            - uses: pnpm/action-setup@v6
+
+            - name: Bump version and push tag
+              run: |
+                  pnpm version patch --no-git-tag-version
+                  VERSION=$(jq -r .version < package.json)
+                  git add package.json
+                  git commit -m "chore(release): bump version to v${VERSION}"
+                  git tag v${VERSION}
+                  git push origin HEAD v${VERSION}
