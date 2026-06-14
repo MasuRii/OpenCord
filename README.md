@@ -35,13 +35,38 @@ OpenCord is an open source Discord client mod forked from [Equicord](https://git
 
 ## Quick Start
 
-Install OpenCord with the installer script:
+<details open>
+<summary>Windows</summary>
+
+Download and run the GUI installer:
+
+```powershell
+Invoke-WebRequest -Uri "https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCordInstaller.exe" -OutFile "OpenCordInstaller.exe"
+Start-Process "OpenCordInstaller.exe"
+```
+
+</details>
+
+<details>
+<summary>macOS</summary>
+
+Download the ZIP for your Mac, extract it, then open `OpenCordInstaller.app`.
+
+- [X64 GUI](https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCord-darwin-x64.zip)
+- [ARM64 GUI](https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCord-darwin-arm64.zip)
+
+</details>
+
+<details>
+<summary>Linux</summary>
+
+Run the installer script:
 
 ```shell
 bash -c "$(curl -sS https://github.com/MasuRii/OpenCord/releases/latest/download/install.sh)"
 ```
 
-Or download the installer for your platform below.
+</details>
 
 > [!NOTE]
 > OpenCord is a client modification. Read the [disclaimer](#disclaimer) before installing it on an account you cannot risk.
