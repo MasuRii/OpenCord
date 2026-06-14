@@ -24,25 +24,13 @@ jobs:
                   repository: Equicord/Equilotl
                   path: Equilotl
 
-            - name: Patch installer source
-              working-directory: Equilotl
-              run: |
-                  python3 - <<'PY'
-                  from pathlib import Path
-                  replacements = {
-                      "https://api.github.com/repos/Equicord/Equicord/releases/latest": "https://api.github.com/repos/MasuRii/OpenCord/releases/latest",
-                      "https://equicord.org/releases/equicord": "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json",
-                      "https://api.github.com/repos/Equicord/Equilotl/releases/latest": "https://api.github.com/repos/MasuRii/OpenCord/releases/latest",
-                      "https://equicord.org/releases/equilotl": "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json",
-                      "https://github.com/Equicord/Equilotl/releases/latest/download/": "https://github.com/MasuRii/OpenCord/releases/latest/download/",
-                      "https://github.com/Equicord/Equilotl": "https://github.com/MasuRii/OpenCord"
-                  }
-                  for path in Path('.').glob('*.go'):
-                      text = path.read_text()
-                      for old, new in replacements.items():
-                          text = text.replace(old, new)
-                      path.write_text(text)
-                  PY
+            - name: Checkout OpenCord
+              uses: actions/checkout@v6
+              with:
+                  path: OpenCord
+
+            - name: Patch installer source and resources
+              run: node OpenCord/scripts/patchEquilotlBranding.mjs Equilotl OpenCord/assets/branding
 
             - name: Install Go
               uses: actions/setup-go@v6
@@ -61,17 +49,17 @@ jobs:
                   go get -v
                   go mod vendor
                   git apply patches/wayland.patch
-                  CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -v -tags static -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o Equilotl-x11
-                  CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -v -tags "cli" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o EquilotlCli-linux
-                  chmod +x Equilotl-x11 EquilotlCli-linux
+                  CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -v -tags static -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o OpenCord-x11
+                  CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -v -tags "cli" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o OpenCordCli-linux
+                  chmod +x OpenCord-x11 OpenCordCli-linux
 
             - name: Upload Linux installer artifacts
               uses: actions/upload-artifact@v7
               with:
                   name: opencord-installers-linux
                   path: |
-                      Equilotl/Equilotl-x11
-                      Equilotl/EquilotlCli-linux
+                      Equilotl/OpenCord-x11
+                      Equilotl/OpenCordCli-linux
 
     InstallerWindows:
         name: Build Windows installer
@@ -84,25 +72,13 @@ jobs:
                   repository: Equicord/Equilotl
                   path: Equilotl
 
-            - name: Patch installer source
-              working-directory: Equilotl
-              shell: pwsh
-              run: |
-                  $replacements = @{
-                      "https://api.github.com/repos/Equicord/Equicord/releases/latest" = "https://api.github.com/repos/MasuRii/OpenCord/releases/latest"
-                      "https://equicord.org/releases/equicord" = "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json"
-                      "https://api.github.com/repos/Equicord/Equilotl/releases/latest" = "https://api.github.com/repos/MasuRii/OpenCord/releases/latest"
-                      "https://equicord.org/releases/equilotl" = "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json"
-                      "https://github.com/Equicord/Equilotl/releases/latest/download/" = "https://github.com/MasuRii/OpenCord/releases/latest/download/"
-                      "https://github.com/Equicord/Equilotl" = "https://github.com/MasuRii/OpenCord"
-                  }
-                  Get-ChildItem -Filter *.go | ForEach-Object {
-                      $text = Get-Content $_ -Raw
-                      foreach ($key in $replacements.Keys) {
-                          $text = $text.Replace($key, $replacements[$key])
-                      }
-                      Set-Content $_ $text -NoNewline
-                  }
+            - name: Checkout OpenCord
+              uses: actions/checkout@v6
+              with:
+                  path: OpenCord
+
+            - name: Patch installer source and resources
+              run: node OpenCord/scripts/patchEquilotlBranding.mjs Equilotl OpenCord/assets/branding
 
             - name: Install Go
               uses: actions/setup-go@v6
@@ -123,16 +99,16 @@ jobs:
                   go get -v
                   go install github.com/tc-hib/go-winres@latest
                   go-winres make --product-version "git-tag"
-                  CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -v -tags "static gui" -ldflags "-s -w -H=windowsgui -extldflags=-static -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o Equilotl.exe
-                  CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -v -tags "cli" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o EquilotlCli.exe
+                  CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -v -tags "static gui" -ldflags "-s -w -H=windowsgui -extldflags=-static -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o OpenCordInstaller.exe
+                  CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build -v -tags "cli" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o OpenCordInstallerCli.exe
 
             - name: Upload Windows installer artifacts
               uses: actions/upload-artifact@v7
               with:
                   name: opencord-installers-windows
                   path: |
-                      Equilotl/Equilotl.exe
-                      Equilotl/EquilotlCli.exe
+                      Equilotl/OpenCordInstaller.exe
+                      Equilotl/OpenCordInstallerCli.exe
 
     InstallerMac:
         name: Build macOS installer
@@ -142,12 +118,12 @@ jobs:
                 include:
                     - arch: amd64
                       runner: macos-15-intel
-                      gui_name: Equilotl-darwin-x64.zip
-                      cli_name: EquilotlCli-darwin-x64
+                      gui_name: OpenCord-darwin-x64.zip
+                      cli_name: OpenCordCli-darwin-x64
                     - arch: arm64
                       runner: macos-latest
-                      gui_name: Equilotl-darwin-arm64.zip
-                      cli_name: EquilotlCli-darwin-arm64
+                      gui_name: OpenCord-darwin-arm64.zip
+                      cli_name: OpenCordCli-darwin-arm64
 
         steps:
             - name: Checkout Equilotl
@@ -156,25 +132,13 @@ jobs:
                   repository: Equicord/Equilotl
                   path: Equilotl
 
-            - name: Patch installer source
-              working-directory: Equilotl
-              run: |
-                  python3 - <<'PY'
-                  from pathlib import Path
-                  replacements = {
-                      "https://api.github.com/repos/Equicord/Equicord/releases/latest": "https://api.github.com/repos/MasuRii/OpenCord/releases/latest",
-                      "https://equicord.org/releases/equicord": "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json",
-                      "https://api.github.com/repos/Equicord/Equilotl/releases/latest": "https://api.github.com/repos/MasuRii/OpenCord/releases/latest",
-                      "https://equicord.org/releases/equilotl": "https://github.com/MasuRii/OpenCord/releases/latest/download/latest.json",
-                      "https://github.com/Equicord/Equilotl/releases/latest/download/": "https://github.com/MasuRii/OpenCord/releases/latest/download/",
-                      "https://github.com/Equicord/Equilotl": "https://github.com/MasuRii/OpenCord"
-                  }
-                  for path in Path('.').glob('*.go'):
-                      text = path.read_text()
-                      for old, new in replacements.items():
-                          text = text.replace(old, new)
-                      path.write_text(text)
-                  PY
+            - name: Checkout OpenCord
+              uses: actions/checkout@v6
+              with:
+                  path: OpenCord
+
+            - name: Patch installer source and resources
+              run: node OpenCord/scripts/patchEquilotlBranding.mjs Equilotl OpenCord/assets/branding
 
             - name: Install Go
               uses: actions/setup-go@v6
@@ -189,13 +153,13 @@ jobs:
               working-directory: Equilotl
               run: |
                   go get -v
-                  CGO_CFLAGS="-mmacosx-version-min=10.15" CGO_LDFLAGS="-mmacosx-version-min=10.15" CGO_ENABLED=1 GOOS=darwin GOARCH=${{ matrix.arch }} go build -v -tags "static gui" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o Equilotl
+                  CGO_CFLAGS="-mmacosx-version-min=10.15" CGO_LDFLAGS="-mmacosx-version-min=10.15" CGO_ENABLED=1 GOOS=darwin GOARCH=${{ matrix.arch }} go build -v -tags "static gui" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o OpenCordInstaller
                   CGO_CFLAGS="-mmacosx-version-min=10.15" CGO_LDFLAGS="-mmacosx-version-min=10.15" CGO_ENABLED=1 GOOS=darwin GOARCH=${{ matrix.arch }} go build -v -tags "cli" -ldflags "-s -w -X 'equilotl/buildinfo.InstallerGitHash=$(git rev-parse --short HEAD)' -X 'equilotl/buildinfo.InstallerTag=opencord'" -o ${{ matrix.cli_name }}
-                  mkdir -p Equilotl.app/Contents/MacOS Equilotl.app/Contents/Resources
-                  cp macos/Info.plist Equilotl.app/Contents/Info.plist
-                  mv Equilotl Equilotl.app/Contents/MacOS/Equilotl
-                  cp macos/icon.icns Equilotl.app/Contents/Resources/icon.icns
-                  zip -r ${{ matrix.gui_name }} Equilotl.app
+                  mkdir -p OpenCordInstaller.app/Contents/MacOS OpenCordInstaller.app/Contents/Resources
+                  cp macos/Info.plist OpenCordInstaller.app/Contents/Info.plist
+                  mv OpenCordInstaller OpenCordInstaller.app/Contents/MacOS/OpenCordInstaller
+                  cp macos/icon.icns OpenCordInstaller.app/Contents/Resources/icon.icns
+                  zip -r ${{ matrix.gui_name }} OpenCordInstaller.app
 
             - name: Upload macOS installer artifacts
               uses: actions/upload-artifact@v7
@@ -291,6 +255,20 @@ jobs:
                   fi
 
                   gh release upload "$VERSION" --clobber dist/release/*
+
+            - name: Generate latest.json installer fallback
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  VERSION="v$(jq -r .version < package.json)"
+                  gh api "repos/${{ github.repository }}/releases/tags/${VERSION}" > dist/release/latest.json
+
+            - name: Upload latest.json installer fallback
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  VERSION="v$(jq -r .version < package.json)"
+                  gh release upload "$VERSION" --clobber dist/release/latest.json
 
             - name: Upload Plugin JSONs to Equibored repo
               if: github.repository == 'Equicord/Equicord' && vars.ACT == 'false'
