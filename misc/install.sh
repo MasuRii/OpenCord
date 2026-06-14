@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Guard against accidental execution on Windows/MSYS/Cygwin
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]] || \
+   [[ "$(uname -s)" =~ ^(CYGWIN|MINGW|MSYS|Windows_NT) ]]; then
+    echo "This installer is for Linux. Windows users should download OpenCordInstaller.exe or OpenCordInstallerCli.exe from https://github.com/MasuRii/OpenCord/releases/latest/download/"
+    exit 1
+fi
+
 # Configuration
 INSTALLER_PATH="$HOME/.opencord-installer"
 GITHUB_URL="https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCordCli-linux"
