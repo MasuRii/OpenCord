@@ -379,7 +379,7 @@ export function definePluginSettings<
         pluginName: "",
 
         withPrivateSettings<T extends object>() {
-            return this as DefinedSettings<Def, T>;
+            return this as DefinedSettings<Def, PrivateSettings & T>;
         }
     };
 
