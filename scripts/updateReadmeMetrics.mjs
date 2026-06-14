@@ -4,8 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+
+import ts from "typescript";
 
 const collections = [
     {
@@ -78,6 +80,124 @@ function countPluginDirs(dir) {
     return readdirSync(dir, { withFileTypes: true }).filter(entry => entry.isDirectory()).length;
 }
 
+const visiblePluginDirs = [
+    "plugins/_api", "plugins/_core", "plugins",
+    "equicordplugins/_api", "equicordplugins/_core", "equicordplugins",
+    "opencordplugins/_api", "opencordplugins/_core", "opencordplugins",
+    "illegalcordplugins/_api", "illegalcordplugins/_core", "illegalcordplugins",
+    "testcordplugins/_api", "testcordplugins/_core", "testcordplugins",
+    "esharqplugins/_api", "esharqplugins/_core", "esharqplugins",
+    "equicordplusplugins/_api", "equicordplusplugins/_core", "equicordplusplugins",
+    "mallcordplugins/_api", "mallcordplugins/_core", "mallcordplugins"
+];
+
+function getPluginTarget(filePath) {
+    const pathParts = filePath.split(/[/\\]/);
+    if (/^index\.tsx?$/.test(pathParts.at(-1))) pathParts.pop();
+
+    const identifier = pathParts.at(-1).replace(/\.tsx?$/, "");
+    const identifierBits = identifier.split(".");
+    return identifierBits.length === 1 ? null : identifierBits.at(-1);
+}
+
+function isExcludedFromDesktopBuild(target) {
+    return target === "dev"
+        || target === "web"
+        || target === "vesktop"
+        || target === "equibop";
+}
+
+function readPluginEntryContent(fullPath, entry) {
+    if (entry.isFile()) return readFileSync(fullPath, "utf8");
+
+    for (const file of ["index.ts", "index.tsx"]) {
+        const entryPath = join(fullPath, file);
+        if (existsSync(entryPath)) return readFileSync(entryPath, "utf8");
+    }
+
+    return null;
+}
+
+function getStaticPropertyName(name, sourceFile) {
+    if (ts.isIdentifier(name) || ts.isStringLiteral(name) || ts.isNumericLiteral(name)) return name.text;
+    return name.getText(sourceFile);
+}
+
+function getPluginMetadata(content) {
+    const sourceFile = ts.createSourceFile("plugin.tsx", content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const metadata = {
+        name: null,
+        hidden: false,
+        required: false,
+        hasSettings: false
+    };
+
+    function visit(node) {
+        if (ts.isCallExpression(node)
+            && ts.isIdentifier(node.expression)
+            && node.expression.text === "definePlugin"
+            && ts.isObjectLiteralExpression(node.arguments[0])) {
+            for (const property of node.arguments[0].properties) {
+                if (ts.isShorthandPropertyAssignment(property)) {
+                    if (property.name.text === "settings") metadata.hasSettings = true;
+                    continue;
+                }
+
+                if (!ts.isPropertyAssignment(property)) continue;
+
+                const propertyName = getStaticPropertyName(property.name, sourceFile);
+                if (propertyName === "name"
+                    && (ts.isStringLiteral(property.initializer) || ts.isNoSubstitutionTemplateLiteral(property.initializer))) {
+                    metadata.name = property.initializer.text;
+                } else if (propertyName === "hidden" && property.initializer.kind === ts.SyntaxKind.TrueKeyword) {
+                    metadata.hidden = true;
+                } else if (propertyName === "required" && property.initializer.kind === ts.SyntaxKind.TrueKeyword) {
+                    metadata.required = true;
+                } else if (propertyName === "settings") {
+                    metadata.hasSettings = true;
+                }
+            }
+        }
+
+        ts.forEachChild(node, visit);
+    }
+
+    visit(sourceFile);
+    return metadata;
+}
+
+function countVisiblePlugins() {
+    const pluginsByName = new Map();
+
+    for (const dir of visiblePluginDirs) {
+        const fullDir = join("src", dir);
+        if (!existsSync(fullDir)) continue;
+
+        for (const entry of readdirSync(fullDir, { withFileTypes: true })) {
+            const fileName = entry.name;
+            if (fileName.startsWith("_") || fileName.startsWith(".") || fileName === "index.ts") continue;
+            if (/\.(zip|rar|7z|tar|gz|bz2)/.test(fileName)) continue;
+
+            const target = getPluginTarget(fileName);
+            if (target && isExcludedFromDesktopBuild(target)) continue;
+
+            const content = readPluginEntryContent(join(fullDir, fileName), entry);
+            if (!content) continue;
+
+            const plugin = getPluginMetadata(content);
+            if (!plugin.name) continue;
+
+            pluginsByName.set(plugin.name, plugin);
+        }
+    }
+
+    return [...pluginsByName.values()].filter(plugin => {
+        return !plugin.hidden
+            && !plugin.required
+            && (!plugin.name.endsWith("API") || plugin.hasSettings);
+    }).length;
+}
+
 function cleanVersion(version) {
     return version.replace(/^[~^]/, "");
 }
@@ -125,6 +245,7 @@ const metrics = collections.map(collection => ({
     count: countPluginDirs(collection.dir)
 }));
 const totalPlugins = metrics.reduce((total, collection) => total + collection.count, 0);
+const visiblePlugins = countVisiblePlugins();
 const typeScriptVersion = cleanVersion(packageJson.devDependencies.typescript);
 const packageManagerVersion = packageJson.packageManager.replace("@", "-");
 const readmePath = "README.md";
@@ -144,9 +265,9 @@ const collectionRows = metrics.map(collection => `| ${collection.name} | ${colle
 
 readme = replaceOne(
     readme,
-    /OpenCord is an open source Discord client mod forked from \[Equicord\]\(https:\/\/github\.com\/Equicord\/Equicord\) and \[Vencord\]\(https:\/\/github\.com\/Vendicated\/Vencord\), focused on a massive cross-community plugin catalog with \d+\+? plugin folders\./,
-    `OpenCord is an open source Discord client mod forked from [Equicord](https://github.com/Equicord/Equicord) and [Vencord](https://github.com/Vendicated/Vencord), focused on a massive cross-community plugin catalog with ${totalPlugins} plugin folders.`,
-    "README tagline plugin total"
+    /OpenCord is an open source Discord client mod forked from \[Equicord\]\(https:\/\/github\.com\/Equicord\/Equicord\) and \[Vencord\]\(https:\/\/github\.com\/Vendicated\/Vencord\), focused on a massive cross-community plugin catalog with \d+\+? plugin source folders\.(?: The desktop settings list currently shows about \d+\+? visible plugins after build filters\.)?/,
+    `OpenCord is an open source Discord client mod forked from [Equicord](https://github.com/Equicord/Equicord) and [Vencord](https://github.com/Vendicated/Vencord), focused on a massive cross-community plugin catalog with ${totalPlugins} plugin source folders. The desktop settings list currently shows about ${visiblePlugins} visible plugins after build filters.`,
+    "README tagline plugin totals"
 );
 readme = replaceOne(
     readme,
@@ -162,9 +283,9 @@ readme = replaceOne(
 );
 readme = replaceOne(
     readme,
-    /\| \d+\+? plugin folders \| Combines Vencord, Equicord, TestCord, Illegalcord, MallCord, Equicord\+, Esharq, and OpenCord plugins\. \|/,
-    `| ${totalPlugins} plugin folders | Combines Vencord, Equicord, TestCord, Illegalcord, MallCord, Equicord+, Esharq, and OpenCord plugins. |`,
-    "features plugin total"
+    /\| \d+\+? plugin source folders \| Combines Vencord, Equicord, TestCord, Illegalcord, MallCord, Equicord\+, Esharq, and OpenCord plugins\. \|(?:\n\| About \d+\+? visible plugins \| [^\n]+ \|)?/,
+    `| ${totalPlugins} plugin source folders | Combines Vencord, Equicord, TestCord, Illegalcord, MallCord, Equicord+, Esharq, and OpenCord plugins. |\n| About ${visiblePlugins} visible plugins | Approximates the desktop in-app settings list; it can be lower because source folders include duplicate names, API/core helpers, and platform or dev-targeted entries filtered out at build time. |`,
+    "features visible plugin totals"
 );
 readme = replaceOne(
     readme,
@@ -180,7 +301,7 @@ readme = replaceOne(
 );
 
 writeFileSync(readmePath, readme);
-console.log(`Updated README metrics for ${totalPlugins} plugin folders.`);
+console.log(`Updated README metrics for ${totalPlugins} plugin source folders and ${visiblePlugins} visible plugins.`);
 for (const collection of metrics) {
     console.log(`${collection.name}: ${collection.count}`);
 }
