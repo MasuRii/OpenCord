@@ -1367,6 +1367,13 @@ export const EquicordDevs = Object.freeze({
     },
 } satisfies Record<string, Dev>);
 
+export const OpenCordDevs = Object.freeze({
+    MasuRii: {
+        name: "MasuRii",
+        id: 397885875184467968n
+    },
+} satisfies Record<string, Dev>);
+
 export const IllegalcordDevs = Object.freeze({
     nobody: {
         name: "nobody",
@@ -1637,6 +1644,14 @@ export const VencordDevsById = /* #__PURE__*/ (() =>
 export const EquicordDevsById = /* #__PURE__*/ (() =>
     Object.freeze(Object.fromEntries(
         Object.entries(EquicordDevs)
+            .filter(d => d[1].id !== 0n)
+            .map(([_, v]) => [v.id, v] as const)
+    ))
+)() as Record<string, Dev>;
+
+export const OpenCordDevsById = /* #__PURE__*/ (() =>
+    Object.freeze(Object.fromEntries(
+        Object.entries(OpenCordDevs)
             .filter(d => d[1].id !== 0n)
             .map(([_, v]) => [v.id, v] as const)
     ))

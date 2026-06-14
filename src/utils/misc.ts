@@ -19,7 +19,7 @@
 import { User } from "@vencord/discord-types";
 import { ChannelStore, GuildMemberStore, IconUtils } from "@webpack/common";
 
-import { EquicordDevsById, EquicordPlusDevsById, EsharqDevsById, GUILD_ID, IllegalcordDevsById, KNOWN_ISSUES_CHANNEL_ID, MallCordDevsById, OPENCORD_HELPERS, SUPPORT_CHANNEL_ID, TestCordDevsById, VencordDevsById } from "./constants";
+import { EquicordDevsById, EquicordPlusDevsById, EsharqDevsById, GUILD_ID, IllegalcordDevsById, KNOWN_ISSUES_CHANNEL_ID, MallCordDevsById, OPENCORD_HELPERS, OpenCordDevsById, SUPPORT_CHANNEL_ID, TestCordDevsById, VencordDevsById } from "./constants";
 
 /**
  * Calls .join(" ") on the arguments
@@ -78,7 +78,7 @@ export function identity<T>(value: T): T {
     return value;
 }
 
-const SourceDevsById = [VencordDevsById, EquicordDevsById, IllegalcordDevsById, TestCordDevsById, EsharqDevsById, EquicordPlusDevsById, MallCordDevsById];
+const SourceDevsById = [VencordDevsById, EquicordDevsById, OpenCordDevsById, IllegalcordDevsById, TestCordDevsById, EsharqDevsById, EquicordPlusDevsById, MallCordDevsById];
 
 export const isPluginDev = (id: string) => Object.hasOwn(VencordDevsById, id);
 export const shouldShowContributorBadge = (id: string) => isPluginDev(id) && VencordDevsById[id].badge !== false;
