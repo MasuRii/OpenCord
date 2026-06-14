@@ -26,8 +26,8 @@ import { finished } from "stream/promises";
 import { fileURLToPath } from "url";
 
 const BASE_URL = "https://github.com/MasuRii/OpenCord/releases/latest/download/";
-const INSTALLER_PATH_DARWIN = "Equilotl.app/Contents/MacOS/Equilotl";
-const INSTALLER_APP_DARWIN = "Equilotl.app";
+const INSTALLER_PATH_DARWIN = "OpenCordInstaller.app/Contents/MacOS/OpenCordInstaller";
+const INSTALLER_APP_DARWIN = "OpenCordInstaller.app";
 
 const BASE_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FILE_DIR = join(BASE_DIR, "dist", "Installer");
@@ -36,18 +36,18 @@ const ETAG_FILE = join(FILE_DIR, "etag.txt");
 function getFilename() {
     switch (process.platform) {
         case "win32":
-            return "EquilotlCli.exe";
+            return "OpenCordInstallerCli.exe";
         case "darwin":
             switch (process.arch) {
                 case "x64":
-                    return "Equilotl-darwin-x64.zip";
+                    return "OpenCord-darwin-x64.zip";
                 case "arm64":
-                    return "Equilotl-darwin-arm64.zip";
+                    return "OpenCord-darwin-arm64.zip";
                 default:
                     throw new Error("Unsupported macOS architecture: " + process.arch);
             }
         case "linux":
-            return "EquilotlCli-linux";
+            return "OpenCordCli-linux";
         default:
             throw new Error("Unsupported platform: " + process.platform);
     }
@@ -73,7 +73,7 @@ async function ensureBinary() {
 
     const res = await fetch(BASE_URL + filename, {
         headers: {
-            "User-Agent": "OpenCord (https://github.com/OpenCord/OpenCord)",
+            "User-Agent": "OpenCord (https://github.com/MasuRii/OpenCord)",
             "If-None-Match": etag
         }
     });
@@ -134,11 +134,8 @@ try {
         env: {
             ...process.env,
             OPENCORD_USER_DATA_DIR: BASE_DIR,
-            OPENCORD_DIRECTORY: join(BASE_DIR, "dist/desktop"),
-            OPENCORD_DEV_INSTALL: "1",
-            EQUICORD_USER_DATA_DIR: BASE_DIR,
-            EQUICORD_DIRECTORY: join(BASE_DIR, "dist/desktop"),
-            EQUICORD_DEV_INSTALL: "1"
+            OPENCORD_DIRECTORY: join(BASE_DIR, "dist/desktop.asar"),
+            OPENCORD_DEV_INSTALL: "1"
         }
     });
 } catch {
