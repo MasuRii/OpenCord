@@ -10,7 +10,7 @@ import { useSettings } from "@api/Settings";
 import { Heading } from "@components/Heading";
 import { Link } from "@components/Link";
 import { Paragraph } from "@components/Paragraph";
-import { EquicordDevsById, EquicordPlusDevsById, EsharqDevsById, IllegalcordDevsById, MallCordDevsById, TestCordDevsById, VencordDevsById } from "@utils/constants";
+import { EquicordDevsById, EquicordPlusDevsById, EsharqDevsById, IllegalcordDevsById, MallCordDevsById, OpenCordDevsById, TestCordDevsById, VencordDevsById } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { fetchUserProfile } from "@utils/discord";
 import { pluralise } from "@utils/misc";
@@ -23,7 +23,7 @@ import { GithubButton, WebsiteButton } from "./LinkIconButton";
 import { PluginCard } from "./PluginCard";
 
 const cl = classNameFactory("vc-author-modal-");
-const SourceDevsById = [VencordDevsById, EquicordDevsById, IllegalcordDevsById, TestCordDevsById, EsharqDevsById, EquicordPlusDevsById, MallCordDevsById];
+const SourceDevsById = [VencordDevsById, EquicordDevsById, OpenCordDevsById, IllegalcordDevsById, TestCordDevsById, EsharqDevsById, EquicordPlusDevsById, MallCordDevsById];
 
 function getAuthorId(author: { id?: BigInt | string | number | bigint | null | undefined; }): string | null {
     if (author == null || author.id == null) return null;
