@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # Configuration
-INSTALLER_PATH="$HOME/.equilotl"
-GITHUB_URL="https://github.com/MasuRii/OpenCord/releases/latest/download/EquilotlCli-linux"
+INSTALLER_PATH="$HOME/.opencord-installer"
+GITHUB_URL="https://github.com/MasuRii/OpenCord/releases/latest/download/OpenCordCli-linux"
 OPENCORD_ASAR_URL="https://github.com/MasuRii/OpenCord/releases/latest/download/desktop.asar"
 OPENCORD_DATA_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/OpenCord"
 OPENCORD_ASAR_PATH="$OPENCORD_DATA_DIR/opencord.asar"
 PRIVILEGE_CMDS=("sudo" "doas")
 DEBUG=false
-LOG_FILE="$(dirname "$(realpath "$0")")/equicordinstalldebug.log"
+LOG_FILE="$(dirname "$(realpath "$0")")/opencordinstalldebug.log"
 
 # Colors for output
 RED='\033[0;31m'
@@ -57,7 +57,7 @@ check_for_updates() {
     fi
 
     local latest_modified local_modified
-    if ! latest_modified=$(curl -sI "$GITHUB_URL" | grep -i "last-modified" | cut -d' ' -f2-); then
+    if ! latest_modified=$(curl -sIL "$GITHUB_URL" | grep -i "last-modified" | cut -d' ' -f2-); then
         echo -e "${YELLOW}Warning: Could not fetch last modified date from GitHub. Using existing installer.${NC}"
         return
     fi
@@ -119,11 +119,11 @@ main() {
     debug_log "Using privilege command: $priv_cmd"
 
     echo -e "${YELLOW}Running installer with $priv_cmd...${NC}"
-    debug_log "Executing installer: $priv_cmd env EQUICORD_USER_DATA_DIR=$OPENCORD_DATA_DIR EQUICORD_DIRECTORY=$OPENCORD_ASAR_PATH EQUICORD_DEV_INSTALL=1 $INSTALLER_PATH --install"
+    debug_log "Executing installer: $priv_cmd env OPENCORD_USER_DATA_DIR=$OPENCORD_DATA_DIR OPENCORD_DIRECTORY=$OPENCORD_ASAR_PATH OPENCORD_DEV_INSTALL=1 $INSTALLER_PATH --install"
     if ! "$priv_cmd" env \
-        EQUICORD_USER_DATA_DIR="$OPENCORD_DATA_DIR" \
-        EQUICORD_DIRECTORY="$OPENCORD_ASAR_PATH" \
-        EQUICORD_DEV_INSTALL=1 \
+        OPENCORD_USER_DATA_DIR="$OPENCORD_DATA_DIR" \
+        OPENCORD_DIRECTORY="$OPENCORD_ASAR_PATH" \
+        OPENCORD_DEV_INSTALL=1 \
         "$INSTALLER_PATH" --install; then
         debug_log "Installer failed"
         error "Installer failed to run"
