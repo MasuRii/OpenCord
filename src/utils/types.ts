@@ -292,6 +292,7 @@ export type PluginSettingDef =
 
 export interface PluginSettingDefCommon extends IsDisabledOrHidden, IsValid<unknown> {
     description: string;
+    displayName?: string;
     placeholder?: string;
     onChange?(newValue: any): void;
     /**
@@ -375,7 +376,7 @@ export interface PluginSettingSliderDef extends PluginSettingDefCommon {
     stickToMarkers?: boolean;
 }
 
-export interface PluginSettingComponentDef extends Omit<PluginSettingDefCommon, "description" | "placeholder"> {
+export interface PluginSettingComponentDef extends Omit<PluginSettingDefCommon, "description" | "placeholder" | "displayName"> {
     type: OptionType.COMPONENT;
     component: (props: PluginSettingComponentProps) => ReactNode | Promise<ReactNode>;
     default?: any;
