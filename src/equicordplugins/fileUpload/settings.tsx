@@ -383,7 +383,7 @@ function SettingTextInput(props: {
     const { description, name, onChange, placeholder, value } = props;
 
     return (
-        <SettingsSection name={name} description={description ?? ""}>
+        <SettingsSection id={name} name={name} description={description ?? ""}>
             <TextInput
                 value={value}
                 onChange={onChange}
@@ -401,7 +401,7 @@ function SettingGroup(props: {
     const { children, description, name } = props;
 
     return (
-        <SettingsSection name={name} description={description ?? ""}>
+        <SettingsSection id={name} name={name} description={description ?? ""}>
             <div className={cl("group")}>
                 {children}
             </div>
@@ -418,7 +418,7 @@ function SettingSwitch(props: {
     const { checked, description, name, onChange } = props;
 
     return (
-        <SettingsSection tag="label" name={name} description={description} inlineSetting>
+        <SettingsSection id={name} tag="label" name={name} description={description} inlineSetting>
             <Switch checked={checked} onChange={onChange} />
         </SettingsSection>
     );
@@ -469,7 +469,7 @@ function FallbackOrderSettings() {
     };
 
     return (
-        <SettingsSection name="Fallback Order" description="Drag hosts to reorder fallback attempts. The selected host is tried first, then this order is used.">
+        <SettingsSection id="fallback-order" name="Fallback Order" description="Drag hosts to reorder fallback attempts. The selected host is tried first, then this order is used.">
             <div className={cl("fallback-order-list")}>
                 {order.map((service, index) => (
                     <div
@@ -567,7 +567,7 @@ export function SettingsComponent() {
 
     return (
         <>
-            <SettingsSection name="Upload Service" description="Choose where FileUpload sends new files.">
+            <SettingsSection id="upload-service" name="Upload Service" description="Choose where FileUpload sends new files.">
                 <ServicePicker
                     value={store.serviceType as ServiceType}
                     onChange={service => {
@@ -636,7 +636,7 @@ export function SettingsComponent() {
                         onChange={v => (store as { encryptingHostKey?: string; }).encryptingHostKey = v}
                         placeholder="Your Encrypting.host API key"
                     />
-                    <SettingsSection name="URL Style" description="How Encrypting.host should format returned links.">
+                    <SettingsSection id="url-style" name="URL Style" description="How Encrypting.host should format returned links.">
                         <Select
                             options={encryptingHostUrlStyleOptions}
                             isSelected={v => v === (store as { encryptingHostUrlStyle?: string; }).encryptingHostUrlStyle}
@@ -648,7 +648,7 @@ export function SettingsComponent() {
                             placeholder="Select URL style"
                         />
                     </SettingsSection>
-                    <SettingsSection name="Domains JSON" description={"JSON array of domains to use, for example [\"offensive\"]."}>
+                    <SettingsSection id="domains-json" name="Domains JSON" description={"JSON array of domains to use, for example [\"offensive\"]."}>
                         <TextArea
                             value={(store as { encryptingHostDomains?: string; }).encryptingHostDomains || ""}
                             rows={3}
@@ -760,7 +760,7 @@ export function SettingsComponent() {
             )}
 
             {isLitterbox && (
-                <SettingsSection name="Litterbox Expiry" description="How long uploads are retained">
+                <SettingsSection id="litterbox-expiry" name="Litterbox Expiry" description="How long uploads are retained">
                     <Select
                         options={litterboxOptions}
                         isSelected={v => v === store.litterboxExpiry}
@@ -813,6 +813,7 @@ export function SettingsComponent() {
             {isShareX && (
                 <SettingGroup name="ShareX Custom Uploader" description="Paste, import, or validate a ShareX custom uploader config.">
                     <SettingsSection
+                        id="sharex-custom-uploader-config"
                         name="ShareX Custom Uploader Config"
                         description="Paste your ShareX custom uploader JSON (.sxcu/.json). DestinationType must include FileUploader or ImageUploader."
                     >
@@ -823,7 +824,7 @@ export function SettingsComponent() {
                             onChange={v => store.sharexConfig = v}
                         />
                     </SettingsSection>
-                    <SettingsSection name="ShareX Config Actions" description="Import from file or validate pasted config">
+                    <SettingsSection id="sharex-config-actions" name="ShareX Config Actions" description="Import from file or validate pasted config">
                         <div className={cl("actions")}>
                             <Button size="small" onClick={triggerShareXFileUpload}>Import .sxcu/.json</Button>
                             <Button size="small" onClick={validateShareXConfig}>Validate</Button>
@@ -869,7 +870,7 @@ export function SettingsComponent() {
                         onChange={v => store.webdavDirectory = v}
                         placeholder="Leave empty for root directory"
                     />
-                    <SettingsSection name="Server Type" description="Select your WebDAV server type. Nextcloud and ownCloud will create a public share link. Generic returns the raw file URL.">
+                    <SettingsSection id="server-type" name="Server Type" description="Select your WebDAV server type. Nextcloud and ownCloud will create a public share link. Generic returns the raw file URL.">
                         <Select
                             options={[
                                 { label: "Nextcloud", value: "nextcloud", default: true },
@@ -886,7 +887,7 @@ export function SettingsComponent() {
                         />
                     </SettingsSection>
                     {store.webdavServerType !== "generic" && (
-                        <SettingsSection name="Share Link Format" description="How to return the public share link. Share Page links to a web page; Direct Download links straight to the file; Markdown Link wraps the share page in a clickable filename.">
+                        <SettingsSection id="share-link-format" name="Share Link Format" description="How to return the public share link. Share Page links to a web page; Direct Download links straight to the file; Markdown Link wraps the share page in a clickable filename.">
                             <Select
                                 options={[
                                     { label: "Share Page", value: "share-page", default: true },
@@ -925,7 +926,7 @@ export function SettingsComponent() {
                 />
 
                 {store.embedProxyEnabled && (
-                    <SettingsSection name="Embed Proxy Service" description="Choose which embed proxy service to use for uploaded video links">
+                    <SettingsSection id="embed-proxy-service" name="Embed Proxy Service" description="Choose which embed proxy service to use for uploaded video links">
                         <Select
                             options={embedProxyOptions}
                             isSelected={v => v === store.embedProxyService}
@@ -1022,11 +1023,11 @@ export function SettingsComponent() {
                     placeholder="https://your-cors-proxy.example.com"
                 />
 
-                <SettingsSection name="Default CORS Proxy Source" description="Source code for the default CORS proxy">
+                <SettingsSection id="default-cors-proxy-source" name="Default CORS Proxy Source" description="Source code for the default CORS proxy">
                     <a href="https://codeberg.org/key/corsproxy" target="_blank" rel="noreferrer">codeberg.org/key/corsproxy</a>
                 </SettingsSection>
 
-                <SettingsSection name="Upload Timeout" description="Maximum time to wait per upload attempt before switching to fallback">
+                <SettingsSection id="upload-timeout" name="Upload Timeout" description="Maximum time to wait per upload attempt before switching to fallback">
                     <Select
                         options={[
                             { label: "30 seconds", value: 30000 },

@@ -68,7 +68,7 @@ async function rdbRequest<T = unknown>(path: string, options: RequestInit = {}):
     return data as T;
 }
 
-export async function getReviews(id: string, { limit, offset = 0, fetchVotes = false }: { limit?: number; offset?: number; fetchVotes?: boolean } = {}): Promise<UserReviewsData> {
+export async function getReviews(id: string, { limit, offset = 0, fetchVotes = false }: { limit?: number; offset?: number; fetchVotes?: boolean; } = {}): Promise<UserReviewsData> {
     let flags = 0;
     if (!settings.store.showWarning) flags |= WarningFlag;
 
@@ -140,7 +140,7 @@ export async function getReviewVotes(id: string): Promise<ReviewVote[]> {
     return res?.votes ?? [];
 }
 
-export async function addReview(review: { userid: string; comment: string }): Promise<UserReviewsData | null> {
+export async function addReview(review): Promise<UserReviewsData | null> {
 
     const token = await getToken();
     if (!token) {
@@ -186,7 +186,7 @@ export async function voteReview(id: number, isUpvote: boolean) {
         return false;
     }
 
-    const data = await rdbRequest<{ message?: string }>(`/reviews/${id}/vote`, {
+    const data = await rdbRequest<{ message?: string; }>(`/reviews/${id}/vote`, {
         method: "POST",
         body: JSON.stringify({ isUpvote })
     });
@@ -204,7 +204,7 @@ export async function deleteReviewVote(id: number) {
         return false;
     }
 
-    const data = await rdbRequest<{ message?: string }>(`/reviews/${id}/vote`, {
+    const data = await rdbRequest<{ message?: string; }>(`/reviews/${id}/vote`, {
         method: "DELETE",
     });
 

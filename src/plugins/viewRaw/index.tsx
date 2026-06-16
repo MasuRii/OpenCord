@@ -32,7 +32,6 @@ import { Message } from "@vencord/discord-types";
 import { ChannelStore, GuildRoleStore, Menu, Modal, openModal, UserProfileStore } from "@webpack/common";
 import { MouseEventHandler } from "react";
 
-
 const CopyRawIcon: IconComponent = ({ height = 20, width = 20, className }) => {
     return (
         <svg

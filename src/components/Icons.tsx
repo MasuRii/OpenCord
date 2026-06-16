@@ -105,7 +105,6 @@ export function CopyIdIcon(props: IconProps) {
     );
 }
 
-
 /**
  * Discord's open external icon, as seen in the user profile connections
  */
