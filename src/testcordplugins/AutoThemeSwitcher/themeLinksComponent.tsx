@@ -47,7 +47,7 @@ export function ThemeLinksComponent({ setValue }: PluginSettingComponentProps, i
 
     // Set up the text area to return
     return (
-        <SettingsSection error={error} name={id} description={description}>
+        <SettingsSection id={id} error={error} name={id} description={description}>
             <TextArea
                 value={state}
                 onChange={handleChange}

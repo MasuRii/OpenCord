@@ -42,6 +42,7 @@ function RulesFileControl({ setValue }: { setValue(value: boolean): void; }) {
         SettingsSection,
         {
             name: "rulesFile",
+            id: "rulesFile",
             description: "Enable JSON5 rules and auto-layout overrides. When off, HyprTiles uses the plugin layout settings only.",
             inlineSetting: true
         },

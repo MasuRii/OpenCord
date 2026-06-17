@@ -51,7 +51,7 @@ export function timeComponent({ setValue }: PluginSettingComponentProps, id: str
         return null;
 
     return (
-        <SettingsSection error={error} name={""} description={""}>
+        <SettingsSection id={id} error={error} name={""} description={""}>
         <TextSetting
             setting={{
                 type: OptionType.STRING,
