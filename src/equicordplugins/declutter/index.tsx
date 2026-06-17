@@ -326,7 +326,7 @@ export default definePlugin({
             // Channel list server boost progress bar
             find: "useGuildActionRow",
             replacement: {
-                match: /(GUILD_NEW_MEMBER_ACTIONS_PROGRESS_BAR\)):(\i(?:\.premiumProgressBarEnabled)?)/,
+                match: /(GUILD_NEW_MEMBER_ACTIONS_PROGRESS_BAR\)):\i(?:\.premiumProgressBarEnabled)?/,
                 replace: "$1:null"
             },
             predicate: () => settings.store.removeServerBoostInfo,

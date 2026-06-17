@@ -199,7 +199,7 @@ export default definePlugin({
         {
             find: "discarding speculative database",
             replacement: {
-                match: /await (\i)\((\i)\)(?=;.{0,15}this\.databases)/,
+                match: /await \i\(\i\)(?=;.{0,15}this\.databases)/,
                 replace: "$&.catch(()=>null)"
             }
         },
