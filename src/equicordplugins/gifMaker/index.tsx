@@ -5,7 +5,7 @@
  */
 
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
-import { definePluginSettings } from "@api/Settings";
+import { definePluginSettings, migratePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
 import { EquicordDevs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
@@ -474,8 +474,9 @@ function openGifMakerFromItem(item) {
     ));
 }
 
+migratePluginSettings("GifMaker", "gifMaker");
 export default definePlugin({
-    name: "gifMaker",
+    name: "GifMaker",
     description: "Create and caption GIFs from any media in chat or the GIF picker.",
     authors: [EquicordDevs.Leon135, EquicordDevs.benjii],
     settings,
