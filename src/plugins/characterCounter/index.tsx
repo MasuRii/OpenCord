@@ -62,8 +62,6 @@ export default definePlugin({
 
         useEffect(() => {
             const listener = () => {
-                if (!editorRef?.current) return setSelectedCount(0);
-
                 setSelectedCount(document.getSelection()?.toString()?.length ?? 0);
             };
 
