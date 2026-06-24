@@ -26,8 +26,8 @@ export default definePlugin({
         {
             find: ".SLASH_COMMAND_USED,{",
             replacement: {
-                match: /searchReplace:\{match:(\i\(\)\.anyScopeRegex)/,
-                replace: "searchReplace:{match:$1($self.sedRegex),action:$self.searchReplace},_eq_$&"
+                match: /searchReplace:\{match:(\i\(\)\.anyScopeRegex).{500,600}content:""\}\}\}/,
+                replace: "searchReplace:{match:$1($self.sedRegex),action:$self.searchReplace}"
             }
         }
     ],
