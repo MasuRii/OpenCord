@@ -36,3 +36,7 @@ ExtensionCache/
 
 # wakatime related stuff
 .wakatime-project
+
+# plugin-sync scratch dirs (must never enter the sync PR)
+upstream-temp/
+.github/sync-quarantine/

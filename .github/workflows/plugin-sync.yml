@@ -377,6 +377,11 @@ jobs:
                   git add ".github/sync-state/${{ matrix.source }}.sha"
                   git commit -m "chore(${{ matrix.source }}): update sync state to ${{ steps.detect.outputs.upstream_sha }}" || true
 
+            - name: Clean up scratch dirs
+              if: steps.stage.outputs.has_plugin_changes == 'true' && steps.quarantine.outputs.build_ok == 'true'
+              run: |
+                  rm -rf upstream-temp .github/sync-quarantine
+
             - name: Create or update PR
               if: steps.stage.outputs.has_plugin_changes == 'true' && steps.quarantine.outputs.build_ok == 'true'
               uses: peter-evans/create-pull-request@v8
