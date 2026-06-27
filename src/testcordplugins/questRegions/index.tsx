@@ -1652,7 +1652,9 @@ async function loadQuestRegions(signal: AbortSignal): Promise<QuestRegionCard[]>
     for (const restriction of storedDiscoveredRestrictions) {
         const existing = restrictionsById.get(restriction.id);
         if (existing) {
-            existing.regions = Array.from(new Set([...existing.regions, ...restriction.regions])).sort();
+            if (Array.isArray(restriction.regions) && restriction.regions.length > 0) {
+                existing.regions = Array.from(new Set([...(existing.regions ?? []), ...restriction.regions])).sort();
+            }
         } else {
             restrictionsById.set(restriction.id, restriction);
         }
@@ -1667,8 +1669,10 @@ async function loadQuestRegions(signal: AbortSignal): Promise<QuestRegionCard[]>
         for (const [id, restriction] of inferred) {
             const existing = restrictionsById.get(id);
             if (!existing) continue;
-            const merged = Array.from(new Set([...existing.regions, ...restriction.regions])).sort();
-            if (merged.length === existing.regions.length) continue;
+            if (!Array.isArray(restriction.regions) || restriction.regions.length === 0) continue;
+            const baseRegions = Array.isArray(existing.regions) ? existing.regions : [];
+            const merged = Array.from(new Set([...baseRegions, ...restriction.regions])).sort();
+            if (merged.length === baseRegions.length) continue;
             restrictionsById.set(id, { ...existing, regions: merged });
             changed = true;
         }
@@ -2257,21 +2261,14 @@ export default definePlugin({
     settings,
 
     start() {
-        if (settings.store.proxyDiscoveryIntervalMinutes === 60) {
-            settings.store.proxyDiscoveryIntervalMinutes = 15;
-        }
         knownQuestIds.clear();
         countryProxyCache.clear();
         void getQuestRegions()
             .then(cards => {
                 for (const card of cards) for (const quest of card.quests) knownQuestIds.add(quest.id);
                 console.debug(`[QuestRegions] start: seeded ${knownQuestIds.size} known quest IDs`);
-                if (settings.store.discoverQuestsViaProxies) {
-                    void warmProxiesForCountries(getActiveQuestCountries(cards));
-                }
             })
             .catch(err => logger.error("Failed to seed known quest IDs", err));
-        startProxyDiscoveryTimer();
     },
 
     stop() {

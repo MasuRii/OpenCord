@@ -430,7 +430,7 @@ function checkMessageForViolations(content: string): ViolationPattern[] {
 }
 
 function toAsterisks(str: string): string {
-    return str.replace(/[^\s]/g, "\\*");
+    return str.replace(/[^\s]/g, "*");
 }
 
 function censorContent(content: string, violations: ViolationPattern[]): { newContent: string; censored: boolean; } {

@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import definePlugin from "@utils/types";
 import { TestcordDevs } from "@utils/constants";
+import definePlugin from "@utils/types";
 
 export default definePlugin({
     name: "NewlinesInCommands",
@@ -36,8 +36,3 @@ export default definePlugin({
     ],
 
 });
-
-
-
-
-

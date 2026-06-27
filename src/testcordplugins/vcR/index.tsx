@@ -1,12 +1,18 @@
-import definePlugin, { OptionType } from "@utils/types";
-import { TestcordDevs } from "@utils/constants";
-import { Menu, React, Toasts, TextInput, Forms, Button, Text } from "@webpack/common";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
-import { ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal, ModalSize } from "@utils/modal";
-import { CSSProperties } from 'react';
 import { DataStore } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
+import { TestcordDevs } from "@utils/constants";
+import { ModalContent, ModalFooter, ModalHeader, ModalRoot, ModalSize,openModal } from "@utils/modal";
 import { useForceUpdater } from "@utils/react";
+import definePlugin, { OptionType } from "@utils/types";
+import { Button, Forms, Menu, React, Text,TextInput, Toasts } from "@webpack/common";
+import { CSSProperties } from "react";
 
 const DISCORD_GATEWAY = "wss://gateway.discord.gg/?v=9&encoding=json";
 const STORAGE_KEY = "vc-toucher";
@@ -73,7 +79,7 @@ function TokenManager() {
         forceUpdate();
     };
 
-    const removeToken = async (tokenToRemove) => {
+    const removeToken = async tokenToRemove => {
         const updatedTokens = tokenEntries.filter(token => token !== tokenToRemove);
         storedTokens = updatedTokens;
         await saveTokensToStorage();
@@ -128,7 +134,7 @@ export default definePlugin({
 async function executeVoiceChannelAction(guildId: string, channelId: string, duration: number, rejoin: number, delay: number, randomDelay: number, amount: number) {
     if (randomDelay <= 1) {
         if (shouldStop) return;
-        console.log('executing method 1');
+        console.log("executing method 1");
         for (const socket of webSockets) {
             const joinPayload = {
                 op: 4,
@@ -158,7 +164,7 @@ async function executeVoiceChannelAction(guildId: string, channelId: string, dur
             socket.send(JSON.stringify(leavePayload));
         }
     } else {
-        console.log('executing method 2');
+        console.log("executing method 2");
         for (const socket of webSockets) {
             if (shouldStop) return;
 
@@ -208,7 +214,7 @@ async function scheduleRejoin(guildId, channelId, duration, rejoin, delay, rando
 }
 
 function initializeWebSockets() {
-    if (typeof webSockets === 'undefined') {
+    if (typeof webSockets === "undefined") {
         webSockets = [];
     }
     currentTokens.forEach((token, index) => {
@@ -279,14 +285,14 @@ let selectedChannelId = "";
 function stopExecution() {
     shouldStop = true;
     Toasts.show({
-        message: `Stopping VC Raper successfully.`,
+        message: "Stopping VC Raper successfully.",
         id: "stop",
         type: Toasts.Type.FAILURE,
         options: {
             position: Toasts.Position.BOTTOM
         }
     });
-    console.log('stopped vc raper');
+    console.log("stopped vc raper");
 }
 
 function VCRaperModal(props) {
@@ -306,37 +312,37 @@ function VCRaperModal(props) {
     return (
         <ModalRoot {...props} size={ModalSize.DYNAMIC}>
             <ModalHeader>
-                <div style={{ display: 'flex', alignItems: 'center', padding: '0 5px' }}>
-                    <Forms.FormTitle tag="h4" style={{ color: '#ffffff', fontSize: '20px', fontWeight: '600', margin: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", padding: "0 5px" }}>
+                    <Forms.FormTitle tag="h4" style={{ color: "#ffffff", fontSize: "20px", fontWeight: "600", margin: 0 }}>
                         VC Raper Control Panel
                     </Forms.FormTitle>
-                    <div style={{ backgroundColor: '#059669', padding: '6px 16px', borderRadius: '20px', fontSize: '14px', marginLeft: 'auto' }}>
-                        <span style={{ color: '#ffffff', fontWeight: '500' }}>Connected: {getConnectionCount()}</span>
+                    <div style={{ backgroundColor: "#059669", padding: "6px 16px", borderRadius: "20px", fontSize: "14px", marginLeft: "auto" }}>
+                        <span style={{ color: "#ffffff", fontWeight: "500" }}>Connected: {getConnectionCount()}</span>
                     </div>
                 </div>
             </ModalHeader>
             <ModalContent>
                 {/* Control Panel */}
                 <div style={{
-                    backgroundColor: 'transparent',
-                    padding: '20px',
-                    borderRadius: '12px',
-                    marginBottom: '20px',
-                    border: '1px solid #334155'
+                    backgroundColor: "transparent",
+                    padding: "20px",
+                    borderRadius: "12px",
+                    marginBottom: "20px",
+                    border: "1px solid #334155"
                 }}>
                     <div style={{
-                        color: '#94a3b8',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '16px',
-                        paddingBottom: '8px',
-                        borderBottom: '1px solid #334155'
+                        color: "#94a3b8",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        marginBottom: "16px",
+                        paddingBottom: "8px",
+                        borderBottom: "1px solid #334155"
                     }}>
                         System Controls
                     </div>
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                    <div style={{ display: "flex", gap: "12px" }}>
                         <Button onClick={connectWebSockets} style={modalStyles.devButton}>
                             🔌 CONNECT WEBSOCKET (DEBUG)
                         </Button>
@@ -348,93 +354,93 @@ function VCRaperModal(props) {
 
                 {/* Configuration Grid */}
                 <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
-                    gap: '20px',
-                    marginBottom: '20px'
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "20px",
+                    marginBottom: "20px"
                 }}>
                     <div style={{
-                        backgroundColor: 'transparent',
-                        padding: '20px',
-                        borderRadius: '12px',
-                        border: '1px solid #334155'
+                        backgroundColor: "transparent",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        border: "1px solid #334155"
                     }}>
                         <div style={{
-                            color: '#94a3b8',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                            marginBottom: '16px',
-                            paddingBottom: '8px',
-                            borderBottom: '1px solid #334155'
+                            color: "#94a3b8",
+                            fontSize: "14px",
+                            fontWeight: "600",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            marginBottom: "16px",
+                            paddingBottom: "8px",
+                            borderBottom: "1px solid #334155"
                         }}>
                             Timing Configuration
                         </div>
 
-                        <div style={{ marginBottom: '16px' }}>
+                        <div style={{ marginBottom: "16px" }}>
                             <label style={{
-                                display: 'block',
-                                color: '#e2e8f0',
-                                fontSize: '13px',
-                                fontWeight: '500',
-                                marginBottom: '6px'
+                                display: "block",
+                                color: "#e2e8f0",
+                                fontSize: "13px",
+                                fontWeight: "500",
+                                marginBottom: "6px"
                             }}>
                                 Duration (ms)
                             </label>
                             <TextInput
                                 style={{
-                                    width: '100%',
-                                    backgroundColor: '#0f172a',
-                                    border: '1px solid #475569',
-                                    borderRadius: '6px',
-                                    color: '#ffffff',
-                                    fontSize: '14px'
+                                    width: "100%",
+                                    backgroundColor: "#0f172a",
+                                    border: "1px solid #475569",
+                                    borderRadius: "6px",
+                                    color: "#ffffff",
+                                    fontSize: "14px"
                                 }}
                                 value={duration.toString()}
                                 placeholder="How long to stay in VC"
-                                onChange={(value) => setDuration(Number(value))}
+                                onChange={value => setDuration(Number(value))}
                             />
                             <span style={{
-                                display: 'block',
-                                color: '#64748b',
-                                fontSize: '11px',
-                                marginTop: '4px',
-                                fontStyle: 'italic'
+                                display: "block",
+                                color: "#64748b",
+                                fontSize: "11px",
+                                marginTop: "4px",
+                                fontStyle: "italic"
                             }}>
                                 Time spent in voice channel
                             </span>
                         </div>
 
-                        <div style={{ marginBottom: '16px' }}>
+                        <div style={{ marginBottom: "16px" }}>
                             <label style={{
-                                display: 'block',
-                                color: '#e2e8f0',
-                                fontSize: '13px',
-                                fontWeight: '500',
-                                marginBottom: '6px'
+                                display: "block",
+                                color: "#e2e8f0",
+                                fontSize: "13px",
+                                fontWeight: "500",
+                                marginBottom: "6px"
                             }}>
                                 Delay (ms)
                             </label>
                             <TextInput
                                 style={{
-                                    width: '100%',
-                                    backgroundColor: '#0f172a',
-                                    border: '1px solid #475569',
-                                    borderRadius: '6px',
-                                    color: '#ffffff',
-                                    fontSize: '14px'
+                                    width: "100%",
+                                    backgroundColor: "#0f172a",
+                                    border: "1px solid #475569",
+                                    borderRadius: "6px",
+                                    color: "#ffffff",
+                                    fontSize: "14px"
                                 }}
                                 value={delay.toString()}
                                 placeholder="Initial delay before action"
-                                onChange={(value) => setDelay(Number(value))}
+                                onChange={value => setDelay(Number(value))}
                             />
                             <span style={{
-                                display: 'block',
-                                color: '#64748b',
-                                fontSize: '11px',
-                                marginTop: '4px',
-                                fontStyle: 'italic'
+                                display: "block",
+                                color: "#64748b",
+                                fontSize: "11px",
+                                marginTop: "4px",
+                                fontStyle: "italic"
                             }}>
                                 Wait time before joining
                             </span>
@@ -442,87 +448,87 @@ function VCRaperModal(props) {
                     </div>
 
                     <div style={{
-                        backgroundColor: 'transparent',
-                        padding: '20px',
-                        borderRadius: '12px',
-                        border: '1px solid #334155'
+                        backgroundColor: "transparent",
+                        padding: "20px",
+                        borderRadius: "12px",
+                        border: "1px solid #334155"
                     }}>
                         <div style={{
-                            color: '#94a3b8',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            textTransform: 'uppercase',
-                            letterSpacing: '0.05em',
-                            marginBottom: '16px',
-                            paddingBottom: '8px',
-                            borderBottom: '1px solid #334155'
+                            color: "#94a3b8",
+                            fontSize: "14px",
+                            fontWeight: "600",
+                            textTransform: "uppercase",
+                            letterSpacing: "0.05em",
+                            marginBottom: "16px",
+                            paddingBottom: "8px",
+                            borderBottom: "1px solid #334155"
                         }}>
                             Behavior Settings
                         </div>
 
-                        <div style={{ marginBottom: '16px' }}>
+                        <div style={{ marginBottom: "16px" }}>
                             <label style={{
-                                display: 'block',
-                                color: '#e2e8f0',
-                                fontSize: '13px',
-                                fontWeight: '500',
-                                marginBottom: '6px'
+                                display: "block",
+                                color: "#e2e8f0",
+                                fontSize: "13px",
+                                fontWeight: "500",
+                                marginBottom: "6px"
                             }}>
                                 Rejoin Count
                             </label>
                             <TextInput
                                 style={{
-                                    width: '100%',
-                                    backgroundColor: '#0f172a',
-                                    border: '1px solid #475569',
-                                    borderRadius: '6px',
-                                    color: '#ffffff',
-                                    fontSize: '14px'
+                                    width: "100%",
+                                    backgroundColor: "#0f172a",
+                                    border: "1px solid #475569",
+                                    borderRadius: "6px",
+                                    color: "#ffffff",
+                                    fontSize: "14px"
                                 }}
                                 value={rejoin.toString()}
                                 placeholder="Number of rejoins"
-                                onChange={(value) => setRejoin(Number(value))}
+                                onChange={value => setRejoin(Number(value))}
                             />
                             <span style={{
-                                display: 'block',
-                                color: '#64748b',
-                                fontSize: '11px',
-                                marginTop: '4px',
-                                fontStyle: 'italic'
+                                display: "block",
+                                color: "#64748b",
+                                fontSize: "11px",
+                                marginTop: "4px",
+                                fontStyle: "italic"
                             }}>
                                 How many times to rejoin
                             </span>
                         </div>
 
-                        <div style={{ marginBottom: '16px' }}>
+                        <div style={{ marginBottom: "16px" }}>
                             <label style={{
-                                display: 'block',
-                                color: '#e2e8f0',
-                                fontSize: '13px',
-                                fontWeight: '500',
-                                marginBottom: '6px'
+                                display: "block",
+                                color: "#e2e8f0",
+                                fontSize: "13px",
+                                fontWeight: "500",
+                                marginBottom: "6px"
                             }}>
                                 Random Delay (ms)
                             </label>
                             <TextInput
                                 style={{
-                                    width: '100%',
-                                    backgroundColor: '#0f172a',
-                                    border: '1px solid #475569',
-                                    borderRadius: '6px',
-                                    color: '#ffffff',
-                                    fontSize: '14px'
+                                    width: "100%",
+                                    backgroundColor: "#0f172a",
+                                    border: "1px solid #475569",
+                                    borderRadius: "6px",
+                                    color: "#ffffff",
+                                    fontSize: "14px"
                                 }}
                                 value={randomDelay.toString()}
                                 placeholder="Randomization factor"
-                                onChange={(value) => setRandomDelay(Number(value))}
+                                onChange={value => setRandomDelay(Number(value))}
                             />
                             <span style={{
-                                display: 'block',
-                                color: '#64748b',
-                                fontSize: '11px',
-                                marginTop: '4px',
-                                fontStyle: 'italic'
+                                display: "block",
+                                color: "#64748b",
+                                fontSize: "11px",
+                                marginTop: "4px",
+                                fontStyle: "italic"
                             }}>
                                 Random variation in timing
                             </span>
@@ -532,55 +538,55 @@ function VCRaperModal(props) {
 
                 {/* Bot Count Section */}
                 <div style={{
-                    backgroundColor: 'transparent',
-                    padding: '20px',
-                    borderRadius: '12px',
-                    border: '1px solid #334155'
+                    backgroundColor: "transparent",
+                    padding: "20px",
+                    borderRadius: "12px",
+                    border: "1px solid #334155"
                 }}>
                     <div style={{
-                        color: '#94a3b8',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em',
-                        marginBottom: '16px',
-                        paddingBottom: '8px',
-                        borderBottom: '1px solid #334155'
+                        color: "#94a3b8",
+                        fontSize: "14px",
+                        fontWeight: "600",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        marginBottom: "16px",
+                        paddingBottom: "8px",
+                        borderBottom: "1px solid #334155"
                     }}>
                         Deployment
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                         <label style={{
-                            color: '#e2e8f0',
-                            fontSize: '13px',
-                            fontWeight: '500'
+                            color: "#e2e8f0",
+                            fontSize: "13px",
+                            fontWeight: "500"
                         }}>
                             Bot Count
                         </label>
                         <TextInput
                             style={{
-                                width: '120px',
-                                backgroundColor: '#0f172a',
-                                border: '1px solid #475569',
-                                borderRadius: '6px',
-                                color: '#ffffff',
-                                fontSize: '14px',
-                                textAlign: 'center'
+                                width: "120px",
+                                backgroundColor: "#0f172a",
+                                border: "1px solid #475569",
+                                borderRadius: "6px",
+                                color: "#ffffff",
+                                fontSize: "14px",
+                                textAlign: "center"
                             }}
                             value={amount.toString()}
                             placeholder="Number of bots"
-                            onChange={(value) => setAmount(Number(value))}
+                            onChange={value => setAmount(Number(value))}
                         />
                         <div style={{
-                            backgroundColor: '#0f172a',
-                            padding: '8px 16px',
-                            borderRadius: '6px',
-                            border: '1px solid #475569'
+                            backgroundColor: "#0f172a",
+                            padding: "8px 16px",
+                            borderRadius: "6px",
+                            border: "1px solid #475569"
                         }}>
                             <span style={{
-                                color: '#059669',
-                                fontSize: '13px',
-                                fontWeight: '500'
+                                color: "#059669",
+                                fontSize: "13px",
+                                fontWeight: "500"
                             }}>
                                 {amount} bots ready
                             </span>
@@ -589,18 +595,18 @@ function VCRaperModal(props) {
                 </div>
             </ModalContent>
             <ModalFooter>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
                     <Button
                         onClick={props.onClose}
                         style={{
-                            backgroundColor: '#dc2626',
-                            color: '#ffffff',
-                            padding: '12px 28px',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            borderRadius: '6px',
-                            border: 'none',
-                            boxShadow: '0 4px 12px rgba(150, 5, 5, 0.25)'
+                            backgroundColor: "#dc2626",
+                            color: "#ffffff",
+                            padding: "12px 28px",
+                            fontSize: "16px",
+                            fontWeight: "600",
+                            borderRadius: "6px",
+                            border: "none",
+                            boxShadow: "0 4px 12px rgba(150, 5, 5, 0.25)"
                         }}
                     >
                         CANCEL
@@ -608,10 +614,10 @@ function VCRaperModal(props) {
                     <Button
                         style={{
                             ...modalStyles.confirmbutton,
-                            padding: '12px 28px',
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)'
+                            padding: "12px 28px",
+                            fontSize: "16px",
+                            fontWeight: "600",
+                            boxShadow: "0 4px 12px rgba(5, 150, 105, 0.25)"
                         }}
                         onClick={() => {
                             executeVoiceChannelAction(selectedGuildId, selectedChannelId, duration, rejoin, delay, randomDelay, amount);
@@ -633,52 +639,52 @@ const modalStyles: {
     confirmbutton: CSSProperties;
 } = {
     button: {
-        fontSize: '18px',
-        padding: '15px 25px',
-        backgroundColor: '#0ea5e9',
-        marginBottom: '10px',
-        color: 'white',
-        border: 'none',
-        borderRadius: '10px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.2)',
-        transition: 'transform 0.2s, background-color 0.2s',
-        width: '400px',
-        textAlign: 'center'
+        fontSize: "18px",
+        padding: "15px 25px",
+        backgroundColor: "#0ea5e9",
+        marginBottom: "10px",
+        color: "white",
+        border: "none",
+        borderRadius: "10px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2)",
+        transition: "transform 0.2s, background-color 0.2s",
+        width: "400px",
+        textAlign: "center"
     },
     devButton: {
-        fontSize: '18px',
-        padding: '15px 25px',
-        backgroundColor: '#b43d39ff',
-        marginBottom: '10px',
-        color: 'white',
-        border: 'none',
-        borderRadius: '10px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.2)',
-        transition: 'transform 0.2s, background-color 0.2s',
-        width: '400px',
-        textAlign: 'center'
+        fontSize: "18px",
+        padding: "15px 25px",
+        backgroundColor: "#b43d39ff",
+        marginBottom: "10px",
+        color: "white",
+        border: "none",
+        borderRadius: "10px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2)",
+        transition: "transform 0.2s, background-color 0.2s",
+        width: "400px",
+        textAlign: "center"
     },
     stop: {
-        fontSize: '18px',
-        padding: '15px 25px',
-        backgroundColor: '#dc2626',
-        marginBottom: '10px',
-        color: 'white',
-        border: 'none',
-        borderRadius: '10px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.2)',
-        transition: 'transform 0.2s, background-color 0.2s',
-        width: '250px',
-        textAlign: 'center'
+        fontSize: "18px",
+        padding: "15px 25px",
+        backgroundColor: "#dc2626",
+        marginBottom: "10px",
+        color: "white",
+        border: "none",
+        borderRadius: "10px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2)",
+        transition: "transform 0.2s, background-color 0.2s",
+        width: "250px",
+        textAlign: "center"
     },
     confirmbutton: {
-        backgroundColor: '#059669',
-        color: 'white',
-        border: 'none',
-        borderRadius: '10px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.2)',
-        transition: 'transform 0.2s, background-color 0.2s',
-        textAlign: 'center'
+        backgroundColor: "#059669",
+        color: "white",
+        border: "none",
+        borderRadius: "10px",
+        boxShadow: "0 4px 6px rgba(0, 0, 0, 0.2)",
+        transition: "transform 0.2s, background-color 0.2s",
+        textAlign: "center"
     }
 };
 
@@ -694,7 +700,7 @@ function createVCMenuItem(guildId: string, id?: string) {
                     selectedChannelId = id;
                 } else {
                     Toasts.show({
-                        message: `Failed - channel not found`,
+                        message: "Failed - channel not found",
                         id: "channel-fail",
                         type: Toasts.Type.FAILURE,
                         options: {

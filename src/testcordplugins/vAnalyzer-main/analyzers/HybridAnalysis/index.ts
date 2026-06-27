@@ -49,7 +49,7 @@ function buildDetails(data: any): AnalysisValue["details"] {
         if (typeof s.name === "string" && s.name.includes("CrowdStrike")) {
             if (s.status === "no-result") {
                 type = "suspicious";
-                details.unshift({ message: `[HA] This file hasnt been fully scanned`, type });
+                details.unshift({ message: "[HA] This file hasnt been fully scanned", type });
             }
         }
 
@@ -143,7 +143,7 @@ async function submitAndWait(submitFn: () => Promise<any>, silent: boolean): Pro
         return null;
     }
 
-    let data = result.data;
+    let { data } = result;
 
     if (!isFinished(data) && !hasResults(data) && data.id) {
         data = await waitForResults(apiKey, data.id, silent);

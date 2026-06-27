@@ -32,7 +32,6 @@ function containsKeywords(text: string, keywords: string[]): string[] {
     return keywords.filter(kw => text.includes(kw));
 }
 
-
 export function isDiscordInvite(url: string): boolean {
     return extractInviteCode(url) !== null;
 }
@@ -54,7 +53,7 @@ export async function analyzeDiscordInvite(url: string, silent = false): Promise
     }
 
     const { data } = result;
-    const guild = data.guild;
+    const { guild } = data;
     const details: AnalysisValue["details"] = [];
 
     if (!guild) {
@@ -64,7 +63,7 @@ export async function analyzeDiscordInvite(url: string, silent = false): Promise
 
     const memberCount = data.approximate_member_count ?? 0;
     const onlineCount = data.approximate_presence_count ?? 0;
-    const name = guild.name;
+    const { name } = guild;
     const description = guild.description ?? "";
     const vanityCode = guild.vanity_url_code ?? "";
     const channelName = data.channel?.name ?? "";

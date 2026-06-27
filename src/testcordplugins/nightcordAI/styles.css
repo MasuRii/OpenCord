@@ -394,6 +394,7 @@
     word-break: break-word;
     overflow-wrap: anywhere;
     padding: 1px 0;
+    user-select: text;
 }
 
 .nai-msg--err .nai-msg-bubble {

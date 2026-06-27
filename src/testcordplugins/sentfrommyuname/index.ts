@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings, Settings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 
 export const Native = VencordNative.pluginHelpers.SentFromMyUname as PluginNative<typeof import("./native")>;
@@ -51,8 +51,3 @@ export default definePlugin({
         msg.content += `\n\nSent from my ${await getWhateverShouldBeSentFromMy()}`;
     }
 });
-
-
-
-
-

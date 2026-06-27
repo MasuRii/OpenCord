@@ -9,11 +9,59 @@ import { FormSwitch } from "@components/FormSwitch";
 import { Span } from "@components/Span";
 import { fetchUserProfile } from "@utils/discord";
 import { ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize } from "@utils/modal";
-import { Button, React, Select, showToast, Toasts, UserProfileStore, UserStore, UserUtils } from "@webpack/common";
+import { Button, GuildStore, React, Select, SelectedGuildStore, showToast, Toasts, UserProfileStore, UserStore, UserUtils } from "@webpack/common";
 
-import { clearTarget, getCachedTarget, getSavedUsers, isActive, loadTarget, notify, setEnabled, setSavedUsers, settings, subscribe } from "./data";
+import { clearTarget, getCachedTarget, getSavedUsers, isActive, loadTarget, logger, notify, resolveTargetUserId, setEnabled, setSavedUsers, settings, subscribe } from "./data";
 
 const ID_RE = /^\d{17,20}$/;
+
+const RPC_PRESETS: Record<string, {
+    activityName: string;
+    activityType: number;
+    activityState?: string;
+    activityDetails?: string;
+    activityLargeImage?: string;
+    activityLargeText?: string;
+    activitySmallImage?: string;
+    activitySmallText?: string;
+}> = {
+    minecraft: {
+        activityName: "Minecraft",
+        activityType: 0,
+        activityState: "Exploring Caves",
+        activityDetails: "Singleplayer",
+        activityLargeImage: "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/png/minecraft.png",
+        activityLargeText: "Minecraft",
+        activitySmallImage: "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/png/minecraft.png",
+        activitySmallText: "Survival Mode"
+    },
+    vscode: {
+        activityName: "Visual Studio Code",
+        activityType: 0,
+        activityState: "Editing index.tsx",
+        activityDetails: "Workspace: testcord-plugins",
+        activityLargeImage: "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/png/vscode.png",
+        activityLargeText: "Visual Studio Code",
+        activitySmallImage: "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/png/vscode.png",
+        activitySmallText: "Line 42:15"
+    },
+    spotify: {
+        activityName: "Spotify",
+        activityType: 2,
+        activityState: "Rick Astley",
+        activityDetails: "Never Gonna Give You Up",
+        activityLargeImage: "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/png/spotify.png",
+        activityLargeText: "Rick Astley - Never Gonna Give You Up",
+    },
+    youtube: {
+        activityName: "YouTube",
+        activityType: 3,
+        activityState: "Watching tech videos",
+        activityDetails: "0:42 / 10:00",
+        activityLargeImage: "https://raw.githubusercontent.com/homarr-labs/dashboard-icons/main/png/youtube.png",
+        activityLargeText: "YouTube",
+    }
+};
 
 export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; }) {
     const [, forceUpdate] = React.useReducer(x => x + 1, 0);
@@ -30,22 +78,96 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
     const [compactHovered, setCompactHovered] = React.useState(false);
     const [manualExpanded, setManualExpanded] = React.useState(settings.store.manualExpanded);
     const [configExpanded, setConfigExpanded] = React.useState(settings.store.configExpanded);
+    const [serverExpanded, setServerExpanded] = React.useState(false);
+    const [customRpcExpanded, setCustomRpcExpanded] = React.useState(settings.store.customRpcExpanded);
+    const [connectionsExpanded, setConnectionsExpanded] = React.useState(settings.store.connectionsExpanded);
+    const [nitroExpanded, setNitroExpanded] = React.useState(settings.store.nitroExpanded);
+    const [connType, setConnType] = React.useState("github");
+    const [connName, setConnName] = React.useState("");
+    const [connVerified, setConnVerified] = React.useState(true);
+
+    const resolvedId = resolveTargetUserId(inputId.trim());
+    const isIdInvalid = inputId.trim() !== "" && !ID_RE.test(inputId.trim()) && !resolvedId;
+    const isAvatarInvalid = settings.store.manualAvatar.trim() !== "" &&
+        !settings.store.manualAvatar.startsWith("http://") &&
+        !settings.store.manualAvatar.startsWith("https://");
+    const isBannerInvalid = settings.store.manualBanner.trim() !== "" &&
+        !settings.store.manualBanner.startsWith("http://") &&
+        !settings.store.manualBanner.startsWith("https://") &&
+        !/^#[0-9A-Fa-f]{3,6}$/.test(settings.store.manualBanner);
+
+    function doEditSaved(s: any) {
+        if (s.id.startsWith("manual_") || s.isManual) {
+            settings.store.manualUsername = s.manualUsername ?? s.name;
+            settings.store.manualDisplayName = s.manualDisplayName ?? "";
+            settings.store.manualClanTag = s.manualClanTag ?? "";
+            settings.store.manualAvatar = s.manualAvatar ?? s.avatar ?? "";
+            settings.store.manualBio = s.manualBio ?? "";
+            settings.store.manualPronouns = s.manualPronouns ?? "";
+            settings.store.manualBanner = s.manualBanner ?? "";
+            settings.store.manualEmail = s.manualEmail ?? "";
+            settings.store.manualPhone = s.manualPhone ?? "";
+            settings.store.manualCreatedAt = s.manualCreatedAt ?? "";
+            settings.store.manualClanGuildId = s.manualClanGuildId ?? "";
+            settings.store.manualClanBadge = s.manualClanBadge ?? "";
+            settings.store.manualClanBadgeCustom = s.manualClanBadgeCustom ?? "";
+            settings.store.manualStatus = s.manualStatus ?? "online";
+            settings.store.manualActivityName = s.manualActivityName ?? "";
+            settings.store.manualActivityType = s.manualActivityType ?? 0;
+            settings.store.manualActivityState = s.manualActivityState ?? "";
+            settings.store.manualActivityDetails = s.manualActivityDetails ?? "";
+            settings.store.manualActivityStartTimer = !!s.manualActivityStartTimer;
+            settings.store.manualActivityLargeImage = s.manualActivityLargeImage ?? "";
+            settings.store.manualActivityLargeText = s.manualActivityLargeText ?? "";
+            settings.store.manualActivitySmallImage = s.manualActivitySmallImage ?? "";
+            settings.store.manualActivitySmallText = s.manualActivitySmallText ?? "";
+            settings.store.customRpcEnabled = !!(s.manualActivityName || s.activity);
+
+            setManualExpanded(true);
+            settings.store.manualExpanded = true;
+            setCustomRpcExpanded(true);
+            settings.store.customRpcExpanded = true;
+            showToast(`Loaded preset details for ${s.name}`, Toasts.Type.SUCCESS);
+            forceUpdate();
+        } else {
+            setInputId(s.id);
+            doPreview();
+            showToast(`Loaded ID ${s.id} for editing`, Toasts.Type.SUCCESS);
+        }
+    }
 
     const active = isActive();
     const currentTargetId = settings.store.targetId;
 
     const Col = {
-        primary: "#e0e1e5",
-        muted: "#a0a4ae",
-        section: "#72757e",
-        online: "#23a55a",
-        idle: "#f0b232",
-        dnd: "#f23f43",
-        offline: "#80848e"
+        primary: "var(--text-normal, #dbdee1)",
+        muted: "var(--text-muted, #949ba4)",
+        section: "var(--header-secondary, #b5bac1)",
+        online: "var(--status-positive, #23a55a)",
+        idle: "var(--status-warning, #f0b232)",
+        dnd: "var(--status-danger, #f23f43)",
+        offline: "var(--status-offline, #80848e)"
     };
 
-    const Label = ({ children }: { children: React.ReactNode; }) => (
-        <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: Col.section, marginBottom: "8px", marginTop: "4px" }}>{children}</div>
+    const Label = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties; }) => (
+        <div
+            title={typeof children === "string" ? children : undefined}
+            style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.07em",
+                textTransform: "uppercase",
+                color: Col.section,
+                marginBottom: "8px",
+                marginTop: "4px",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                ...style
+            }}
+        >
+            {children}
+        </div>
     );
 
     const Pfp = ({ user, size, status }: { user: any; size: number; status?: string; }) => {
@@ -90,10 +212,11 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
     };
 
     async function doPreview() {
-        const id = inputId.trim();
-        if (!id) return;
-        if (!ID_RE.test(id)) {
-            showToast("Invalid User ID format. Must be 17-20 digits.", Toasts.Type.FAILURE);
+        const input = inputId.trim();
+        if (!input) return;
+        const id = resolveTargetUserId(input);
+        if (!id) {
+            showToast("Could not resolve username to a cached User ID. Please enter their ID.", Toasts.Type.FAILURE);
             return;
         }
         const me = UserStore.getCurrentUser();
@@ -123,8 +246,19 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
     }
 
     async function doActivate(userId?: string) {
-        const id = userId || inputId.trim();
-        if (!id) return;
+        const input = userId || inputId.trim();
+        if (!input) return;
+
+        let id = input;
+        if (!id.startsWith("manual_")) {
+            const resolved = resolveTargetUserId(input);
+            if (!resolved) {
+                showToast("Could not resolve username to a cached User ID. Please enter their ID.", Toasts.Type.FAILURE);
+                return;
+            }
+            id = resolved;
+        }
+
         const me = UserStore.getCurrentUser();
         if (me && me.id === id) {
             showToast("You cannot spoof as yourself!", Toasts.Type.FAILURE);
@@ -133,18 +267,12 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
         if (id.startsWith("manual_")) {
             const savedItem = saved.find(s => s.id === id);
             if (savedItem) {
+                doEditSaved(savedItem);
                 settings.store.manualMode = true;
-                settings.store.manualUsername = savedItem.name;
-                settings.store.manualAvatar = savedItem.avatar || "";
                 setEnabled(true);
                 showToast(`Activated manual mode as ${savedItem.name}`, Toasts.Type.SUCCESS);
                 forceUpdate();
             }
-            return;
-        }
-
-        if (!ID_RE.test(id)) {
-            showToast("Invalid User ID format. Must be 17-20 digits.", Toasts.Type.FAILURE);
             return;
         }
 
@@ -244,6 +372,11 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
         banner: settings.store.manualBanner,
         status: settings.store.manualStatus,
         activity: settings.store.manualActivityName,
+        clan: settings.store.manualClanTag && settings.store.manualClanTag.trim() !== "" ? {
+            tag: settings.store.manualClanTag.trim(),
+            identity_guild_id: "962776363578798130",
+            identity_enabled: true
+        } : null,
         accentColor: undefined
     } : null;
 
@@ -256,6 +389,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
         pronouns: previewProfile?.pronouns ?? "",
         banner: getBannerUrl(previewUser, previewProfile),
         accentColor: previewProfile?.accentColor,
+        clan: previewUser.clan ?? previewProfile?.clan ?? null,
     } : activeManualUser;
 
     const isCurrentlyActive = (id: string, name?: string, avatar?: string | null) => {
@@ -281,9 +415,9 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
             <ModalHeader separator={false} style={{ padding: "20px 20px 0 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", width: "100%", justifyContent: "space-between" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24"><path fill="#e0e1e5" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2a7.2 7.2 0 0 1-6-3.22c.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08a7.2 7.2 0 0 1-6 3.22z" /></svg>
-                        <span style={{ fontSize: "20px", fontWeight: 700, color: "#e0e1e5" }}>Fake User Switcher V3</span>
-                        {active && <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", color: "var(--status-danger)", backgroundColor: "rgba(237,66,69,0.15)", padding: "2px 8px", borderRadius: "4px" }}>Active</span>}
+                        <svg width="22" height="22" viewBox="0 0 24 24"><path fill="var(--header-primary, #ffffff)" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2a7.2 7.2 0 0 1-6-3.22c.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08a7.2 7.2 0 0 1-6 3.22z" /></svg>
+                        <span style={{ fontSize: "20px", fontWeight: 700, color: "var(--header-primary, #ffffff)" }}>Fake User Switcher</span>
+                        {active && <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", color: "var(--status-danger, #f23f43)", backgroundColor: "rgba(237,66,69,0.15)", padding: "2px 8px", borderRadius: "4px" }}>Active</span>}
                     </div>
                     <Button color={Button.Colors.PRIMARY} size={Button.Sizes.NONE} style={{ padding: "4px 8px" }} onClick={() => modalProps.onClose()}>✕</Button>
                 </div>
@@ -302,10 +436,11 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                 onChange={e => setInputId(e.target.value)}
                                 onKeyDown={e => { if (e.key === "Enter") doPreview(); }}
                                 placeholder="Enter a Discord User ID"
-                                style={{ flex: 1, padding: "10px 14px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", fontFamily: "var(--font-code, monospace)" }}
+                                style={{ flex: 1, padding: "10px 14px", backgroundColor: "var(--background-tertiary)", border: `1px solid ${isIdInvalid ? "var(--status-danger)" : "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))"}`, borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", fontFamily: "var(--font-code, monospace)" }}
                             />
-                            <Button size={Button.Sizes.MEDIUM} color={Button.Colors.BRAND} disabled={loading || !inputId.trim()} onClick={doPreview}>{loading ? "..." : "Preview"}</Button>
+                            <Button size={Button.Sizes.MEDIUM} color={Button.Colors.BRAND} disabled={loading || !inputId.trim() || isIdInvalid} onClick={doPreview}>{loading ? "..." : "Preview"}</Button>
                         </div>
+                        {isIdInvalid && <div style={{ color: "var(--status-danger)", fontSize: "12px", marginTop: "4px" }}>Invalid User ID format. Must be 17-20 digits.</div>}
                     </div>
 
                     {/* Live Preview Card */}
@@ -341,8 +476,22 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                 <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", padding: "16px" }}>
                                     <Pfp user={displayUser} size={64} status={settings.store.manualMode ? settings.store.manualStatus : "online"} />
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: "18px", fontWeight: 700, color: "#e0e1e5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                            {displayUser.globalName || displayUser.username}
+                                        <div style={{ fontSize: "18px", fontWeight: 700, color: "#e0e1e5", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: "6px" }}>
+                                            <span>{displayUser.globalName || displayUser.username}</span>
+                                            {displayUser.clan?.tag && (
+                                                <span style={{
+                                                    fontSize: "10px",
+                                                    fontWeight: 700,
+                                                    backgroundColor: "var(--brand-experiment-500, #5865f2)",
+                                                    color: "#ffffff",
+                                                    padding: "1px 5px",
+                                                    borderRadius: "4px",
+                                                    textTransform: "uppercase",
+                                                    lineHeight: "1.2"
+                                                }}>
+                                                    {displayUser.clan.tag}
+                                                </span>
+                                            )}
                                         </div>
                                         <div style={{ fontSize: "13px", color: Col.muted }}>
                                             @{displayUser.username}
@@ -420,11 +569,68 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                     {/* Saved Identities */}
                     <div>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                            <Label>
-                                {searchQuery.trim()
-                                    ? `Saved Identities (${filteredSaved.length} of ${saved.length} found)`
-                                    : `Saved Identities (${saved.length})`}
-                            </Label>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                <Label>
+                                    {searchQuery.trim()
+                                        ? `Saved Identities (${filteredSaved.length} of ${saved.length} found)`
+                                        : `Saved Identities (${saved.length})`}
+                                </Label>
+                                <Button
+                                    size={Button.Sizes.MIN}
+                                    color={Button.Colors.PRIMARY}
+                                    onClick={() => {
+                                        if (saved.length === 0) {
+                                            showToast("No presets to export.", Toasts.Type.FAILURE);
+                                            return;
+                                        }
+                                        const blob = new Blob([JSON.stringify(saved, null, 2)], { type: "application/json" });
+                                        const a = document.createElement("a");
+                                        a.href = URL.createObjectURL(blob);
+                                        a.download = `fake-user-presets-${Date.now()}.json`;
+                                        a.click();
+                                        showToast("Exported presets successfully!", Toasts.Type.SUCCESS);
+                                    }}
+                                >
+                                    Export
+                                </Button>
+                                <Button
+                                    size={Button.Sizes.MIN}
+                                    color={Button.Colors.PRIMARY}
+                                    onClick={() => {
+                                        const input = document.createElement("input");
+                                        input.type = "file";
+                                        input.accept = ".json";
+                                        input.onchange = async (e: any) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            try {
+                                                const text = await file.text();
+                                                const parsed = JSON.parse(text);
+                                                if (Array.isArray(parsed)) {
+                                                    const list = [...getSavedUsers()];
+                                                    for (const item of parsed) {
+                                                        if (item && item.id && item.name) {
+                                                            if (!list.find(x => x.id === item.id)) {
+                                                                list.push(item);
+                                                            }
+                                                        }
+                                                    }
+                                                    setSavedUsers(list);
+                                                    setSaved(list);
+                                                    showToast(`Imported ${parsed.length} presets successfully!`, Toasts.Type.SUCCESS);
+                                                } else {
+                                                    showToast("Invalid format. Must be a JSON array.", Toasts.Type.FAILURE);
+                                                }
+                                            } catch {
+                                                showToast("Failed to parse JSON file.", Toasts.Type.FAILURE);
+                                            }
+                                        };
+                                        input.click();
+                                    }}
+                                >
+                                    Import
+                                </Button>
+                            </div>
                             {saved.length > 0 && (
                                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "6px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "4px", padding: "4px 8px" }}>
@@ -595,7 +801,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                                     "#ffffff",
                                                                     "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))",
                                                                     "var(--status-positive)",
-                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12" /></svg>
                                                                 )
                                                             ) : (
                                                                 renderCompactButton(
@@ -607,8 +813,19 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                                     "#ffffff",
                                                                     "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))",
                                                                     "var(--status-danger)",
-                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="5" y="5" width="14" height="14" rx="2" ry="2"/></svg>
+                                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="5" y="5" width="14" height="14" rx="2" ry="2" /></svg>
                                                                 )
+                                                            )}
+                                                            {renderCompactButton(
+                                                                () => doEditSaved(s),
+                                                                "Edit identity",
+                                                                "var(--background-tertiary)",
+                                                                "var(--brand-experiment)",
+                                                                "var(--text-muted)",
+                                                                "#ffffff",
+                                                                "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))",
+                                                                "var(--brand-experiment)",
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
                                                             )}
                                                             {renderCompactButton(
                                                                 () => doRemoveSaved(s.id),
@@ -619,7 +836,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                                 "#ffffff",
                                                                 "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))",
                                                                 "var(--status-danger)",
-                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                                                             )}
                                                         </>
                                                     ) : (
@@ -643,6 +860,13 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                                     Stop
                                                                 </Button>
                                                             )}
+                                                            <Button
+                                                                size={Button.Sizes.SMALL}
+                                                                color={Button.Colors.BRAND}
+                                                                onClick={() => doEditSaved(s)}
+                                                            >
+                                                                Edit
+                                                            </Button>
                                                             <Button
                                                                 size={Button.Sizes.SMALL}
                                                                 color={Button.Colors.PRIMARY}
@@ -683,51 +907,77 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                 justifyContent: "space-between",
                                 cursor: "pointer",
                                 userSelect: "none",
-                                marginTop: "4px",
-                                marginBottom: "8px"
+                                padding: "12px 16px",
+                                backgroundColor: "var(--background-secondary-alt)",
+                                borderRadius: "8px",
+                                border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))",
+                                transition: "background-color 0.2s, border-color 0.2s",
+                                marginBottom: "6px"
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-modifier-hover)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-medium, rgba(255, 255, 255, 0.15))";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-secondary-alt)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))";
                             }}
                         >
-                            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: Col.section }}>
+                            <span style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", color: Col.primary, letterSpacing: "0.02em" }}>
                                 Manual Spoofing
-                            </div>
+                            </span>
                             <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke={Col.section}
-                                strokeWidth="3"
                                 style={{
                                     transform: manualExpanded ? "rotate(180deg)" : "rotate(0deg)",
                                     transition: settings.store.disableAnimations ? "none" : "transform 0.2s ease",
+                                    color: Col.section
                                 }}
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                             >
                                 <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </div>
-                        <div style={{
-                            display: "grid",
-                            gridTemplateRows: manualExpanded ? "1fr" : "0fr",
-                            opacity: manualExpanded ? 1 : 0,
-                            transition: settings.store.disableAnimations ? "none" : "grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease",
-                        }}>
-                            <div style={{ overflow: "hidden", minHeight: 0 }}>
-                                <div style={{ backgroundColor: "var(--background-secondary)", padding: "14px", borderRadius: "8px", border: "1px solid var(--background-modifier-accent)", display: "flex", flexDirection: "column", gap: "12px", marginBottom: "8px", marginTop: "4px" }}>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        <div
+                            style={{
+                                maxHeight: manualExpanded ? "1200px" : "0px",
+                                overflow: "hidden",
+                                transition: settings.store.disableAnimations ? "none" : "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                                opacity: manualExpanded ? 1 : 0
+                            }}
+                        >
+                            <div style={{ padding: "8px 12px 16px 12px", backgroundColor: "var(--background-secondary)", borderRadius: "8px", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", display: "flex", flexDirection: "column", gap: "12px", marginBottom: "8px" }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                                         <div>
                                             <Label>Custom Username</Label>
                                             <input type="text" value={settings.store.manualUsername} onChange={e => { settings.store.manualUsername = e.target.value; notify(); }} placeholder="FakeUser" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
                                         </div>
                                         <div>
-                                            <Label>Custom Avatar URL</Label>
-                                            <input type="text" value={settings.store.manualAvatar} onChange={e => { settings.store.manualAvatar = e.target.value; notify(); }} placeholder="https://image.png" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                            <Label>Custom Display Name</Label>
+                                            <input type="text" value={settings.store.manualDisplayName} onChange={e => { settings.store.manualDisplayName = e.target.value; notify(); }} placeholder="Leave blank to use username" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                        <div>
+                                            <Label>Custom Created Date</Label>
+                                            <input type="text" value={settings.store.manualCreatedAt} onChange={e => { settings.store.manualCreatedAt = e.target.value; notify(); }} placeholder="YYYY-MM-DD" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
                                         </div>
                                     </div>
 
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                                         <div>
-                                            <Label>Custom Banner URL or #Hex</Label>
-                                            <input type="text" value={settings.store.manualBanner} onChange={e => { settings.store.manualBanner = e.target.value; notify(); }} placeholder="#ff0077 or https://banner.png" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                            <Label>Custom Avatar URL</Label>
+                                            <input type="text" value={settings.store.manualAvatar} onChange={e => { settings.store.manualAvatar = e.target.value; notify(); }} placeholder="https://image.png" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: `1px solid ${isAvatarInvalid ? "var(--status-warning)" : "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))"}`, borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                            {isAvatarInvalid && <div style={{ color: "var(--status-warning)", fontSize: "11px", marginTop: "2px" }}>Should be a valid http:// or https:// URL</div>}
+                                        </div>
+                                        <div>
+                                            <Label>Custom Banner URL/Hex</Label>
+                                            <input type="text" value={settings.store.manualBanner} onChange={e => { settings.store.manualBanner = e.target.value; notify(); }} placeholder="#ff0077 or https://banner.png" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: `1px solid ${isBannerInvalid ? "var(--status-warning)" : "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))"}`, borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                            {isBannerInvalid && <div style={{ color: "var(--status-warning)", fontSize: "11px", marginTop: "2px" }}>Should be a valid URL or hex color (e.g. #ff0077)</div>}
                                         </div>
                                         <div>
                                             <Label>Custom Pronouns</Label>
@@ -735,59 +985,99 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                         </div>
                                     </div>
 
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                                        <div>
+                                            <Label>Fake Email</Label>
+                                            <input type="text" value={settings.store.manualEmail} onChange={e => { settings.store.manualEmail = e.target.value; notify(); }} placeholder="fake@gmail.com" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                        <div>
+                                            <Label>Fake Phone Number</Label>
+                                            <input type="text" value={settings.store.manualPhone} onChange={e => { settings.store.manualPhone = e.target.value; notify(); }} placeholder="+1234567890" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                        <div>
+                                            <Label>Custom Status</Label>
+                                            <Select
+                                                options={[
+                                                    { label: "Online", value: "online" },
+                                                    { label: "Idle", value: "idle" },
+                                                    { label: "Do Not Disturb", value: "dnd" },
+                                                    { label: "Invisible / Offline", value: "offline" }
+                                                ]}
+                                                isSelected={v => v === (settings.store.manualStatus || "online")}
+                                                serialize={v => String(v)}
+                                                select={v => {
+                                                    settings.store.manualStatus = v;
+                                                    notify();
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                                        <div>
+                                            <Label>Custom Server Tag</Label>
+                                            <input type="text" value={settings.store.manualClanTag} onChange={e => { settings.store.manualClanTag = e.target.value; notify(); }} placeholder="e.g. /testcord" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                        <div>
+                                            <Label>Guild Tag Source</Label>
+                                            <Select
+                                                options={(() => {
+                                                    const guilds = Object.values(GuildStore.getGuilds() || {});
+                                                    return [
+                                                        { label: "None / Default", value: "" },
+                                                        ...guilds.map((g: any) => ({
+                                                            label: g.name,
+                                                            value: g.id
+                                                        }))
+                                                    ];
+                                                })()}
+                                                isSelected={v => v === settings.store.manualClanGuildId}
+                                                serialize={v => String(v)}
+                                                select={v => {
+                                                    settings.store.manualClanGuildId = v;
+                                                    notify();
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Guild Tag Badge</Label>
+                                            <Select
+                                                options={[
+                                                    { label: "None", value: "" },
+                                                    { label: "Sword", value: "sword" },
+                                                    { label: "Leaf", value: "leaf" },
+                                                    { label: "Flame", value: "flame" },
+                                                    { label: "Heart", value: "heart" },
+                                                    { label: "Compass", value: "compass" },
+                                                    { label: "Trophy", value: "trophy" },
+                                                    { label: "Shield", value: "shield" },
+                                                    { label: "Crown", value: "crown" },
+                                                    { label: "Star", value: "star" },
+                                                    { label: "Moon", value: "moon" },
+                                                    { label: "Zap / Lightning", value: "zap" },
+                                                    { label: "Skull", value: "skull" },
+                                                    { label: "Custom Badge Hash / URL", value: "custom" }
+                                                ]}
+                                                isSelected={v => v === settings.store.manualClanBadge}
+                                                serialize={v => String(v)}
+                                                select={v => {
+                                                    settings.store.manualClanBadge = v;
+                                                    notify();
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {settings.store.manualClanBadge === "custom" && (
+                                        <div>
+                                            <Label>Custom Guild Tag Badge Hash / URL</Label>
+                                            <input type="text" value={settings.store.manualClanBadgeCustom} onChange={e => { settings.store.manualClanBadgeCustom = e.target.value; notify(); }} placeholder="Hash or absolute image URL" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                    )}
+
                                     <div>
                                         <Label>Custom Bio / About Me</Label>
                                         <textarea rows={2} value={settings.store.manualBio} onChange={e => { settings.store.manualBio = e.target.value; notify(); }} placeholder="Write a custom bio..." style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", fontFamily: "inherit", resize: "none", boxSizing: "border-box" }} />
-                                    </div>
-
-                                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "8px" }}>
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                                            <div>
-                                                <Label>Status</Label>
-                                                <Select
-                                                    options={[
-                                                        { label: "Online", value: "online" },
-                                                        { label: "Idle", value: "idle" },
-                                                        { label: "Do Not Disturb", value: "dnd" },
-                                                        { label: "Invisible", value: "offline" }
-                                                    ]}
-                                                    select={v => { settings.store.manualStatus = v; notify(); }}
-                                                    isSelected={v => v === settings.store.manualStatus}
-                                                    serialize={v => v}
-                                                />
-                                            </div>
-                                            <div>
-                                                <Label>Activity Type</Label>
-                                                <Select
-                                                    options={[
-                                                        { label: "Playing", value: 0 },
-                                                        { label: "Streaming", value: 1 },
-                                                        { label: "Listening to", value: 2 },
-                                                        { label: "Watching", value: 3 },
-                                                        { label: "Custom Status", value: 4 },
-                                                        { label: "Competing in", value: 5 }
-                                                    ]}
-                                                    select={v => { settings.store.manualActivityType = Number(v); notify(); }}
-                                                    isSelected={v => v === settings.store.manualActivityType}
-                                                    serialize={v => String(v)}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginTop: "10px" }}>
-                                            <div style={{ gridColumn: "span 1" }}>
-                                                <Label>Activity Name</Label>
-                                                <input type="text" value={settings.store.manualActivityName} onChange={e => { settings.store.manualActivityName = e.target.value; notify(); }} placeholder="Minecraft" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-                                            </div>
-                                            <div style={{ gridColumn: "span 1" }}>
-                                                <Label>State</Label>
-                                                <input type="text" value={settings.store.manualActivityState} onChange={e => { settings.store.manualActivityState = e.target.value; notify(); }} placeholder="Survival Mode" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-                                            </div>
-                                            <div style={{ gridColumn: "span 1" }}>
-                                                <Label>Details</Label>
-                                                <input type="text" value={settings.store.manualActivityDetails} onChange={e => { settings.store.manualActivityDetails = e.target.value; notify(); }} placeholder="Exploring Caves" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-                                            </div>
-                                        </div>
                                     </div>
 
                                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "12px" }}>
@@ -798,16 +1088,652 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                 id: `manual_${Date.now()}`,
                                                 name,
                                                 username: name,
-                                                avatar: settings.store.manualAvatar || null
+                                                avatar: settings.store.manualAvatar || null,
+                                                isManual: true,
+                                                manualUsername: settings.store.manualUsername,
+                                                manualDisplayName: settings.store.manualDisplayName,
+                                                manualClanTag: settings.store.manualClanTag,
+                                                manualAvatar: settings.store.manualAvatar,
+                                                manualBio: settings.store.manualBio,
+                                                manualPronouns: settings.store.manualPronouns,
+                                                manualBanner: settings.store.manualBanner,
+                                                manualEmail: settings.store.manualEmail,
+                                                manualPhone: settings.store.manualPhone,
+                                                manualCreatedAt: settings.store.manualCreatedAt,
+                                                manualClanGuildId: settings.store.manualClanGuildId,
+                                                manualClanBadge: settings.store.manualClanBadge,
+                                                manualClanBadgeCustom: settings.store.manualClanBadgeCustom,
+                                                manualStatus: settings.store.manualStatus,
+                                                manualActivityName: settings.store.manualActivityName,
+                                                manualActivityType: settings.store.manualActivityType,
+                                                manualActivityState: settings.store.manualActivityState,
+                                                manualActivityDetails: settings.store.manualActivityDetails,
+                                                manualActivityStartTimer: settings.store.manualActivityStartTimer,
+                                                manualActivityLargeImage: settings.store.manualActivityLargeImage,
+                                                manualActivityLargeText: settings.store.manualActivityLargeText,
+                                                manualActivitySmallImage: settings.store.manualActivitySmallImage,
+                                                manualActivitySmallText: settings.store.manualActivitySmallText
                                             });
                                             setSavedUsers(list); setSaved(list);
-                                            showToast("Saved custom profile!", Toasts.Type.SUCCESS);
+                                            showToast("Saved custom profile preset!", Toasts.Type.SUCCESS);
                                         }}>Save Identity</Button>
                                         {active && settings.store.manualMode ? (
                                             <Button size={Button.Sizes.MEDIUM} color={Button.Colors.RED} onClick={() => { settings.store.manualMode = false; setEnabled(false); showToast("Manual spoof disabled.", Toasts.Type.SUCCESS); forceUpdate(); }}>Deactivate</Button>
                                         ) : (
                                             <Button size={Button.Sizes.MEDIUM} color={Button.Colors.GREEN} onClick={() => { settings.store.manualMode = true; setEnabled(true); showToast("Manual spoof activated.", Toasts.Type.SUCCESS); forceUpdate(); }}>Activate Spoof</Button>
                                         )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Custom Rich Presence (RPC) */}
+                    <div>
+                        <div
+                            onClick={() => {
+                                const next = !customRpcExpanded;
+                                setCustomRpcExpanded(next);
+                                settings.store.customRpcExpanded = next;
+                            }}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                cursor: "pointer",
+                                userSelect: "none",
+                                padding: "12px 16px",
+                                backgroundColor: "var(--background-secondary-alt)",
+                                borderRadius: "8px",
+                                border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))",
+                                transition: "background-color 0.2s, border-color 0.2s",
+                                marginBottom: "6px"
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-modifier-hover)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-medium, rgba(255, 255, 255, 0.15))";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-secondary-alt)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))";
+                            }}
+                        >
+                            <span style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", color: Col.primary, letterSpacing: "0.02em" }}>
+                                Custom Rich Presence (RPC)
+                            </span>
+                            <svg
+                                style={{
+                                    transform: customRpcExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                                    transition: settings.store.disableAnimations ? "none" : "transform 0.2s ease",
+                                    color: Col.section
+                                }}
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </div>
+
+                        <div
+                            style={{
+                                maxHeight: customRpcExpanded ? "1200px" : "0px",
+                                overflow: "hidden",
+                                transition: settings.store.disableAnimations ? "none" : "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                                opacity: customRpcExpanded ? 1 : 0
+                            }}
+                        >
+                            <div style={{ padding: "8px 12px 16px 12px", backgroundColor: "var(--background-secondary)", borderRadius: "8px", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", display: "flex", flexDirection: "column", gap: "12px", marginBottom: "8px" }}>
+                                <FormSwitch
+                                    value={settings.store.customRpcEnabled}
+                                    onChange={v => {
+                                        settings.store.customRpcEnabled = v;
+                                        notify();
+                                    }}
+                                    description="Override client-side Rich Presence activity with your custom configuration."
+                                    title="Enable Custom Rich Presence"
+                                />
+
+                                <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "8px" }}>
+                                    <div style={{ marginBottom: "10px" }}>
+                                        <Label>Activity Preset</Label>
+                                        <Select
+                                            options={[
+                                                { label: "Select a preset...", value: "" },
+                                                { label: "Minecraft", value: "minecraft" },
+                                                { label: "Visual Studio Code", value: "vscode" },
+                                                { label: "Spotify", value: "spotify" },
+                                                { label: "YouTube", value: "youtube" }
+                                            ]}
+                                            select={v => {
+                                                if (!v) return;
+                                                const preset = RPC_PRESETS[v];
+                                                if (preset) {
+                                                    settings.store.manualActivityName = preset.activityName;
+                                                    settings.store.manualActivityType = preset.activityType;
+                                                    settings.store.manualActivityState = preset.activityState ?? "";
+                                                    settings.store.manualActivityDetails = preset.activityDetails ?? "";
+                                                    settings.store.manualActivityLargeImage = preset.activityLargeImage ?? "";
+                                                    settings.store.manualActivityLargeText = preset.activityLargeText ?? "";
+                                                    settings.store.manualActivitySmallImage = preset.activitySmallImage ?? "";
+                                                    settings.store.manualActivitySmallText = preset.activitySmallText ?? "";
+                                                    notify();
+                                                }
+                                            }}
+                                            isSelected={v => false}
+                                            serialize={v => v}
+                                        />
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                        <div>
+                                            <Label>Activity Status</Label>
+                                            <Select
+                                                options={[
+                                                    { label: "Online", value: "online" },
+                                                    { label: "Idle", value: "idle" },
+                                                    { label: "Do Not Disturb", value: "dnd" },
+                                                    { label: "Invisible", value: "offline" }
+                                                ]}
+                                                select={v => { settings.store.manualStatus = v; notify(); }}
+                                                isSelected={v => v === settings.store.manualStatus}
+                                                serialize={v => v}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Activity Type</Label>
+                                            <Select
+                                                options={[
+                                                    { label: "Playing", value: 0 },
+                                                    { label: "Streaming", value: 1 },
+                                                    { label: "Listening to", value: 2 },
+                                                    { label: "Watching", value: 3 },
+                                                    { label: "Custom Status", value: 4 },
+                                                    { label: "Competing in", value: 5 }
+                                                ]}
+                                                select={v => { settings.store.manualActivityType = Number(v); notify(); }}
+                                                isSelected={v => v === settings.store.manualActivityType}
+                                                serialize={v => String(v)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginTop: "10px" }}>
+                                        <div style={{ gridColumn: "span 1" }}>
+                                            <Label>Activity Name</Label>
+                                            <input type="text" value={settings.store.manualActivityName} onChange={e => { settings.store.manualActivityName = e.target.value; notify(); }} placeholder="Minecraft" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                        <div style={{ gridColumn: "span 1" }}>
+                                            <Label>State</Label>
+                                            <input type="text" value={settings.store.manualActivityState} onChange={e => { settings.store.manualActivityState = e.target.value; notify(); }} placeholder="Survival Mode" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                        <div style={{ gridColumn: "span 1" }}>
+                                            <Label>Details</Label>
+                                            <input type="text" value={settings.store.manualActivityDetails} onChange={e => { settings.store.manualActivityDetails = e.target.value; notify(); }} placeholder="Exploring Caves" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px", alignItems: "center" }}>
+                                        <FormSwitch
+                                            value={settings.store.manualActivityStartTimer}
+                                            onChange={v => { settings.store.manualActivityStartTimer = v; notify(); }}
+                                            description="Display elapsed time since you started the activity."
+                                            title="Enable Activity Timer"
+                                        />
+                                    </div>
+
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" }}>
+                                        <div>
+                                            <Label>Large Image URL / Asset Key</Label>
+                                            <input type="text" value={settings.store.manualActivityLargeImage} onChange={e => { settings.store.manualActivityLargeImage = e.target.value; notify(); }} placeholder="https://image.png or asset_key" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                        <div>
+                                            <Label>Large Image Text (Tooltip)</Label>
+                                            <input type="text" value={settings.store.manualActivityLargeText} onChange={e => { settings.store.manualActivityLargeText = e.target.value; notify(); }} placeholder="Playing Minecraft" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" }}>
+                                        <div>
+                                            <Label>Small Image URL / Asset Key</Label>
+                                            <input type="text" value={settings.store.manualActivitySmallImage} onChange={e => { settings.store.manualActivitySmallImage = e.target.value; notify(); }} placeholder="https://image.png or asset_key" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                        <div>
+                                            <Label>Small Image Text (Tooltip)</Label>
+                                            <input type="text" value={settings.store.manualActivitySmallText} onChange={e => { settings.store.manualActivitySmallText = e.target.value; notify(); }} placeholder="Lvl 42" style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Fake Connections */}
+                    <div>
+                        <div
+                            onClick={() => {
+                                const next = !connectionsExpanded;
+                                setConnectionsExpanded(next);
+                                settings.store.connectionsExpanded = next;
+                            }}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                cursor: "pointer",
+                                userSelect: "none",
+                                padding: "12px 16px",
+                                backgroundColor: "var(--background-secondary-alt)",
+                                borderRadius: "8px",
+                                border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))",
+                                transition: "background-color 0.2s, border-color 0.2s",
+                                marginBottom: "6px"
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-modifier-hover)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-medium, rgba(255, 255, 255, 0.15))";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-secondary-alt)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))";
+                            }}
+                        >
+                            <span style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", color: Col.primary, letterSpacing: "0.02em" }}>
+                                Fake Connections
+                            </span>
+                            <svg
+                                style={{
+                                    transform: connectionsExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                                    transition: settings.store.disableAnimations ? "none" : "transform 0.2s ease",
+                                    color: Col.section
+                                }}
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </div>
+
+                        <div
+                            style={{
+                                maxHeight: connectionsExpanded ? "1200px" : "0px",
+                                overflow: "hidden",
+                                transition: settings.store.disableAnimations ? "none" : "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                                opacity: connectionsExpanded ? 1 : 0
+                            }}
+                        >
+                            <div style={{ padding: "8px 12px 16px 12px", backgroundColor: "var(--background-secondary)", borderRadius: "8px", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", display: "flex", flexDirection: "column", gap: "12px", marginBottom: "8px" }}>
+                                <FormSwitch
+                                    value={settings.store.fakeConnectionsEnabled}
+                                    onChange={v => {
+                                        settings.store.fakeConnectionsEnabled = v;
+                                        notify();
+                                    }}
+                                    description="Display fake connected social accounts on your profile."
+                                    title="Enable Fake Connections"
+                                />
+
+                                <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "8px" }}>
+                                    <Label>Current Fake Connections</Label>
+                                    {(() => {
+                                        let list: any[] = [];
+                                        try {
+                                            list = JSON.parse(settings.store.fakeConnectionsList || "[]");
+                                        } catch { }
+                                        if (list.length === 0) {
+                                            return <div style={{ color: Col.muted, fontSize: "13px", fontStyle: "italic", margin: "8px 0" }}>No connections added yet.</div>;
+                                        }
+                                        return (
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "8px", margin: "8px 0" }}>
+                                                {list.map((c: any, index: number) => (
+                                                    <div key={c.id || index} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", backgroundColor: "var(--background-tertiary)", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                                            <span style={{ fontWeight: 600, textTransform: "capitalize", color: Col.primary }}>{c.type}</span>
+                                                            <span style={{ color: Col.muted }}>•</span>
+                                                            <span style={{ color: Col.primary }}>{c.name}</span>
+                                                            {c.verified && (
+                                                                <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--status-positive)", backgroundColor: "rgba(35,165,90,0.15)", padding: "1px 6px", borderRadius: "4px" }}>Verified</span>
+                                                            )}
+                                                        </div>
+                                                        <Button
+                                                            size={Button.Sizes.NONE}
+                                                            color={Button.Colors.RED}
+                                                            style={{ padding: "4px 8px", fontSize: "12px" }}
+                                                            onClick={() => {
+                                                                const filtered = list.filter((_, i) => i !== index);
+                                                                settings.store.fakeConnectionsList = JSON.stringify(filtered);
+                                                                notify();
+                                                            }}
+                                                        >
+                                                            Delete
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+
+                                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "12px", marginTop: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                                        <Label>Add New Fake Connection</Label>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                            <div>
+                                                <Label>Platform Type</Label>
+                                                <Select
+                                                    options={[
+                                                        { label: "GitHub", value: "github" },
+                                                        { label: "Spotify", value: "spotify" },
+                                                        { label: "Twitter", value: "twitter" },
+                                                        { label: "YouTube", value: "youtube" },
+                                                        { label: "Steam", value: "steam" },
+                                                        { label: "Twitch", value: "twitch" },
+                                                        { label: "Reddit", value: "reddit" },
+                                                        { label: "TikTok", value: "tiktok" },
+                                                        { label: "Instagram", value: "instagram" },
+                                                        { label: "Roblox", value: "roblox" },
+                                                        { label: "Xbox", value: "xbox" },
+                                                        { label: "PlayStation", value: "playstation" },
+                                                        { label: "Epic Games", value: "epicgames" }
+                                                    ]}
+                                                    select={v => setConnType(v)}
+                                                    isSelected={v => v === connType}
+                                                    serialize={v => v}
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label>Account Name</Label>
+                                                <input
+                                                    type="text"
+                                                    value={connName}
+                                                    onChange={e => setConnName(e.target.value)}
+                                                    placeholder="e.g. Octocat"
+                                                    style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "4px" }}>
+                                            <FormSwitch
+                                                value={connVerified}
+                                                onChange={v => setConnVerified(v)}
+                                                description="Show verified badge next to connection."
+                                                title="Verified Connection"
+                                            />
+                                            <Button
+                                                size={Button.Sizes.MEDIUM}
+                                                color={Button.Colors.BRAND}
+                                                disabled={!connName.trim()}
+                                                onClick={() => {
+                                                    let currentList: any[] = [];
+                                                    try {
+                                                        currentList = JSON.parse(settings.store.fakeConnectionsList || "[]");
+                                                    } catch { }
+                                                    currentList.push({
+                                                        id: `${connType}_${Date.now()}`,
+                                                        type: connType,
+                                                        name: connName.trim(),
+                                                        verified: connVerified
+                                                    });
+                                                    settings.store.fakeConnectionsList = JSON.stringify(currentList);
+                                                    setConnName("");
+                                                    notify();
+                                                    showToast(`Added fake ${connType} connection!`, Toasts.Type.SUCCESS);
+                                                }}
+                                            >
+                                                Add Connection
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Server-Specific Identities */}
+                    <div>
+                        <div
+                            onClick={() => setServerExpanded(!serverExpanded)}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                cursor: "pointer",
+                                userSelect: "none",
+                                padding: "12px 16px",
+                                backgroundColor: "var(--background-secondary-alt)",
+                                borderRadius: "8px",
+                                border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))",
+                                transition: "background-color 0.2s, border-color 0.2s",
+                                marginBottom: "6px"
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-modifier-hover)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-medium, rgba(255, 255, 255, 0.15))";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-secondary-alt)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))";
+                            }}
+                        >
+                            <span style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", color: Col.primary, letterSpacing: "0.02em" }}>
+                                Server-Specific Spoofs
+                            </span>
+                            <svg
+                                style={{
+                                    transform: serverExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                                    transition: settings.store.disableAnimations ? "none" : "transform 0.2s ease",
+                                    color: Col.section
+                                }}
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </div>
+                        <div
+                            style={{
+                                maxHeight: serverExpanded ? "1200px" : "0px",
+                                overflow: "hidden",
+                                transition: settings.store.disableAnimations ? "none" : "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                                opacity: serverExpanded ? 1 : 0
+                            }}
+                        >
+                            <div style={{ padding: "8px 12px 16px 12px", backgroundColor: "var(--background-secondary)", borderRadius: "8px", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", display: "flex", flexDirection: "column", gap: "12px", marginBottom: "8px" }}>
+                                    {(() => {
+                                        const currentGuildId = SelectedGuildStore?.getGuildId?.();
+                                        if (!currentGuildId) {
+                                            return (
+                                                <div style={{ color: Col.muted, fontSize: "13px" }}>
+                                                    Please open this modal from within a Discord server to configure server-specific identity overrides.
+                                                </div>
+                                            );
+                                        }
+                                        const currentGuildName = GuildStore?.getGuild?.(currentGuildId)?.name || "Current Server";
+                                        let guildMap: Record<string, string> = {};
+                                        try {
+                                            guildMap = JSON.parse(settings.store.guildIdentities || "{}");
+                                        } catch { /* ignore */ }
+
+                                        const activeIdentityId = guildMap[currentGuildId] || "";
+
+                                        const options = [
+                                            { label: "None (Use Global Identity)", value: "" },
+                                            ...saved.map(s => ({ label: `${s.name} (${(s as any).isManual ? "Manual" : "Target"})`, value: s.id }))
+                                        ];
+
+                                        return (
+                                            <>
+                                                <div style={{ color: Col.primary, fontSize: "14px", fontWeight: 600 }}>
+                                                    Configure identity override for: <span style={{ color: "var(--brand-experiment, #5865f2)" }}>{currentGuildName}</span>
+                                                </div>
+                                                <div>
+                                                    <Label>Select Preset Profile</Label>
+                                                    <Select
+                                                        options={options}
+                                                        select={v => {
+                                                            const newMap = { ...guildMap };
+                                                            if (v === "") {
+                                                                delete newMap[currentGuildId];
+                                                                settings.store.guildIdentities = JSON.stringify(newMap);
+                                                                notify();
+                                                                forceUpdate();
+                                                            } else {
+                                                                newMap[currentGuildId] = v;
+                                                                settings.store.guildIdentities = JSON.stringify(newMap);
+                                                                const savedItem = saved.find(s => s.id === v);
+                                                                if (savedItem && !(savedItem as any).isManual) {
+                                                                    loadTarget(savedItem.id, false)
+                                                                        .then(() => {
+                                                                            notify();
+                                                                            forceUpdate();
+                                                                        })
+                                                                        .catch(e => {
+                                                                            logger.error("Failed to preload guild target on select", e);
+                                                                        });
+                                                                } else {
+                                                                    notify();
+                                                                    forceUpdate();
+                                                                }
+                                                            }
+                                                        }}
+                                                        isSelected={v => v === activeIdentityId}
+                                                        serialize={v => v}
+                                                    />
+                                                </div>
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+
+                    {/* Fake Nitro Status */}
+                    <div>
+                        <div
+                            onClick={() => {
+                                const next = !nitroExpanded;
+                                setNitroExpanded(next);
+                                settings.store.nitroExpanded = next;
+                            }}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                cursor: "pointer",
+                                userSelect: "none",
+                                padding: "12px 16px",
+                                backgroundColor: "var(--background-secondary-alt)",
+                                borderRadius: "8px",
+                                border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))",
+                                transition: "background-color 0.2s, border-color 0.2s",
+                                marginBottom: "6px"
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-modifier-hover)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-medium, rgba(255, 255, 255, 0.15))";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-secondary-alt)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))";
+                            }}
+                        >
+                            <span style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", color: Col.primary, letterSpacing: "0.02em" }}>
+                                Fake Nitro Status
+                            </span>
+                            <svg
+                                style={{
+                                    transform: nitroExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                                    transition: settings.store.disableAnimations ? "none" : "transform 0.2s ease",
+                                    color: Col.section
+                                }}
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                        </div>
+                        <div
+                            style={{
+                                maxHeight: nitroExpanded ? "1200px" : "0px",
+                                overflow: "hidden",
+                                transition: settings.store.disableAnimations ? "none" : "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                                opacity: nitroExpanded ? 1 : 0
+                            }}
+                        >
+                            <div style={{ padding: "8px 12px 16px 12px", backgroundColor: "var(--background-secondary)", borderRadius: "8px", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", display: "flex", flexDirection: "column", gap: "12px", marginBottom: "8px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                    <div>
+                                        <Label>Nitro Age Presets</Label>
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                            {[
+                                                { label: "1 Mo", val: 1 },
+                                                { label: "3 Mo", val: 3 },
+                                                { label: "6 Mo", val: 6 },
+                                                { label: "1 Yr", val: 12 },
+                                                { label: "2 Yr", val: 24 },
+                                                { label: "3 Yr", val: 36 },
+                                                { label: "6 Yr", val: 72 }
+                                            ].map(preset => (
+                                                <Button
+                                                    key={preset.val}
+                                                    size={Button.Sizes.MIN}
+                                                    color={settings.store.fakeNitroMonths === preset.val ? Button.Colors.BRAND : Button.Colors.PRIMARY}
+                                                    onClick={() => {
+                                                        settings.store.fakeNitroMonths = preset.val;
+                                                        notify();
+                                                    }}
+                                                >
+                                                    {preset.label}
+                                                </Button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label>Custom Months</Label>
+                                        <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={settings.store.fakeNitroMonths}
+                                                onChange={e => {
+                                                    const val = Math.max(0, parseInt(e.target.value) || 0);
+                                                    settings.store.fakeNitroMonths = val;
+                                                    notify();
+                                                }}
+                                                style={{ width: "100%", padding: "10px", backgroundColor: "var(--background-tertiary)", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", borderRadius: "8px", color: "#dbdee1", fontSize: "14px", outline: "none", boxSizing: "border-box" }}
+                                            />
+                                            <Button
+                                                size={Button.Sizes.MEDIUM}
+                                                color={Button.Colors.RED}
+                                                disabled={settings.store.fakeNitroMonths === 0}
+                                                onClick={() => {
+                                                    settings.store.fakeNitroMonths = 0;
+                                                    notify();
+                                                }}
+                                            >
+                                                Reset
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -825,39 +1751,55 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                             style={{
                                 display: "flex",
                                 alignItems: "center",
+                                transition: "background-color 0.2s, border-color 0.2s",
                                 justifyContent: "space-between",
                                 cursor: "pointer",
                                 userSelect: "none",
-                                marginTop: "4px",
-                                marginBottom: "8px"
+                                padding: "12px 16px",
+                                backgroundColor: "var(--background-secondary-alt)",
+                                borderRadius: "8px",
+                                border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))",
+                                marginBottom: "6px"
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-modifier-hover)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-medium, rgba(255, 255, 255, 0.15))";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.backgroundColor = "var(--background-secondary-alt)";
+                                e.currentTarget.style.borderColor = "var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.08))";
                             }}
                         >
-                            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.07em", textTransform: "uppercase", color: Col.section }}>
+                            <span style={{ fontSize: "13px", fontWeight: 700, textTransform: "uppercase", color: Col.primary, letterSpacing: "0.02em" }}>
                                 Configuration
-                            </div>
+                            </span>
                             <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke={Col.section}
-                                strokeWidth="3"
                                 style={{
                                     transform: configExpanded ? "rotate(180deg)" : "rotate(0deg)",
                                     transition: settings.store.disableAnimations ? "none" : "transform 0.2s ease",
+                                    color: Col.section
                                 }}
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
                             >
                                 <polyline points="6 9 12 15 18 9" />
                             </svg>
                         </div>
-                        <div style={{
-                            display: "grid",
-                            gridTemplateRows: configExpanded ? "1fr" : "0fr",
-                            opacity: configExpanded ? 1 : 0,
-                            transition: settings.store.disableAnimations ? "none" : "grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease",
-                        }}>
-                            <div style={{ overflow: "hidden", minHeight: 0 }}>
-                                <div style={{ backgroundColor: "var(--background-secondary)", padding: "12px 14px", borderRadius: "8px", border: "1px solid var(--background-modifier-accent)", display: "flex", flexDirection: "column", gap: "16px", marginBottom: "8px", marginTop: "4px" }}>
+                        <div
+                            style={{
+                                maxHeight: configExpanded ? "1200px" : "0px",
+                                overflow: "hidden",
+                                transition: settings.store.disableAnimations ? "none" : "max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
+                                opacity: configExpanded ? 1 : 0
+                            }}
+                        >
+                            <div style={{ padding: "8px 12px 16px 12px", backgroundColor: "var(--background-secondary)", borderRadius: "8px", border: "1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15))", display: "flex", flexDirection: "column", gap: "16px", marginBottom: "8px" }}>
                                     <FormSwitch
                                         value={settings.store.fakeMessages}
                                         onChange={v => { settings.store.fakeMessages = v; notify(); }}
@@ -893,6 +1835,30 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                         <div className="vc-form-switch">
                                             <div className="vc-form-switch-text">
                                                 <Flex flexDirection="column" gap="4px">
+                                                    <Span size="md" weight="medium" color="text-strong">Spoofed Status</Span>
+                                                    <Span size="sm" color="text-subtle">Override your client-side presence status globally.</Span>
+                                                </Flex>
+                                            </div>
+                                            <div className="vc-form-switch-control" style={{ width: "180px", flexShrink: 0 }}>
+                                                <Select
+                                                    options={[
+                                                        { label: "None (Use Real/Target)", value: "none" },
+                                                        { label: "Online", value: "online" },
+                                                        { label: "Idle", value: "idle" },
+                                                        { label: "Do Not Disturb", value: "dnd" },
+                                                        { label: "Invisible", value: "offline" }
+                                                    ]}
+                                                    select={v => { settings.store.spoofedStatus = v; notify(); forceUpdate(); }}
+                                                    isSelected={v => v === settings.store.spoofedStatus}
+                                                    serialize={v => v}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="vc-form-switch-container vc-form-switch-no-border" style={{ marginBottom: 0, paddingBottom: 0 }}>
+                                        <div className="vc-form-switch">
+                                            <div className="vc-form-switch-text">
+                                                <Flex flexDirection="column" gap="4px">
                                                     <Span size="md" weight="medium" color="text-strong">UI Mode</Span>
                                                     <Span size="sm" color="text-subtle">Choose between the modern settings UI or the legacy visual spoofing modal.</Span>
                                                 </Flex>
@@ -912,8 +1878,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                </div>
                 </div>
             </ModalContent>
 

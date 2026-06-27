@@ -6,7 +6,7 @@
 
 import { ApplicationCommandInputType, ApplicationCommandOptionType, findOption, sendBotMessage } from "@api/Commands";
 import { DataStore } from "@api/index";
-import { addMessageAccessory } from "@api/MessageAccessories";
+import { addMessageAccessory, removeMessageAccessory } from "@api/MessageAccessories";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { Parser, React, Text } from "@webpack/common";
@@ -93,6 +93,9 @@ export default definePlugin({
         addMessageAccessory("flag", (props: Record<string, any>) => (
             <Flag id={props.message.author.id} />
         ), 4);
+    },
+    stop() {
+        removeMessageAccessory("flag");
     },
     commands: [
         {

@@ -10,7 +10,7 @@ import { HeaderBarButton } from "@api/HeaderBar";
 import { DataStore } from "@api/index";
 import { classNameFactory } from "@utils/css";
 import { copyWithToast } from "@utils/discord";
-import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
+import { closeModal, ModalCloseButton, ModalContent, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { moment, React, useEffect, useRef, useState } from "@webpack/common";
 
@@ -388,6 +388,7 @@ let modalKey: string | null = null;
 
 function toggleCalendar() {
     if (modalKey) {
+        closeModal(modalKey);
         modalKey = null;
         return;
     }

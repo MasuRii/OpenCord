@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { Button } from "@webpack/common";
 
@@ -65,10 +65,3 @@ export default definePlugin({
         if (i !== -1) customSettingsSections.splice(i, 1);
     },
 });
-
-
-
-
-
-
-

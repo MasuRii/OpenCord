@@ -5,9 +5,9 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { ChannelStore, MessageStore, SelectedChannelStore, UserStore } from "@webpack/common";
+import { ChannelStore, MessageStore, SelectedChannelStore } from "@webpack/common";
 
 const settings = definePluginSettings({
     currentVC: {
@@ -60,8 +60,3 @@ export default definePlugin({
         return false;
     }
 });
-
-
-
-
-

@@ -84,5 +84,3 @@ export const successToast = (message: string) => {
         type: Toasts.Type.SUCCESS
     });
 };
-
-

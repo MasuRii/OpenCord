@@ -27,7 +27,6 @@ export function ThemeLinksComponent({ setValue }: PluginSettingComponentProps, i
         return newValue.match(URLRegex) !== null;
     }
 
-
     // Internal function to handle changes in the value
     function handleChange(newValue: string) {
         // Check validity on our own terms

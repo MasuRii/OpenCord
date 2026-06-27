@@ -89,5 +89,3 @@ export function PasswordModal({ channelId, type, callback, modalProps }: Props) 
         </ModalRoot>
     );
 }
-
-

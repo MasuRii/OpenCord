@@ -39,4 +39,3 @@ app.on("browser-window-created", (_, win) => {
         });
     });
 });
-

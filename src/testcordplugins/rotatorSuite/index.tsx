@@ -1,12 +1,21 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { DataStore } from "@api/index";
-import { UserAreaButton } from "@api/UserArea";
 import { definePluginSettings } from "@api/Settings";
+import { UserAreaButton } from "@api/UserArea";
 import { getUserSettingLazy } from "@api/UserSettings";
-import { ModalContent, ModalFooter, ModalHeader, RenderModalProps, ModalRoot, openModal } from "@utils/modal";
+import { Logger } from "@utils/Logger";
+import { ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal,RenderModalProps } from "@utils/modal";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByProps } from "@webpack";
 import { Button, Forms, React, RestAPI, TextInput, Toasts, UserStore } from "@webpack/common";
+
+const logger = new Logger("RotatorSuite");
 
 const SK = "RS_v1";
 const AR_SK = "AvatarRotator_v6";
@@ -46,7 +55,7 @@ let arShuffleQueue: number[] = [];
 let arRotatorTimer: ReturnType<typeof setTimeout> | null = null;
 const PALETTE = ["#7c4dff","#9c67ff","#b24df7","#6a1fff","#a855f7","#8b5cf6","#7e22ce","#c084fc","#d946ef","#a21caf","#6d28d9","#4c1d95"];
 const UNICODE_EMOJI_RE = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})\s*/u;
-const CUSTOM_EMOJI_RE  = /^:([^:]+):(\d{17,20}):\s*/;
+const CUSTOM_EMOJI_RE = /^:([^:]+):(\d{17,20}):\s*/;
 const DISCORD_EMOJI_RE = /<a?:([^:]+):(\d+)>/;
 
 const BCR_SK = "BannerColorRotator_v3";
@@ -277,11 +286,11 @@ function minutesToMs(raw: string): number {
 
 type StatusType = "online" | "idle" | "dnd" | "invisible" | "auto";
 const STATUS_OPTIONS: { value: StatusType; label: string; color: string; hint: string }[] = [
-    { value: "online",    label: "Online",    color: "#23a55a", hint: "Sets your presence to Online - you appear active and available to everyone." },
-    { value: "idle",      label: "Idle",      color: "#f0b232", hint: "Sets your presence to Idle - shows you as away (crescent moon icon)." },
-    { value: "dnd",       label: "DND",       color: "#f23f43", hint: "Do Not Disturb - suppresses all notifications and marks you as busy." },
-    { value: "invisible", label: "Invis",     color: "#80848e", hint: "Invisible - you appear fully offline to others while still using Discord." },
-    { value: "auto",      label: "Auto",      color: "#9c67ff", hint: "Auto - keeps your current presence unchanged; only updates the status text/emoji." },
+    { value: "online", label: "Online", color: "#23a55a", hint: "Sets your presence to Online - you appear active and available to everyone." },
+    { value: "idle", label: "Idle", color: "#f0b232", hint: "Sets your presence to Idle - shows you as away (crescent moon icon)." },
+    { value: "dnd", label: "DND", color: "#f23f43", hint: "Do Not Disturb - suppresses all notifications and marks you as busy." },
+    { value: "invisible", label: "Invis", color: "#80848e", hint: "Invisible - you appear fully offline to others while still using Discord." },
+    { value: "auto", label: "Auto", color: "#9c67ff", hint: "Auto - keeps your current presence unchanged; only updates the status text/emoji." },
 ];
 
 type NickMode = "custom" | "global" | "both";
@@ -415,14 +424,14 @@ function loadCloseConfigSync(): void {
         const raw = localStorage.getItem(RS_CLOSE_LS);
         if (!raw) return;
         const c = JSON.parse(raw);
-        closeStatusEnabled = c.closeStatusEnabled  ?? false;
-        closeStatusText    = c.closeStatusText     ?? "";
-        closeStatusEmoji   = c.closeStatusEmoji    ?? "";
-        closeStatusType    = c.closeStatusType     ?? "auto";
-        closeClanEnabled   = c.closeClanEnabled    ?? false;
-        closeClanId        = c.closeClanId         ?? "";
-        closeBannerEnabled = c.closeBannerEnabled  ?? false;
-        closeBannerColor   = c.closeBannerColor    ?? "#111214";
+        closeStatusEnabled = c.closeStatusEnabled ?? false;
+        closeStatusText = c.closeStatusText ?? "";
+        closeStatusEmoji = c.closeStatusEmoji ?? "";
+        closeStatusType = c.closeStatusType ?? "auto";
+        closeClanEnabled = c.closeClanEnabled ?? false;
+        closeClanId = c.closeClanId ?? "";
+        closeBannerEnabled = c.closeBannerEnabled ?? false;
+        closeBannerColor = c.closeBannerColor ?? "#111214";
     } catch {}
 }
 
@@ -452,10 +461,7 @@ function fireCloseKeepalive(): void {
     }
 }
 
-if (!(window as any)._rsCloseReg) {
-    window.addEventListener("beforeunload", () => { loadCloseConfigSync(); void applyOnCloseAll(); fireCloseKeepalive(); });
-    (window as any)._rsCloseReg = true;
-}
+function rsBeforeUnloadHandler() { loadCloseConfigSync(); void applyOnCloseAll(); fireCloseKeepalive(); }
 
 async function applyCloseStatus(): Promise<void> {
     if (!closeStatusEnabled) return;
@@ -1588,7 +1594,7 @@ const EVAL_SNIPPETS: { cat: string; items: [string, string][] }[] = [
         ["H:MM am/pm", "eval new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})"],
         ["Full time", "eval new Date().toLocaleTimeString()"],
         ["Hour :00", "eval new Date().getHours()+':00'"],
-    ]},
+    ] },
     { cat: "📅 Date", items: [
         ["Short date", "eval new Date().toLocaleDateString()"],
         ["DD/MM/YYYY", "eval let d=new Date();`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`"],
@@ -1596,25 +1602,25 @@ const EVAL_SNIPPETS: { cat: string; items: [string, string][] }[] = [
         ["Day short", "eval ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]"],
         ["Date+Time", "eval new Date().toLocaleString()"],
         ["Month name", "eval ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][new Date().getMonth()]"],
-    ]},
+    ] },
     { cat: "🕛 Emoji clock", items: [
         ["Clock emoji", "eval ['🕛','🕐','🕑','🕒','🕓','🕔','🕕','🕖','🕗','🕘','🕙','🕚'][new Date().getHours()%12]"],
         ["Moon phase", "eval ['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'][Math.floor(new Date().getDate()/3.75)%8]"],
         ["Day emoji", "eval ['☀️','🌙','🌙','🌙','☀️','☀️','☀️'][new Date().getDay()]"],
         ["AM/PM emoji", "eval new Date().getHours()<12?'🌅':'🌆'"],
-    ]},
+    ] },
     { cat: "🎲 Fun", items: [
         ["Random 1-100", "eval Math.floor(Math.random()*100)+1"],
         ["Coin flip", "eval Math.random()<.5?'heads':'tails'"],
         ["Dice 🎲", "eval ['⚀','⚁','⚂','⚃','⚄','⚅'][Math.floor(Math.random()*6)]"],
         ["Random color", "eval '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0')"],
-    ]},
+    ] },
     { cat: "📊 System", items: [
         ["Memory MB", "eval Math.round(performance.memory?.usedJSHeapSize/1048576||0)+'MB'"],
         ["Timestamp", "eval Date.now()"],
         ["ISO time", "eval new Date().toISOString().slice(11,19)"],
         ["UTC offset", "eval 'UTC'+(new Date().getTimezoneOffset()>0?'-':'+')+Math.abs(new Date().getTimezoneOffset()/60)"],
-    ]},
+    ] },
 ];
 
 const EVAL_TOKENS: { label: string; code: string; pad: boolean }[] = [
@@ -1782,9 +1788,9 @@ function StatusRunModeSelector({ presets, forceUpdate }: { presets: StatusPreset
     };
 
     const MODES: { key: "all" | "presets" | "none"; label: string; cls: string; hint: string }[] = [
-        { key: "all",     label: "All Entries",      cls: "active-all",     hint: "Cycle through every status entry regardless of preset" },
-        { key: "presets", label: "Selected Presets",  cls: "active-presets", hint: "Only cycle entries belonging to the checked presets below" },
-        { key: "none",    label: "None",              cls: "active-none",    hint: "Status rotator is paused - no entries will be cycled" },
+        { key: "all", label: "All Entries", cls: "active-all", hint: "Cycle through every status entry regardless of preset" },
+        { key: "presets", label: "Selected Presets", cls: "active-presets", hint: "Only cycle entries belonging to the checked presets below" },
+        { key: "none", label: "None", cls: "active-none", hint: "Status rotator is paused - no entries will be cycled" },
     ];
 
     const activeHint = MODES.find(m => m.key === mode)?.hint ?? "";
@@ -2201,17 +2207,17 @@ function updateDomTagCache(): void {
             if (!m) return;
             const id = m[1];
             if (domTagCache.has(id)) return;
-            const labeled = img.closest('[aria-label]');
+            const labeled = img.closest("[aria-label]");
             if (labeled) {
-                const al = labeled.getAttribute('aria-label') ?? '';
+                const al = labeled.getAttribute("aria-label") ?? "";
                 const am = al.match(/[:\uff1a]\s*(.+)$/);
                 if (am?.[1]?.trim()) { domTagCache.set(id, am[1].trim()); return; }
             }
             const par = img.parentElement;
             if (!par) return;
-            for (const sp of Array.from(par.querySelectorAll('span'))) {
-                const t = sp.textContent?.trim() ?? '';
-                if (t && t.length >= 1 && t.length <= 16 && !sp.querySelector('img') && !sp.querySelector('span')) {
+            for (const sp of Array.from(par.querySelectorAll("span"))) {
+                const t = sp.textContent?.trim() ?? "";
+                if (t && t.length >= 1 && t.length <= 16 && !sp.querySelector("img") && !sp.querySelector("span")) {
                     domTagCache.set(id, t); return;
                 }
             }
@@ -2734,7 +2740,6 @@ async function arPrepareForDiscord(data: string): Promise<string> {
     });
 }
 
-
 async function arGifFirstFramePng(data: string, cropParams?: CropParams): Promise<string> {
     const S = AR_EXP_S;
     return new Promise<string>((res, rej) => {
@@ -2762,7 +2767,7 @@ async function arGifFirstFramePng(data: string, cropParams?: CropParams): Promis
 
 async function arGenPreview(data: string, cropParams?: CropParams): Promise<string> {
     const S = 76;
-    return new Promise<string>((res) => {
+    return new Promise<string>(res => {
         const img = new Image();
         img.onload = () => {
             const c = document.createElement("canvas"); c.width = S; c.height = S;
@@ -2923,7 +2928,6 @@ function ArExtFilterSection({ excluded, onChange }: { excluded: string[]; onChan
         </div>
     );
 }
-
 
 function ArCropModal({ src, onApply, onSkip, modalProps }: { src: string; onApply: (d: string, cropParams?: CropParams) => void; onSkip: () => void; modalProps: any; }) {
     const [loaded, setLoaded] = React.useState(false);
@@ -3887,7 +3891,7 @@ function NicksTab({ forceUpdate }: { forceUpdate: () => void }) {
             <div className="rs-nick-list">
                 {globalNicks.length === 0 && <span className="rs-empty">No shared nicks yet.</span>}
                 {globalNicks.map((n, ni) => {
-                    const es = nickEdit["__g"];
+                    const es = nickEdit.__g;
                     return (
                         <div key={`gn_${ni}`} {...gnDProps(ni)} className={gnCls(ni, "rs-item rs-item-compact")}>
                             <span className="rs-drag">⠿</span>
@@ -4912,13 +4916,13 @@ function RotatorSuiteModal({ modalProps }: { modalProps: RenderModalProps }) {
     }, []);
 
     const tabs: { id: TabId; label: string; color: string }[] = [
-        { id: "status",  label: "Status",          color: C.status },
-        { id: "clan",    label: "Clan",             color: C.clan   },
-        { id: "profile", label: "Profile",          color: C.bio    },
-        { id: "avatar",      label: "Avatar",       color: "#9c67ff" },
-        { id: "colorbanner", label: "ColorBanner",  color: "#c084fc" },
-        { id: "servers", label: "Server Profiles",  color: C.nick   },
-        { id: "data",    label: "Data",             color: C.data   },
+        { id: "status", label: "Status", color: C.status },
+        { id: "clan", label: "Clan", color: C.clan },
+        { id: "profile", label: "Profile", color: C.bio },
+        { id: "avatar", label: "Avatar", color: "#9c67ff" },
+        { id: "colorbanner", label: "ColorBanner", color: "#c084fc" },
+        { id: "servers", label: "Server Profiles", color: C.nick },
+        { id: "data", label: "Data", color: C.data },
     ];
 
     const isGlobalSync = settings.store.globalSync;
@@ -4933,7 +4937,7 @@ function RotatorSuiteModal({ modalProps }: { modalProps: RenderModalProps }) {
                         Rotator Suite
                     </Forms.FormTitle>
                     {isGlobalSync && (
-                        <div style={{ fontSize: 10, padding: "2px 9px", borderRadius: 10, background: "rgba(255,167,38,.15)", color: C.data, fontWeight: 800, border: `1px solid rgba(255,167,38,.35)` }}>
+                        <div style={{ fontSize: 10, padding: "2px 9px", borderRadius: 10, background: "rgba(255,167,38,.15)", color: C.data, fontWeight: 800, border: "1px solid rgba(255,167,38,.35)" }}>
                             SYNC · {settings.store.globalSyncSeconds}s
                         </div>
                     )}
@@ -4960,20 +4964,20 @@ function RotatorSuiteModal({ modalProps }: { modalProps: RenderModalProps }) {
                             onClick={() => setTab(t.id)}>{t.label}</button>
                     ))}
                 </div>
-                {tab === "status"  && <StatusTab  forceUpdate={forceUpdate} />}
-                {tab === "clan"    && <ClanTab    forceUpdate={forceUpdate} />}
+                {tab === "status" && <StatusTab forceUpdate={forceUpdate} />}
+                {tab === "clan" && <ClanTab forceUpdate={forceUpdate} />}
                 {tab === "profile" && <ProfileTab forceUpdate={forceUpdate} />}
-                {tab === "avatar"      && <AvatarTab  forceUpdate={forceUpdate} />}
-                {tab === "colorbanner" && <BannerTab  forceUpdate={forceUpdate} />}
-                {tab === "servers" && <NicksTab   forceUpdate={forceUpdate} />}
-                {tab === "data"    && <DataTab    forceUpdate={forceUpdate} />}
+                {tab === "avatar" && <AvatarTab forceUpdate={forceUpdate} />}
+                {tab === "colorbanner" && <BannerTab forceUpdate={forceUpdate} />}
+                {tab === "servers" && <NicksTab forceUpdate={forceUpdate} />}
+                {tab === "data" && <DataTab forceUpdate={forceUpdate} />}
             </ModalContent>
 
             <ModalFooter>
                 <div style={{ display: "flex", gap: 8, width: "100%", alignItems: "center", flexWrap: "wrap" as const }}>
                     {(isManualStop || wasInvisible) && (
                         <div style={{ width: "100%", padding: "5px 10px", borderRadius: 7, background: "rgba(239,83,80,.1)", border: "1px solid rgba(239,83,80,.3)", fontSize: 11, color: "#ef9a9a", fontWeight: 700, display: "flex", alignItems: "center", gap: 6 }}>
-                            {wasInvisible && !isManualStop ? "⛔ PAUSED - Invisible status" : isManualStop && globalStopEndTime ? `⏸ STOPPED - Go to Data tab to resume` : "⏸ MANUALLY STOPPED - Go to Data tab to resume"}
+                            {wasInvisible && !isManualStop ? "⛔ PAUSED - Invisible status" : isManualStop && globalStopEndTime ? "⏸ STOPPED - Go to Data tab to resume" : "⏸ MANUALLY STOPPED - Go to Data tab to resume"}
                         </div>
                     )}
                     {settings.store.stopOnInvisible && !wasInvisible && !isManualStop && (
@@ -5014,7 +5018,6 @@ function RotatorSuiteModal({ modalProps }: { modalProps: RenderModalProps }) {
         </ModalRoot>
     );
 }
-
 
 function RSUserAreaButton() {
     const [active, setActive] = React.useState(false);
@@ -5070,6 +5073,10 @@ export default definePlugin({
 
     async start() {
         injectCSS();
+        if (!(window as any)._rsCloseReg) {
+            window.addEventListener("beforeunload", rsBeforeUnloadHandler);
+            (window as any)._rsCloseReg = true;
+        }
         cachedToken = null; cachedGuildStore = null; cachedClanGuilds = []; lastClanFetch = 0;
         statusLastVal = null; clanLastVal = null; bioLastVal = null; prLastVal = null;
         pluginActive = true;
@@ -5084,8 +5091,8 @@ export default definePlugin({
 
         const stored: StoreData = (await DataStore.get(SK)) ?? defaults;
         storeCreatedAt = stored.createdAt ?? defaults.createdAt;
-        globalNicks  = stored.globalNicks  ?? [];
-        guilds       = (stored.guilds ?? []).map((g: any) => ({
+        globalNicks = stored.globalNicks ?? [];
+        guilds = (stored.guilds ?? []).map((g: any) => ({
             ...g,
             nickMode: g.nickMode ?? (g.useGlobal ? "global" : "custom") as NickMode,
             lastNickVal: null,
@@ -5098,7 +5105,7 @@ export default definePlugin({
             nickVoiceEnabled: g.nickVoiceEnabled ?? g.enabled,
             pronounsVoiceEnabled: g.pronounsVoiceEnabled ?? g.guildPronounsEnabled,
         }));
-        bioEntries   = stored.bioEntries   ?? [];
+        bioEntries = stored.bioEntries ?? [];
         pronounsList = stored.pronounsList ?? "";
         if (Array.isArray((stored as any).statusEntries)) {
             statusEntries = (stored as any).statusEntries;
@@ -5106,18 +5113,18 @@ export default definePlugin({
             statusEntries = parseLegacyStatuses((stored as any).statuses);
         }
         statusPresets = Array.isArray((stored as any).statusPresets) ? (stored as any).statusPresets : [];
-        clanIds      = stored.clanIds      ?? [];
+        clanIds = stored.clanIds ?? [];
         clanServerNames = (stored as any).clanServerNames ?? {};
         statusSeqIdx = stored.statusSeqIdx ?? 0;
-        clanSeqIdx   = stored.clanSeqIdx   ?? 0;
-        bioSeqIdx    = stored.bioSeqIdx    ?? 0;
-        prSeqIdx     = stored.prSeqIdx     ?? 0;
+        clanSeqIdx = stored.clanSeqIdx ?? 0;
+        bioSeqIdx = stored.bioSeqIdx ?? 0;
+        prSeqIdx = stored.prSeqIdx ?? 0;
         statusLastVal = (stored as any).statusLastVal ?? null;
-        clanLastVal   = (stored as any).clanLastVal   ?? null;
-        bioLastVal    = (stored as any).bioLastVal    ?? null;
-        prLastVal     = (stored as any).prLastVal     ?? null;
+        clanLastVal = (stored as any).clanLastVal ?? null;
+        bioLastVal = (stored as any).bioLastVal ?? null;
+        prLastVal = (stored as any).prLastVal ?? null;
         globalNickEntries = (stored as any).globalNickEntries ?? [];
-        globalNickSeqIdx  = (stored as any).globalNickSeqIdx  ?? 0;
+        globalNickSeqIdx = (stored as any).globalNickSeqIdx ?? 0;
         globalNickLastVal = (stored as any).globalNickLastVal ?? null;
         globalGuildPronouns = (stored as any).globalGuildPronouns ?? [];
 
@@ -5125,26 +5132,26 @@ export default definePlugin({
         await saveData();
 
         const arStored: ArStoreData = (await DataStore.get(AR_SK)) ?? { avatars: [], seqIndex: 0, shuffleQueue: [] };
-        arAvatars      = arStored.avatars      ?? [];
-        arSeqIndex     = arStored.seqIndex     ?? 0;
+        arAvatars = arStored.avatars ?? [];
+        arSeqIndex = arStored.seqIndex ?? 0;
         arShuffleQueue = arStored.shuffleQueue ?? [];
         if (settings.store.avatarEnabled && arGetActive().length) arStartRotator(false);
 
         const bcrStored: BcrStoreData = (await DataStore.get(BCR_SK)) ?? { favorites: [], usedFavs: [], wasRunning: false, currentColor: null };
-        bcrFavorites    = bcrStored.favorites    ?? [];
-        bcrUsedFavs     = bcrStored.usedFavs     ?? [];
+        bcrFavorites = bcrStored.favorites ?? [];
+        bcrUsedFavs = bcrStored.usedFavs ?? [];
         bcrCurrentColor = bcrStored.currentColor ?? null;
         if (bcrStored.wasRunning || settings.store.bannerEnabled) bcrStartRotator(false);
 
         const closeStored = (await DataStore.get(RS_CLOSE_SK)) ?? {};
-        closeStatusEnabled  = closeStored.closeStatusEnabled  ?? false;
-        closeStatusText     = closeStored.closeStatusText     ?? "";
-        closeStatusEmoji    = closeStored.closeStatusEmoji    ?? "";
-        closeStatusType     = closeStored.closeStatusType     ?? "auto";
-        closeClanEnabled    = closeStored.closeClanEnabled    ?? false;
-        closeClanId         = closeStored.closeClanId         ?? "";
-        closeBannerEnabled  = closeStored.closeBannerEnabled  ?? false;
-        closeBannerColor    = closeStored.closeBannerColor    ?? "#111214";
+        closeStatusEnabled = closeStored.closeStatusEnabled ?? false;
+        closeStatusText = closeStored.closeStatusText ?? "";
+        closeStatusEmoji = closeStored.closeStatusEmoji ?? "";
+        closeStatusType = closeStored.closeStatusType ?? "auto";
+        closeClanEnabled = closeStored.closeClanEnabled ?? false;
+        closeClanId = closeStored.closeClanId ?? "";
+        closeBannerEnabled = closeStored.closeBannerEnabled ?? false;
+        closeBannerColor = closeStored.closeBannerColor ?? "#111214";
         try { localStorage.setItem(RS_CLOSE_LS, JSON.stringify({ closeStatusEnabled, closeStatusText, closeStatusEmoji, closeStatusType, closeClanEnabled, closeClanId, closeBannerEnabled, closeBannerColor })); } catch {}
 
         Vencord.Api.UserArea.addUserAreaButton("rotator-suite", () => <RSUserAreaButton />);
@@ -5176,5 +5183,7 @@ export default definePlugin({
         bcrCurrentColor = null; bcrOnColorApplied = null;
         Vencord.Api.UserArea.removeUserAreaButton("rotator-suite");
         document.getElementById("rs-css")?.remove();
+        window.removeEventListener("beforeunload", rsBeforeUnloadHandler);
+        (window as any)._rsCloseReg = false;
     },
 });

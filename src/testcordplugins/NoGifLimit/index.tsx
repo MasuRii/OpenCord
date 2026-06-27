@@ -16,10 +16,10 @@ import definePlugin, { OptionType } from "@utils/types";
 import { ChannelStore, Menu, React, showToast, Toasts, useState } from "@webpack/common";
 
 import type { CaptionMedia } from "../gifCaptioner/types";
-import { fetchMedia } from "../gifCaptioner/utils/fetchMedia";
-import { inspectMedia } from "../gifCaptioner/utils/media";
 import GifCaptionerModal from "../gifCaptioner/ui/modal";
 import { showError as showCaptionError } from "../gifCaptioner/ui/statusCard";
+import { fetchMedia } from "../gifCaptioner/utils/fetchMedia";
+import { inspectMedia } from "../gifCaptioner/utils/media";
 
 const DATA_KEY = "heartGifs-data";
 const FOLDERS_KEY = "heartGifs-folders";

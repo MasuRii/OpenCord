@@ -63,11 +63,8 @@ const ChannelContect: NavContextMenuPatchCallback = (children, props) => {
     container?.unshift(createPasswordItem(props.channel.id));
 };
 
-
 export const contextMenus = {
     "gdm-context": GroupDMContext,
     "user-context": UserContext,
     "channel-context": ChannelContect
 };
-
-

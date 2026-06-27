@@ -7,6 +7,7 @@
 import "./styles.css";
 
 import { ChatBarButton } from "@api/ChatButtons";
+import { addChannelToolbarButton, addHeaderBarButton, ChannelToolbarButton, HeaderBarButton, removeChannelToolbarButton, removeHeaderBarButton } from "@api/HeaderBar";
 import { DataStore } from "@api/index";
 import { definePluginSettings, migratePluginSettings, Settings } from "@api/Settings";
 import { FormSwitch } from "@components/FormSwitch";
@@ -39,6 +40,60 @@ async function handleButtonClick(context: string) {
     if (!currentChannel) return;
 
     sendMessage(currentChannel.id, { content: context });
+}
+
+function PlusIcon() {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+            <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+        </svg>
+    );
+}
+
+function CustomButtonIcon({ svg }: { svg: string; }) {
+    return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 24 24">
+            <g dangerouslySetInnerHTML={{ __html: svg }} />
+        </svg>
+    );
+}
+
+function HeaderChatButtons() {
+    return (
+        <>
+            {buttonEntries.filter(entry => entry.enabled !== false).map(entry => {
+                const Icon = () => <CustomButtonIcon svg={entry.svg} />;
+
+                return (
+                    <HeaderBarButton
+                        key={entry.id}
+                        icon={Icon}
+                        tooltip={entry.label}
+                        onClick={() => handleButtonClick(entry.message)}
+                    />
+                );
+            })}
+        </>
+    );
+}
+
+function ChannelChatButtons() {
+    return (
+        <>
+            {buttonEntries.filter(entry => entry.enabled !== false).map(entry => {
+                const Icon = () => <CustomButtonIcon svg={entry.svg} />;
+
+                return (
+                    <ChannelToolbarButton
+                        key={entry.id}
+                        icon={Icon}
+                        tooltip={entry.label}
+                        onClick={() => handleButtonClick(entry.message)}
+                    />
+                );
+            })}
+        </>
+    );
 }
 
 async function addButtonEntry(forceUpdate: () => void) {
@@ -256,6 +311,17 @@ function ButtonEntries() {
 }
 
 const settings = definePluginSettings({
+    location: {
+        type: OptionType.SELECT,
+        description: "Where to show the button",
+        options: [
+            { label: "Chat bar", value: "chatbar", default: true },
+            { label: "Header bar", value: "headerbar" },
+            { label: "Channel toolbar", value: "channeltoolbar" },
+            { label: "Disabled", value: "disabled" },
+        ],
+        restartNeeded: true,
+    },
     buttons: {
         type: OptionType.COMPONENT,
         description: "Manage your custom chat buttons",
@@ -269,10 +335,13 @@ export default definePlugin({
     description: "Add custom chat buttons with personalized + messages and SVG icons",
     tags: ["Chat", "Customisation"],
     authors: [TestcordDevs.x2b],
+    dependencies: ["HeaderBarAPI"],
     settings,
 
-    renderChatBarButton: (({ isMainChat }) => {
-        if (!isMainChat) return null;
+    chatBarButton: {
+        icon: PlusIcon as any,
+        render: (({ isMainChat }) => {
+            if (!isMainChat || settings.store.location !== "chatbar") return null;
 
         return (
             <>
@@ -282,14 +351,13 @@ export default definePlugin({
                         tooltip={entry.label}
                         onClick={() => handleButtonClick(entry.message)}
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20px" height="20px" viewBox="0 0 24 24">
-                            <g dangerouslySetInnerHTML={{ __html: entry.svg }} />
-                        </svg>
+                        <CustomButtonIcon svg={entry.svg} />
                     </ChatBarButton>
                 ))}
             </>
         );
     }) as any,
+    },
 
     async start() {
         const storedEntries = await DataStore.get(BUTTON_ENTRIES_KEY) ?? [];
@@ -321,10 +389,17 @@ export default definePlugin({
         await DataStore.set(BUTTON_ENTRIES_KEY, storedEntries);
 
         buttonEntries = storedEntries;
+
+        const { location } = settings.store;
+        if (location === "headerbar") {
+            addHeaderBarButton("ChatButtonsPlus", HeaderChatButtons, 5);
+        } else if (location === "channeltoolbar") {
+            addChannelToolbarButton("ChatButtonsPlus", ChannelChatButtons, 5);
+        }
+    },
+
+    stop() {
+        removeHeaderBarButton("ChatButtonsPlus");
+        removeChannelToolbarButton("ChatButtonsPlus");
     }
 });
-
-
-
-
-

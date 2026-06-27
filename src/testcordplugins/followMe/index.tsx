@@ -1,6 +1,6 @@
 /*
- * Nightcord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -9,7 +9,7 @@ import { HeaderBarButton } from "@api/HeaderBar";
 import { DataStore } from "@api/index";
 import definePlugin from "@utils/types";
 import { findStoreLazy } from "@webpack";
-import { Menu, React, Toasts, useState, useEffect, UserStore, PermissionStore, PermissionsBits, ChannelStore, RestAPI, Constants } from "@webpack/common";
+import { ChannelStore, Constants,Menu, PermissionsBits, PermissionStore, React, RestAPI, Toasts, useEffect, UserStore, useState } from "@webpack/common";
 
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
 
@@ -141,7 +141,7 @@ const ctxPatch: NavContextMenuPatchCallback = (children, props) => {
 export default definePlugin({
     name: "FollowMe",
     description: "Forces a user to follow you in voice channels (if you have permissions). Right-click a user -> Follow Me.",
-    tags: ["Voice", "Utility"],
+    tags: ["Voice", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
 
     headerBarButton: {

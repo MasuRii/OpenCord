@@ -152,6 +152,9 @@ function hiddenReplyComponent() {
     );
 }
 
+const hebrewCheckCache = new Map<string, boolean>();
+const HEBREW_CACHE_MAX = 500;
+
 export default definePlugin({
     name: "AntiSoap (hideSoap)",
     description: "basically hide all messages from j*ws",
@@ -161,24 +164,37 @@ export default definePlugin({
     shouldHideUser,
     hiddenReplyComponent,
 
+    stop() {
+        hebrewCheckCache.clear();
+    },
+
     flux: {
         MESSAGE_CREATE({ message }) {
             if (!message?.author?.id || message.author.bot) return;
 
             // Check if message contains Hebrew text
-            if (detectHebrewText(message)) {
-                const userId = message.author.id;
+            const userId = message.author.id;
+            const cached = hebrewCheckCache.get(userId);
+            if (cached === true) return;
+            if (cached === false) return;
 
-                // Add user to custom blocked list if not already there
-                const currentBlocked = settings.store.customBlockedUsers;
-                const blockedList = currentBlocked.length > 0
-                    ? currentBlocked.split(", ").filter(Boolean)
-                    : [];
+            const hasHebrew = detectHebrewText(message);
+            if (hebrewCheckCache.size >= HEBREW_CACHE_MAX) {
+                const firstKey = hebrewCheckCache.keys().next().value;
+                if (firstKey) hebrewCheckCache.delete(firstKey);
+            }
+            hebrewCheckCache.set(userId, hasHebrew);
+            if (!hasHebrew) return;
 
-                if (!blockedList.includes(userId)) {
-                    blockedList.push(userId);
-                    settings.store.customBlockedUsers = blockedList.join(", ");
-                }
+            // Add user to custom blocked list if not already there
+            const currentBlocked = settings.store.customBlockedUsers;
+            const blockedList = currentBlocked.length > 0
+                ? currentBlocked.split(", ").filter(Boolean)
+                : [];
+
+            if (!blockedList.includes(userId)) {
+                blockedList.push(userId);
+                settings.store.customBlockedUsers = blockedList.join(", ");
             }
         }
     },

@@ -1,14 +1,14 @@
 /*
- * Nightcord — AntiDeleteMessage
- * Automatically resends your messages if someone deletes them.
- * Cache is persisted in IndexedDB — survives restarts.
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { ChannelToolbarButton } from "@api/HeaderBar";
 import * as DataStore from "@api/DataStore";
+import { ChannelToolbarButton } from "@api/HeaderBar";
 import { definePluginSettings } from "@api/Settings";
-import { OptionType } from "@utils/types";
 import definePlugin from "@utils/types";
+import { OptionType } from "@utils/types";
 import { Constants, React, RestAPI, UserStore } from "@webpack/common";
 
 const settings = definePluginSettings({
@@ -130,7 +130,7 @@ async function resendMessage(cached: CachedMessage) {
 }
 
 function AntiDeleteIcon({ size = 18 }: { size?: number; }) {
-    const enabled = settings.store.enabled;
+    const { enabled } = settings.store;
     const color = enabled ? "#3ba55c" : "#72767d";
     return React.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: color },
         React.createElement("path", { d: "M19.73 4.87l-1.52-1.52L12 9.43 5.79 3.35 4.27 4.87 10.41 11H2v2h20V9h-8.41l6.14-6.13zM4 15h16v2H4v-2z" })
@@ -140,7 +140,7 @@ function AntiDeleteIcon({ size = 18 }: { size?: number; }) {
 export default definePlugin({
     name: "AntiDeleteMessage",
     description: "Automatically resends your messages if someone deletes them. Cache persisted across restarts.",
-    tags: ["Privacy", "Notifications", "Utility"],
+    tags: ["Privacy", "Notifications", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     enabledByDefault: false,
     settings,
@@ -148,6 +148,7 @@ export default definePlugin({
     headerBarButton: {
         location: "channeltoolbar" as const,
         icon: AntiDeleteIcon,
+        label: "Toggle AntiDeleteMessage",
         render() {
             return React.createElement(ChannelToolbarButton, {
                 icon: AntiDeleteIcon,

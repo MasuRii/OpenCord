@@ -4,14 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-
-import { definePluginSettings } from "@api/Settings";
-import { sendBotMessage } from "@api/Commands";
-import { addMessagePreSendListener, removeMessagePreSendListener, MessageSendListener } from "@api/MessageEvents";
 import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
-import { Devs } from "@utils/constants";
+import { sendBotMessage } from "@api/Commands";
+import { addChannelToolbarButton, addHeaderBarButton, ChannelToolbarButton, HeaderBarButton } from "@api/HeaderBar";
+import { addMessagePreSendListener, MessageSendListener,removeMessagePreSendListener } from "@api/MessageEvents";
+import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
-import definePlugin, { IconComponent, OptionType } from "@utils/types";
+import definePlugin, { OptionType } from "@utils/types";
 import { Message } from "@vencord/discord-types";
 
 interface IMessageCreate {
@@ -24,11 +23,11 @@ interface IMessageCreate {
 
 // BlazingOpossum Cipher - High-Performance, Post-Quantum Resilient Symmetric Cipher
 class BlazingOpossumCipher {
-    private static readonly BLOCK_SIZE = 16;      // 128-bit blocks
-    private static readonly KEY_SIZE = 32;        // 256-bit key
-    private static readonly IV_SIZE = 16;         // 128-bit IV
-    private static readonly TAG_SIZE = 16;        // 128-bit Poly-hash Tag
-    private static readonly ROUNDS = 20;          // Increased rounds for Quantum resistance
+    private static readonly BLOCK_SIZE = 16; // 128-bit blocks
+    private static readonly KEY_SIZE = 32; // 256-bit key
+    private static readonly IV_SIZE = 16; // 128-bit IV
+    private static readonly TAG_SIZE = 16; // 128-bit Poly-hash Tag
+    private static readonly ROUNDS = 20; // Increased rounds for Quantum resistance
 
     private roundKeys: Uint8Array[];
 
@@ -36,7 +35,7 @@ class BlazingOpossumCipher {
         if (key.length !== 32) {
             throw new Error(`Key must be ${32} bytes`);
         }
-        
+
         this.roundKeys = [];
         this.expandKey();
     }
@@ -51,25 +50,25 @@ class BlazingOpossumCipher {
         const PRIME_ADD = 0xBB67AE85; // Sqrt(3) derived
 
         const temp = new Uint8Array(BlazingOpossumCipher.BLOCK_SIZE);
-        
+
         for (let i = 32; i < expandedKey.length; i += BlazingOpossumCipher.BLOCK_SIZE) {
             temp.set(expandedKey.subarray(i - BlazingOpossumCipher.BLOCK_SIZE, i));
-            
+
             // Nonlinear mix: (State * Prime + Key) ^ Rotate(State)
             for (let j = 0; j < temp.length; j += 4) {
                 const val = (temp[j] | (temp[j + 1] << 8) | (temp[j + 2] << 16) | (temp[j + 3] << 24)) >>> 0;
                 const mixed = Math.imul(val, PRIME_MUL) + this.readUint32LE(expandedKey, i - 32 + j);
-                
+
                 // Rotate left by 7 bits
                 const rotated = ((mixed << 7) | (mixed >>> 25)) >>> 0;
-                
+
                 this.writeUint32LE(temp, j, rotated);
             }
-            
+
             // XOR with round constant
             const roundConstant = (i / BlazingOpossumCipher.BLOCK_SIZE) | 0;
             temp[0] ^= roundConstant;
-            
+
             expandedKey.set(temp, i);
         }
 
@@ -97,34 +96,34 @@ class BlazingOpossumCipher {
     private generateKeystreamBlock(ivLow: number, ivHigh: number, counter: number): Uint8Array {
         // Initialize state with IV and Counter
         const state = new Uint8Array(BlazingOpossumCipher.BLOCK_SIZE);
-        
+
         // Pack IV and counter into state
         this.writeUint32LE(state, 0, ivHigh);
         this.writeUint32LE(state, 4, ivLow + counter);
         this.writeUint32LE(state, 8, ivHigh);
         this.writeUint32LE(state, 12, ivLow + counter + 1);
-        
+
         const PRIME_MUL = 0x9E3779B9;
         const PRIME_ADD = 0xBB67AE85;
 
         for (let r = 0; r < BlazingOpossumCipher.ROUNDS; r++) {
             const roundKey = this.roundKeys[r];
-            
+
             // Non-linear mixing using multiplication
             for (let i = 0; i < state.length; i += 4) {
                 const val = this.readUint32LE(state, i);
                 const roundKeyValue = this.readUint32LE(roundKey, i);
-                
+
                 // Multiply and add with round key
                 const multiplied = Math.imul(val, PRIME_MUL);
                 const mixed = (multiplied + roundKeyValue) >>> 0;
-                
+
                 // Rotate left by position-dependent amount
                 const rotated = ((mixed << ((i * 7) % 32)) | (mixed >>> (32 - ((i * 7) % 32)))) >>> 0;
-                
+
                 this.writeUint32LE(state, i, rotated);
             }
-            
+
             // Add round constant
             for (let i = 0; i < state.length; i++) {
                 state[i] ^= (PRIME_ADD + r) & 0xFF;
@@ -135,7 +134,7 @@ class BlazingOpossumCipher {
         for (let i = 0; i < state.length; i++) {
             state[i] ^= this.roundKeys[BlazingOpossumCipher.ROUNDS][i];
         }
-        
+
         return state;
     }
 
@@ -143,115 +142,110 @@ class BlazingOpossumCipher {
         // Initialize accumulator with IV
         const acc = new Uint8Array(BlazingOpossumCipher.BLOCK_SIZE);
         acc.set(iv.subarray(0, Math.min(iv.length, BlazingOpossumCipher.BLOCK_SIZE)));
-        
+
         const PRIME_MUL = 0x9E3779B9;
         const PRIME_ADD = 0xBB67AE85;
-        
+
         // Process data in chunks
         for (let i = 0; i < data.length; i += BlazingOpossumCipher.BLOCK_SIZE) {
             const chunk = data.subarray(i, Math.min(i + BlazingOpossumCipher.BLOCK_SIZE, data.length));
-            
+
             // Absorb chunk into accumulator
             for (let j = 0; j < chunk.length; j++) {
                 acc[j % acc.length] ^= chunk[j];
             }
-            
+
             // Mix using multiplication
             for (let j = 0; j < acc.length; j += 4) {
                 const val = this.readUint32LE(acc, j);
                 const multiplied = Math.imul(val, PRIME_MUL);
                 const mixed = (multiplied + PRIME_ADD) >>> 0;
-                
+
                 // Rotate
                 const rotated = ((mixed << 11) | (mixed >>> 21)) >>> 0;
                 this.writeUint32LE(acc, j, rotated);
             }
         }
-        
+
         // Final squeeze with multiple rounds
         for (let r = 0; r < 4; r++) {
             for (let i = 0; i < acc.length; i += 4) {
                 const val = this.readUint32LE(acc, i);
                 const roundKeyValue = this.readUint32LE(this.roundKeys[r % this.roundKeys.length], i);
-                
+
                 const mixed = (Math.imul(val, PRIME_MUL) + roundKeyValue) >>> 0;
                 const rotated = ((mixed << 13) | (mixed >>> 19)) >>> 0;
                 this.writeUint32LE(acc, i, rotated);
             }
         }
-        
+
         return acc.slice(0, BlazingOpossumCipher.TAG_SIZE);
     }
 
     private processCTR(inputData: Uint8Array, iv: Uint8Array): Uint8Array {
         const outputData = new Uint8Array(inputData.length);
-        let ivLow = this.readUint32LE(iv, 0);
-        let ivHigh = this.readUint32LE(iv, 4);
+        const ivLow = this.readUint32LE(iv, 0);
+        const ivHigh = this.readUint32LE(iv, 4);
         let counter = 0;
-        
+
         let processedBytes = 0;
         while (processedBytes < inputData.length) {
             const keystreamBlock = this.generateKeystreamBlock(ivLow, ivHigh, counter);
-            
+
             const bytesToProcess = Math.min(BlazingOpossumCipher.BLOCK_SIZE, inputData.length - processedBytes);
-            
+
             // XOR input with keystream
             for (let i = 0; i < bytesToProcess; i++) {
                 outputData[processedBytes + i] = inputData[processedBytes + i] ^ keystreamBlock[i];
             }
-            
+
             processedBytes += bytesToProcess;
             counter += 2; // We generated 2 blocks worth of keystream
         }
-        
+
         return outputData;
     }
-
-
-
-
-
 
     public encrypt(plaintext: string, password: string): string {
         const encoder = new TextEncoder();
         const data = encoder.encode(plaintext);
-            
+
         // Derive key from password using PBKDF2 or simple hash
         const keyMaterial = this.deriveKey(password);
-            
+
         // Generate random IV
         const iv = crypto.getRandomValues(new Uint8Array(BlazingOpossumCipher.IV_SIZE));
-            
+
         // Process with CTR mode
         const processed = this.processCTR(data, iv);
-            
+
         // Compute tag for integrity
         const tag = this.computeTag(processed, iv);
-            
+
         // Combine IV, processed data, and tag
         const result = new Uint8Array(BlazingOpossumCipher.IV_SIZE + processed.length + BlazingOpossumCipher.TAG_SIZE);
         result.set(iv, 0);
         result.set(processed, BlazingOpossumCipher.IV_SIZE);
         result.set(tag, BlazingOpossumCipher.IV_SIZE + processed.length);
-            
+
         return btoa(String.fromCharCode(...result));
     }
-    
+
     public decrypt(encrypted: string, password: string): string {
         try {
-            const data = new Uint8Array(atob(encrypted).split('').map(c => c.charCodeAt(0)));
-                
+            const data = new Uint8Array(atob(encrypted).split("").map(c => c.charCodeAt(0)));
+
             if (data.length < BlazingOpossumCipher.IV_SIZE + BlazingOpossumCipher.TAG_SIZE) {
                 throw new Error("Data too short");
             }
-                
+
             const iv = data.subarray(0, BlazingOpossumCipher.IV_SIZE);
             const encryptedData = data.subarray(BlazingOpossumCipher.IV_SIZE, data.length - BlazingOpossumCipher.TAG_SIZE);
             const receivedTag = data.subarray(data.length - BlazingOpossumCipher.TAG_SIZE);
-                
+
             // Compute expected tag
             const computedTag = this.computeTag(encryptedData, iv);
-                
+
             // Verify tag (constant-time comparison)
             let tagValid = true;
             for (let i = 0; i < BlazingOpossumCipher.TAG_SIZE; i++) {
@@ -260,14 +254,14 @@ class BlazingOpossumCipher {
                     break;
                 }
             }
-                
+
             if (!tagValid) {
                 throw new Error("Integrity check failed");
             }
-                
+
             // Decrypt using CTR mode
             const processed = this.processCTR(encryptedData, iv);
-                
+
             const decoder = new TextDecoder();
             return decoder.decode(processed);
         } catch (error) {
@@ -275,18 +269,18 @@ class BlazingOpossumCipher {
             throw new Error("Decryption failed");
         }
     }
-    
+
     private deriveKey(password: string): Uint8Array {
         // Simple key derivation (in a real implementation, use PBKDF2 or similar)
         const encoder = new TextEncoder();
         const data = encoder.encode(password);
         const key = new Uint8Array(BlazingOpossumCipher.KEY_SIZE);
-            
+
         // Use a simple hash-like approach
         for (let i = 0; i < key.length; i++) {
             key[i] = data[i % data.length] ^ (i % 256);
         }
-            
+
         return key;
     }
 }
@@ -333,7 +327,7 @@ const EncryptionToggleButton: ChatBarButtonFactory = ({ channel, type }) => {
 
     const validChat = ["normal", "sidebar"].some(x => type.analyticsName === x);
 
-    if (!validChat) return null;
+    if (!validChat || settings.store.location !== "chatbar") return null;
 
     // Only show button when plugin is activated
     if (!pluginActivated) {
@@ -379,6 +373,17 @@ const EncryptionToggleButton: ChatBarButtonFactory = ({ channel, type }) => {
 
 // Plugin settings definition
 const settings = definePluginSettings({
+    location: {
+        type: OptionType.SELECT,
+        description: "Where to show the button",
+        options: [
+            { label: "Chat bar", value: "chatbar", default: true },
+            { label: "Header bar", value: "headerbar" },
+            { label: "Channel toolbar", value: "channeltoolbar" },
+            { label: "Disabled", value: "disabled" },
+        ],
+        restartNeeded: true,
+    },
     pluginActivated: {
         type: OptionType.BOOLEAN,
         description: "Activate/deactivate the Securecord Opossum plugin",
@@ -407,10 +412,30 @@ export default definePlugin({
     description: "High-Performance, Post-Quantum Resilient end-to-end encryption for Discord based on BlazingOpossum cipher. Share the same password with other users to communicate securely.",
     tags: ["Privacy", "Utility"],
     authors: [{ name: "irritably", id: 928787166916640838n }, TestcordDevs.nnenaza],
+    dependencies: ["HeaderBarAPI"],
     settings,
     chatBarButton: { render: EncryptionToggleButton, icon: () => null as any },
 
     start() {
+        const { location } = settings.store;
+        if (location === "headerbar") {
+            addHeaderBarButton("SecurecordOpossum", () => (
+                <HeaderBarButton
+                    icon={() => settings.store.encryptionEnabled ? <EncryptionEnabledIcon /> : <EncryptionDisabledIcon />}
+                    tooltip={settings.store.encryptionEnabled ? "Disable Encryption" : "Enable Encryption"}
+                    onClick={() => { settings.store.encryptionEnabled = !settings.store.encryptionEnabled; }}
+                />
+            ), 5);
+        } else if (location === "channeltoolbar") {
+            addChannelToolbarButton("SecurecordOpossum", () => (
+                <ChannelToolbarButton
+                    icon={() => settings.store.encryptionEnabled ? <EncryptionEnabledIcon /> : <EncryptionDisabledIcon />}
+                    tooltip={settings.store.encryptionEnabled ? "Disable Encryption" : "Enable Encryption"}
+                    onClick={() => { settings.store.encryptionEnabled = !settings.store.encryptionEnabled; }}
+                />
+            ), 5);
+        }
+
         // Add listener to encrypt messages before sending
         const listener: MessageSendListener = async (_, message) => {
             if (settings.store.pluginActivated && settings.store.encryptionEnabled && settings.store.encryptionPassword) {
@@ -419,22 +444,22 @@ export default definePlugin({
                     const encoder = new TextEncoder();
                     const passwordBytes = encoder.encode(settings.store.encryptionPassword);
                     const key = new Uint8Array(32);
-                    
+
                     // Derive key from password
                     for (let i = 0; i < key.length; i++) {
                         key[i] = passwordBytes[i % passwordBytes.length] ^ (i % 256);
                     }
-                    
+
                     cipher = new BlazingOpossumCipher(key);
                 }
-                
+
                 // Encrypt message only if not already encrypted
                 if (!message.content.startsWith("🔒ENCRYPTED:") && !message.content.endsWith(":ENDLOCK")) {
                     try {
                         const encryptedMessage = cipher.encrypt(message.content, settings.store.encryptionPassword);
                         // Replace message content with encrypted version
                         message.content = `🔒ENCRYPTED:${encryptedMessage}:ENDLOCK`;
-                        
+
                         if (settings.store.enableLogging) {
                             console.log("Securecord BlazingOpossum: Message encrypted");
                         }
@@ -481,12 +506,12 @@ export default definePlugin({
                     const encoder = new TextEncoder();
                     const passwordBytes = encoder.encode(settings.store.encryptionPassword);
                     const key = new Uint8Array(32);
-                    
+
                     // Derive key from password
                     for (let i = 0; i < key.length; i++) {
                         key[i] = passwordBytes[i % passwordBytes.length] ^ (i % 256);
                     }
-                    
+
                     cipher = new BlazingOpossumCipher(key);
                 }
 
@@ -544,8 +569,3 @@ export default definePlugin({
     }
 
 });
-
-
-
-
-

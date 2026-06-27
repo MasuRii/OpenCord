@@ -5,7 +5,7 @@
  */
 
 import { ApplicationCommandInputType, ApplicationCommandOptionType, findOption } from "@api/Commands";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import { openUserProfile } from "@utils/discord";
 import definePlugin from "@utils/types";
 import { UserStore } from "@webpack/common";
@@ -31,8 +31,3 @@ export default definePlugin({
         }
     ]
 });
-
-
-
-
-

@@ -16,10 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Framerate, Resolution } from "../../../../philsPluginLibrary/types";
 // @ts-ignore
 import type TypedEmitter from "typed-emitter";
 
+import { Framerate, Resolution } from "../../../../philsPluginLibrary/types";
 import { Conn, FramerateReducer, VideoQualityManager } from "./";
 
 export const ConnectionEvent = {

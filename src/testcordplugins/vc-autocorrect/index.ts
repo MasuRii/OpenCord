@@ -17,7 +17,7 @@
 */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, EquicordDevs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType, PluginSettingDef } from "@utils/types";
 
 const settingsSharedProps: PluginSettingDef = {
@@ -77,8 +77,3 @@ export default definePlugin({
         },
     ],
 });
-
-
-
-
-

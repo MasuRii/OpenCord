@@ -1,17 +1,19 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import "./styles.css";
+
 import { HeaderBarButton } from "@api/HeaderBar";
-import { openModal, ModalRoot, ModalHeader, ModalContent, ModalFooter, ModalCloseButton } from "@utils/modal";
+import { ModalCloseButton,ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import { Forms } from "@webpack/common";
-import { React, useState, useEffect, useMemo } from "@webpack/common";
+import { React, useEffect, useMemo,useState } from "@webpack/common";
+
 import { t, useTranslation } from "../autoTranslateNightcord";
-import "./styles.css";
 
 const RelationshipStore = findStoreLazy("RelationshipStore");
 const UserStore = findStoreLazy("UserStore");
@@ -211,7 +213,7 @@ function BulkFriendRemoveButton() {
 export default definePlugin({
     name: "BulkFriendRemove",
     description: "Delete multiple friends at once.",
-    tags: ["Friends", "Utility"],
+    tags: ["Friends", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     headerBarButton: { icon: BulkRemoveIcon, render: BulkFriendRemoveButton, priority: 5 },
 });

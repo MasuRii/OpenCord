@@ -1,0 +1,19 @@
+.c98-author-dead {
+    text-decoration: line-through;
+    text-decoration-color: var(--status-danger);
+    opacity: 0.6;
+}
+
+.c98-author-dead-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.c98-author-dead-badge::after {
+    content: "✕";
+    color: var(--status-danger);
+    font-size: 10px;
+    font-weight: 700;
+    margin-left: 2px;
+}

@@ -145,15 +145,28 @@ function applyCaretPosition() {
 }
 
 let observer: MutationObserver | null = null;
+let caretScanQueued = false;
 
 function startObserver() {
-    observer = new MutationObserver(() => applyCaretPosition());
+    // The caret only matters while a slate editor is focused. Bail immediately
+    // otherwise, and coalesce a burst of mutations into a single rAF-scoped pass
+    // instead of running getSelection + getClientRects on every DOM mutation.
+    observer = new MutationObserver(() => {
+        if (caretScanQueued) return;
+        if (!document.activeElement?.closest("[data-slate-editor]")) return;
+        caretScanQueued = true;
+        requestAnimationFrame(() => {
+            caretScanQueued = false;
+            applyCaretPosition();
+        });
+    });
     observer.observe(document.body, { childList: true, subtree: true });
 }
 
 function stopObserver() {
     observer?.disconnect();
     observer = null;
+    caretScanQueued = false;
 }
 
 const handlers = {

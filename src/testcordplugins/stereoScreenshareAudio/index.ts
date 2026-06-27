@@ -7,7 +7,7 @@
 import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 
-let orig = {};
+const orig = {};
 
 const mungeSDP = sdp => {
     if (!sdp) return sdp;
@@ -44,32 +44,42 @@ export default definePlugin({
     authors: [TestcordDevs.x2b],
 
     async start() {
-        // grab the original setRemoteDescription and setLocalDescription functions
-        orig = {
-            SRD: RTCPeerConnection.prototype.setRemoteDescription,
-            SLD: RTCPeerConnection.prototype.setLocalDescription,
-        };
+        const SRD = RTCPeerConnection.prototype.setRemoteDescription as any;
+        const SLD = RTCPeerConnection.prototype.setLocalDescription as any;
 
-        // overwrite the setRemoteDescription and setLocalDescription functions
-        // with the patched versions
-        RTCPeerConnection.prototype.setRemoteDescription = function (desc, ...rest) {
-            // call the original setRemoteDescription function with the patched desc
-            return (orig as any).SRD.call(this, patchSDPDesc(desc), ...rest);
-        };
+        // only wrap if not already wrapped by this plugin
+        if (!SRD._stereoScreenshareAudioPatched) {
+            (orig as any).SRD = SRD;
+            const wrappedSRD = function (this: RTCPeerConnection, desc: any, ...rest: any[]) {
+                return SRD.call(this, patchSDPDesc(desc), ...rest);
+            };
+            (wrappedSRD as any)._stereoScreenshareAudioPatched = true;
+            RTCPeerConnection.prototype.setRemoteDescription = wrappedSRD as any;
+        }
 
-        RTCPeerConnection.prototype.setLocalDescription = function (desc, ...rest) {
-            // setLocalDescription() may be called with no args
-            // if it is defined, call the original setLocalDescription function with
-            // the patched desc
-            return (orig as any).SLD.call(this, patchSDPDesc(desc), ...rest);
-        };
+        if (!SLD._stereoScreenshareAudioPatched) {
+            (orig as any).SLD = SLD;
+            const wrappedSLD = function (this: RTCPeerConnection, desc: any, ...rest: any[]) {
+                return SLD.call(this, patchSDPDesc(desc), ...rest);
+            };
+            (wrappedSLD as any)._stereoScreenshareAudioPatched = true;
+            RTCPeerConnection.prototype.setLocalDescription = wrappedSLD as any;
+        }
     },
 
     async stop() {
-        // reset the setRemoteDescription and setLocalDescription functions
-        // to their original values which were stored in this.orig
-        RTCPeerConnection.prototype.setRemoteDescription = (orig as any).SRD;
-        RTCPeerConnection.prototype.setLocalDescription = (orig as any).SLD;
+        // only restore if our own wrapper is still the active one,
+        // otherwise another plugin owns the chain and we leave it alone
+        const srd = RTCPeerConnection.prototype.setRemoteDescription as any;
+        if (srd?._stereoScreenshareAudioPatched && (orig as any).SRD) {
+            RTCPeerConnection.prototype.setRemoteDescription = (orig as any).SRD;
+        }
+        const sld = RTCPeerConnection.prototype.setLocalDescription as any;
+        if (sld?._stereoScreenshareAudioPatched && (orig as any).SLD) {
+            RTCPeerConnection.prototype.setLocalDescription = (orig as any).SLD;
+        }
+        (orig as any).SRD = undefined;
+        (orig as any).SLD = undefined;
     },
 
 });

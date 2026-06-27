@@ -1,13 +1,13 @@
 /*
- * Nightcord – CursorMacOS native module
- * Modifies Windows system cursors via registry + SystemParametersInfo
- * Runs in Electron main process (full Node.js)
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import * as fs from "fs";
-import * as path from "path";
 import { execSync } from "child_process";
 import { app } from "electron";
+import * as fs from "fs";
+import * as path from "path";
 
 // Folder where cursors are copied so Windows can read them
 const CURSOR_DIR = path.join(app.getPath("userData"), "NightcordCursors");
@@ -187,7 +187,7 @@ export async function applyCursors(_: any, style: string, size: string): Promise
         // 4. Set scheme name
         try {
             execSync(
-                `reg add "HKCU\\Control Panel\\Cursors" /ve /t REG_SZ /d "Nightcord macOS" /f`,
+                "reg add \"HKCU\\Control Panel\\Cursors\" /ve /t REG_SZ /d \"Nightcord macOS\" /f",
                 {
                     encoding: "utf-8",
                     windowsHide: true,
@@ -240,7 +240,7 @@ export async function restoreCursors(_: any): Promise<{ ok: boolean; error?: str
             // Set default scheme name back
             try {
                 execSync(
-                    `reg add "HKCU\\Control Panel\\Cursors" /ve /t REG_SZ /d "Windows Default" /f`,
+                    "reg add \"HKCU\\Control Panel\\Cursors\" /ve /t REG_SZ /d \"Windows Default\" /f",
                     { encoding: "utf-8", windowsHide: true, stdio: "ignore" }
                 );
             } catch { }
@@ -260,7 +260,7 @@ export async function restoreCursors(_: any): Promise<{ ok: boolean; error?: str
             }
             try {
                 execSync(
-                    `reg add "HKCU\\Control Panel\\Cursors" /ve /t REG_SZ /d "Windows Default" /f`,
+                    "reg add \"HKCU\\Control Panel\\Cursors\" /ve /t REG_SZ /d \"Windows Default\" /f",
                     {
                         encoding: "utf-8",
                         windowsHide: true,

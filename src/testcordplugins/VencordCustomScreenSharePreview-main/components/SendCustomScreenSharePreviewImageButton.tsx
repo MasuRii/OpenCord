@@ -13,7 +13,6 @@ import { CustomStreamPreviewState } from "../state";
 import { ScreenSharePreviewImageModal } from "./ScreenSharePreviewImageModal";
 import { StreamPreviewChangeIcon } from "./StreamPreviewChangeIcon";
 
-
 const PanelButton = findComponentByCodeLazy(".NONE,disabled:", ".PANEL_BUTTON");
 
 export function SendCustomScreenSharePreviewImageButton() {

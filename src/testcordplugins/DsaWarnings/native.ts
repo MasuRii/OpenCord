@@ -5,30 +5,41 @@
  */
 
 import { RendererSettings } from "@main/settings";
-import { BrowserWindow, IpcMainInvokeEvent, session, shell } from "electron";
+import { BrowserWindow, IpcMainInvokeEvent, net, session, shell } from "electron";
 
-import type { NativeCordCatResult } from "./types";
+import type { NativeCordCatResult, NativeCordCatResultOk } from "./types";
 
-const pluginSettings = RendererSettings.store.plugins?.DsaWarnings;
-const BASE_URL = pluginSettings?.dsaBrowseBaseUrl || "https://dsa.discord.food";
-const CORDBASE_URL = pluginSettings?.cordCatApiBaseUrl || "https://api.cord.cat";
+const LOG_PREFIX = "[DsaWarnings/native]";
+const CORS_PROXY = "https://cors.keiran0.workers.dev";
 const PARTITION = "persist:dsa-warnings";
-const FETCH_TIMEOUT_MS = 10_000;
+const FETCH_TIMEOUT_MS = 15_000;
 const WINDOW_WIDTH = 1120;
 const WINDOW_HEIGHT = 860;
 
 let captchaWindow: BrowserWindow | null = null;
 
-function getMainWindow() {
-    return BrowserWindow.getAllWindows().find(window => !window.isDestroyed()) ?? null;
+function getPluginSettings() {
+    return RendererSettings.store.plugins?.DsaWarnings;
+}
+
+function getBaseUrl() {
+    return getPluginSettings()?.dsaBrowseBaseUrl || "https://dsa.discord.food";
+}
+
+function getCordBaseUrl() {
+    return getPluginSettings()?.cordCatApiBaseUrl || "https://api.cord.cat";
 }
 
 function getSession() {
     return session.fromPartition(PARTITION, { cache: true });
 }
 
+function getMainWindow() {
+    return BrowserWindow.getAllWindows().find(window => !window.isDestroyed()) ?? null;
+}
+
 function buildBrowseUrl(parsedId?: string) {
-    const url = new URL("/browse", BASE_URL);
+    const url = new URL("/browse", getBaseUrl());
     if (parsedId) url.searchParams.set("parsedId", parsedId);
     url.searchParams.set("sort", "applicationDate");
     url.searchParams.set("order", "desc");
@@ -85,23 +96,117 @@ export async function openCaptchaWindow(_: IpcMainInvokeEvent, parsedId?: string
     });
 }
 
-export async function fetchCordCatQuery(_: IpcMainInvokeEvent, parsedId: string): Promise<NativeCordCatResult> {
-    try {
-        const url = `${CORDBASE_URL}/api/v2/query/${encodeURIComponent(parsedId)}`;
-        const response = await fetch(url, {
-            headers: { Accept: "application/json" },
-            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
-        });
+async function tryDirectFetch(url: string, headers: Record<string, string>): Promise<NativeCordCatResultOk> {
+    const response = await net.fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        session: getSession()
+    } as any);
 
-        return {
-            ok: true,
-            status: response.status,
-            body: await response.text()
-        };
-    } catch (error) {
+    return {
+        ok: true,
+        status: response.status,
+        body: await response.text()
+    };
+}
+
+async function tryNodeFetch(url: string, headers: Record<string, string>): Promise<NativeCordCatResultOk> {
+    const response = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    });
+
+    return {
+        ok: true,
+        status: response.status,
+        body: await response.text()
+    };
+}
+
+async function tryProxiedFetch(targetUrl: string, headers: Record<string, string>): Promise<NativeCordCatResultOk> {
+    const proxiedUrl = `${CORS_PROXY}?url=${encodeURIComponent(targetUrl)}`;
+    const response = await fetch(proxiedUrl, {
+        headers,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    });
+
+    return {
+        ok: true,
+        status: response.status,
+        body: await response.text()
+    };
+}
+
+function isUsableResponse(result: NativeCordCatResult): boolean {
+    return result.ok && result.status >= 200 && result.status < 400;
+}
+
+export async function fetchCordCatQuery(_: IpcMainInvokeEvent, parsedId: string): Promise<NativeCordCatResult> {
+    const cordBaseUrl = getCordBaseUrl();
+    const url = `${cordBaseUrl}/api/v2/query/${encodeURIComponent(parsedId)}`;
+    const apiKey = getPluginSettings()?.cordCatApiKey;
+
+    if (!apiKey || typeof apiKey !== "string" || apiKey.trim().length === 0) {
+        console.warn(LOG_PREFIX, "No API key configured. CordCat requires an API key for external access. Set one in plugin settings.");
         return {
             ok: false,
-            error: error instanceof Error ? error.message : String(error)
+            error: "No CordCat API key configured. Open plugin settings and add your API key (get one at https://api.cord.cat)."
         };
     }
+
+    const headers: Record<string, string> = {
+        "Accept": "application/json",
+        "X-API-Key": apiKey.trim()
+    };
+
+    let lastAuthStatus: number | null = null;
+
+    // Try net.fetch with session (shares cookies from captcha window)
+    try {
+        console.warn(LOG_PREFIX, "Trying net.fetch with session for", url);
+        const result = await tryDirectFetch(url, headers);
+        console.warn(LOG_PREFIX, "net.fetch result: status=", result.status, "bodyLen=", result.body?.length, "preview=", result.body?.slice(0, 200));
+        if (isUsableResponse(result)) return result;
+        if (result.status === 401 || result.status === 403) lastAuthStatus = result.status;
+        console.warn(LOG_PREFIX, "net.fetch response not usable (status", result.status + "), falling through");
+    } catch (e) {
+        console.warn(LOG_PREFIX, "net.fetch threw:", e);
+    }
+
+    // Try Node's fetch directly
+    try {
+        console.warn(LOG_PREFIX, "Trying Node fetch for", url);
+        const result = await tryNodeFetch(url, headers);
+        console.warn(LOG_PREFIX, "Node fetch result: status=", result.status, "bodyLen=", result.body?.length, "preview=", result.body?.slice(0, 200));
+        if (isUsableResponse(result)) return result;
+        if (result.status === 401 || result.status === 403) lastAuthStatus = result.status;
+        console.warn(LOG_PREFIX, "Node fetch response not usable (status", result.status + "), falling through");
+    } catch (e) {
+        console.warn(LOG_PREFIX, "Node fetch threw:", e);
+    }
+
+    // Try via CORS proxy
+    try {
+        console.warn(LOG_PREFIX, "Trying CORS proxy for", url);
+        const result = await tryProxiedFetch(url, headers);
+        console.warn(LOG_PREFIX, "CORS proxy result: status=", result.status, "bodyLen=", result.body?.length, "preview=", result.body?.slice(0, 200));
+        if (isUsableResponse(result)) return result;
+        if (result.status === 401 || result.status === 403) lastAuthStatus = result.status;
+        console.warn(LOG_PREFIX, "CORS proxy response not usable (status", result.status + "), falling through");
+    } catch (e) {
+        console.warn(LOG_PREFIX, "CORS proxy threw:", e);
+    }
+
+    // All methods failed, return error
+    console.warn(LOG_PREFIX, "All fetch methods failed for", url);
+    if (lastAuthStatus != null) {
+        return {
+            ok: false,
+            error: `CordCat API key was rejected (HTTP ${lastAuthStatus}). The key may be invalid or expired. Get a new one at https://api.cord.cat`
+        };
+    }
+    return {
+        ok: false,
+        error: `All fetch methods failed for ${url}`
+    };
 }

@@ -4,16 +4,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import managedStyle from "./styles.css?managed";
-
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { OpenExternalIcon } from "@components/Icons";
-import { Devs } from "@utils/constants";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { Message, MessageAttachment } from "@vencord/discord-types";
 import { Tooltip, useEffect, useMemo, useRef, useState } from "@webpack/common";
+
+import managedStyle from "./styles.css?managed";
 
 const Native = VencordNative.pluginHelpers.PdfViewer as PluginNative<typeof import("./native")>;
 const logger = new Logger("PdfViewer");

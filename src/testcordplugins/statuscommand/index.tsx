@@ -15,6 +15,8 @@ import { findStoreLazy } from "@webpack";
 const UserStore = findStoreLazy("UserStore");
 const StatusSettings = getUserSettingLazy<string>("status", "status")!;
 
+const revertTimers = new Set<ReturnType<typeof setTimeout>>();
+
 const parseDuration = (str: string): number | null => {
     let ms = 0;
     // Remove spaces to handle inputs like "1h 30m" -> "1h30m"
@@ -79,11 +81,13 @@ export default definePlugin({
             } else {
                 // Time hasn't passed yet, set timeout for remaining time
                 const remainingMs = revertData.revertAt - now;
-                setTimeout(async () => {
+                const timer = setTimeout(async () => {
+                    revertTimers.delete(timer);
                     StatusSettings.updateSetting(revertData.originalStatus);
                     await deleteRevertData();
                     // Note: No message sent here as it's on startup
                 }, remainingMs);
+                revertTimers.add(timer);
             }
         }
     },
@@ -149,7 +153,8 @@ export default definePlugin({
             });
 
             // 7. Set Timeout to Revert
-            setTimeout(async () => {
+            const timer = setTimeout(async () => {
+                revertTimers.delete(timer);
                 StatusSettings.updateSetting(oldStatus);
                 await deleteRevertData(); // Clean up the file
 
@@ -157,7 +162,12 @@ export default definePlugin({
                     content: `Time's up! Status reverted to **${oldStatus.toUpperCase()}**.`
                 });
             }, durationMs);
+            revertTimers.add(timer);
         }
-    }]
-});
+    }],
 
+    stop() {
+        for (const timer of revertTimers) clearTimeout(timer);
+        revertTimers.clear();
+    }
+});

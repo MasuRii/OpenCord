@@ -1,16 +1,15 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
-import { DataStore } from "@api/index";
 import { Modals, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { RelationshipType } from "@vencord/discord-types/enums";
 import { findByProps } from "@webpack";
-import { ChannelStore, Constants, GuildMemberStore, Menu, React, RelationshipStore, FluxDispatcher, RestAPI, Toasts, UserStore, UserUtils } from "@webpack/common";
+import { ChannelStore, FluxDispatcher, GuildMemberStore, Menu, React, RelationshipStore, Toasts, UserStore, UserUtils } from "@webpack/common";
 
 const DS_KEY = "FakeFriends_state";
 
@@ -647,6 +646,8 @@ async function fakeMessageRequestGuild(guildId: string) {
 }
 
 let MessageRequestStore: any = null;
+
+let reapplyTimer: ReturnType<typeof setTimeout> | null = null;
 let origGetRequests: Function | null = null;
 let origHasRequest: Function | null = null;
 
@@ -878,7 +879,7 @@ const guildContextPatch: NavContextMenuPatchCallback = (children, props) => {
 export default definePlugin({
     name: "FakeFriends",
     description: "Locally simulates Discord friends and requests. Persistent between reloads.",
-    tags: ["Friends", "Utility"],
+    tags: ["Friends", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     dependencies: ["ContextMenuAPI"],
 
@@ -894,11 +895,12 @@ export default definePlugin({
         await loadState();
         if (fakeState.size > 0) {
             // Delay to let Discord fully load
-            setTimeout(() => reapplyFakeStates(), 3000);
+            reapplyTimer = setTimeout(() => { reapplyTimer = null; reapplyFakeStates(); }, 3000);
         }
     },
 
     stop() {
+        if (reapplyTimer !== null) { clearTimeout(reapplyTimer); reapplyTimer = null; }
         removeContextMenuPatch("user-context", userContextPatch);
         removeContextMenuPatch("guild-context", guildContextPatch);
         unpatchAcceptFriend();

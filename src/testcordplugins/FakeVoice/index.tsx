@@ -102,6 +102,7 @@ export default definePlugin({
     description: "Appear muted or deaf while listening. By mushzi, fixed by x2b",
     authors: [{ name: "mushzi", id: 449282863582412850n }, TestcordDevs.x2b],
     dependencies: ["CommandsAPI", "UserAreaAPI"],
+    enabledByDefault: true,
 
     patches: [
         {

@@ -7,7 +7,7 @@
 import { DataStore } from "@api/index";
 import { Flex } from "@components/Flex";
 import { Paragraph } from "@components/Paragraph";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { PluginNative } from "@utils/types";
 import { findComponentByCodeLazy } from "@webpack";
 import { Alerts, Button, FluxDispatcher, Toasts, UserProfileStore, UserStore } from "@webpack/common";
@@ -148,8 +148,3 @@ export default definePlugin({
         },
     ]
 });
-
-
-
-
-

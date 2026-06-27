@@ -5,8 +5,8 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
-import definePlugin, { PluginSettingComponentProps, OptionType } from "@utils/types";
+import { TestcordDevs } from "@utils/constants";
+import definePlugin, { OptionType,PluginSettingComponentProps } from "@utils/types";
 import { findComponentByCodeLazy } from "@webpack";
 import { Button, Toasts, useEffect, useState } from "@webpack/common";
 // two lines because formatting removes the two spaces at the end of the line
@@ -139,8 +139,3 @@ export default definePlugin({
         return <></>;
     }
 });
-
-
-
-
-

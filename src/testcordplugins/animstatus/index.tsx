@@ -143,13 +143,18 @@ export default definePlugin({
     },
     forceUpdate() { this.buttonUpdateSignal = Date.now(); },
     buttonUpdateSignal: 0,
+    _autoStartTimer: null as ReturnType<typeof setTimeout> | null,
     start() {
         state._started = false;
         if (settings.store.autoStart) {
-            setTimeout(() => this.begin().catch(() => { }), START_DELAY);
+            this._autoStartTimer = setTimeout(() => {
+                this._autoStartTimer = null;
+                this.begin().catch(() => { });
+            }, START_DELAY);
         }
     },
     stop() {
+        if (this._autoStartTimer) { clearTimeout(this._autoStartTimer); this._autoStartTimer = null; }
         if (state.interval) clearInterval(state.interval);
         state.currentIndex = 0; state.isRunning = false; state._started = true; this.forceUpdate();
     },

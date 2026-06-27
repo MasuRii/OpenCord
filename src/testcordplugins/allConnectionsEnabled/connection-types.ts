@@ -25,5 +25,3 @@ export interface ConnectionIcon {
     darkSVG: string,
     whiteSVG: string,
 }
-
-

@@ -4,10 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { useEffect, useMemo, useState } from "@webpack/common";
-import { Message } from "@vencord/discord-types";
-
 import { SafetyIcon } from "@components/Icons";
+import { Message } from "@vencord/discord-types";
+import { useEffect, useMemo, useState } from "@webpack/common";
 
 import { extractDomain, flagDomain } from "./threatStore";
 import { AnalysisValue, cl, pruneMap } from "./utils";

@@ -1,27 +1,19 @@
 /*
- * Nightcord — MultiInstance plugin
- *
- * Left click on an account:
- *   → If token available: directly chooses "New window" or "Split" via the ctx menu
- *   → If no token: quick switch only
- *
- * Right click on an account: context menu (New window | Split screen | Close)
- *
- * The logic is:
- *   - Left CLICK with token → opens the context menu (same as right click)
- *     (we NO LONGER do location.reload on left click if the account has a token)
- *   - Left CLICK without token → classic quick switch
- *   - Right CLICK with token → context menu
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
+
+import "./styles.css";
 
 import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
 import { DataStore } from "@api/index";
-import definePlugin, { PluginNative } from "@utils/types";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
+import definePlugin, { PluginNative } from "@utils/types";
 import { findByProps } from "@webpack";
 import { Forms, React, ReactDOM, UserStore } from "@webpack/common";
+
 import { t } from "../autoTranslateNightcord";
-import "./styles.css";
 
 const Native = VencordNative.pluginHelpers.MultiInstance as PluginNative<typeof import("./native")>;
 const STORE_KEY = "TokenImporter_accounts";
@@ -416,7 +408,7 @@ function MultiInstanceModal({ rootProps }: { rootProps: any; }) {
                     ) : allAccounts.map(acc => {
                         const isOpen = openInstances.includes(acc.id);
                         const tagText = acc.hasToken
-                            ? (acc.isNative ? "🔗 Discord Account" : `🔑 Token`)
+                            ? (acc.isNative ? "🔗 Discord Account" : "🔑 Token")
                             : t("Switch only");
                         return (
                             <div
@@ -564,7 +556,7 @@ function MultiInstanceButton() {
 export default definePlugin({
     name: "MultiInstance",
     description: "Opens a 2nd Discord (new window or split screen) with another account.",
-    tags: ["Utility", "Utility"],
+    tags: ["Utility", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     dependencies: ["HeaderBarAPI"],
 

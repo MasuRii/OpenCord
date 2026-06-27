@@ -5,5 +5,3 @@
  */
 
 export const knownHosts = ["rickroll.link", "rickrolled.fr"];
-
-

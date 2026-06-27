@@ -50,7 +50,7 @@ export function extractCdnFileUrls(urls: string[]): CdnFileInfo[] {
     for (const url of urls) {
         if (!DISCORD_CDN_FILE_REGEX.test(url)) continue;
         try {
-            const pathname = new URL(url).pathname;
+            const { pathname } = new URL(url);
             const lastSegment = pathname.split("/").pop() ?? "";
             const fileName = decodeURIComponent(lastSegment);
             if (fileName && fileName.includes(".")) {

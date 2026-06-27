@@ -244,12 +244,12 @@ function buildCSS(): string {
             ${S.callControls} ${S.callButton} .lottieIcon__5eb9b, ${S.callControls} ${S.callButton} svg { width: 18px !important; height: 18px !important; }`);
     }
 
-    if (st.hideMute) lines.push(`[aria-label="Mute"] { display: none !important; }`);
-    if (st.hideDeafen) lines.push(`[aria-label="Deafen"] { display: none !important; }`);
-    if (st.hideSettings) lines.push(`[aria-label="User Settings"] { display: none !important; }`);
-    if (st.hideCamera) lines.push(`[aria-label="Turn On Camera"] { display: none !important; }`);
-    if (st.hideScreenShare) lines.push(`[aria-label="Share Your Screen"] { display: none !important; }`);
-    if (st.hideActivity) lines.push(`[aria-label="Start An Activity"] { display: none !important; }`);
+    if (st.hideMute) lines.push("[aria-label=\"Mute\"] { display: none !important; }");
+    if (st.hideDeafen) lines.push("[aria-label=\"Deafen\"] { display: none !important; }");
+    if (st.hideSettings) lines.push("[aria-label=\"User Settings\"] { display: none !important; }");
+    if (st.hideCamera) lines.push("[aria-label=\"Turn On Camera\"] { display: none !important; }");
+    if (st.hideScreenShare) lines.push("[aria-label=\"Share Your Screen\"] { display: none !important; }");
+    if (st.hideActivity) lines.push("[aria-label=\"Start An Activity\"] { display: none !important; }");
 
     return lines.join("\n");
 }

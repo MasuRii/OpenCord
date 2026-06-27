@@ -222,7 +222,7 @@ export function analyzeMessages(messages: MessageData[], use24h = false): Algori
     }
 
     const sections: ResultSection[] = [];
-    const author = messages[0].author;
+    const { author } = messages[0];
 
     const totalMessages = messages.length;
     const totalChars = messages.reduce((sum, m) => sum + m.content.length, 0);

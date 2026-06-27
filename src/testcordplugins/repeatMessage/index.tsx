@@ -41,7 +41,7 @@ function RepeatMessageIcon({ className }: { className?: string; }) {
 
 let shift = false;
 
-function repeatMessage(channelId: string, id: string, content: string, stickers: any[]) {
+function repeatMessage(channelId: string, id: string, content: string, stickers: { id: string; }[]) {
     sendMessage(channelId, {
         content
     }, true, {
@@ -74,9 +74,8 @@ const messageCtxPatch: NavContextMenuPatchCallback = (children, { message }: { m
 };
 
 function setTitle(title: string) {
-    const contextMenuOption = document.querySelector("#message-vc-repeat .label__563c3");
-
-    if (contextMenuOption) contextMenuOption.innerHTML = title;
+    const contextMenuOption = document.getElementById("message-vc-repeat");
+    if (contextMenuOption) contextMenuOption.textContent = title;
 }
 
 const keyupListener = (event: KeyboardEvent) => {
@@ -104,8 +103,7 @@ export default definePlugin({
         "message": messageCtxPatch
     },
     start() {
-        // @ts-ignore
-        addMessagePopoverButton("vc-repeat", (message: any) => {
+        addMessagePopoverButton("vc-repeat", message => {
             if (!message.content && message.stickerItems.length === 0) return null;
 
             return {
@@ -115,7 +113,7 @@ export default definePlugin({
                 channel: ChannelStore.getChannel(message.channel_id),
                 onClick: async () => repeatMessage(message.channel_id, message.id, message.content, message.stickerItems)
             };
-        });
+        }, RepeatMessageIcon);
 
         document.addEventListener("keyup", keyupListener);
         document.addEventListener("keydown", keydownListener);
@@ -127,8 +125,3 @@ export default definePlugin({
         document.removeEventListener("keydown", keydownListener);
     },
 });
-
-
-
-
-

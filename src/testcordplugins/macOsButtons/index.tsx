@@ -84,6 +84,7 @@ const CSS = `
 
 let focusHandler: (() => void) | null = null;
 let blurHandler: (() => void) | null = null;
+let btnHandlers: { close?: EventListener; min?: EventListener; max?: EventListener; } | null = null;
 
 function injectMacOsButtons() {
     if (document.getElementById("macos-window-controls")) return;
@@ -108,21 +109,25 @@ function injectMacOsButtons() {
     btnClose.className = "macos-btn macos-btn-close";
     btnClose.title = "Close";
     btnClose.innerHTML = "<span class=\"macos-btn-icon\"><svg width=\"6\" height=\"6\" viewBox=\"0 0 6 6\" fill=\"none\"><path d=\"M1 1L5 5M5 1L1 5\" stroke=\"#4d0000\" stroke-width=\"1.3\" stroke-linecap=\"round\"/></svg></span>";
-    btnClose.addEventListener("click", e => { e.stopPropagation(); Native.closeWindow(); });
+    const handlers = btnHandlers ??= {};
+    handlers.close = e => { e.stopPropagation(); Native.closeWindow(); };
+    btnClose.addEventListener("click", handlers.close);
 
     // Yellow — Minimize
     const btnMin = document.createElement("button");
     btnMin.className = "macos-btn macos-btn-min";
     btnMin.title = "Minimize";
     btnMin.innerHTML = "<span class=\"macos-btn-icon\"><svg width=\"7\" height=\"2\" viewBox=\"0 0 7 2\" fill=\"none\"><path d=\"M0.5 1H6.5\" stroke=\"#6d4c00\" stroke-width=\"1.3\" stroke-linecap=\"round\"/></svg></span>";
-    btnMin.addEventListener("click", e => { e.stopPropagation(); Native.minimizeWindow(); });
+    handlers.min = e => { e.stopPropagation(); Native.minimizeWindow(); };
+    btnMin.addEventListener("click", handlers.min);
 
     // Green — Maximize
     const btnMax = document.createElement("button");
     btnMax.className = "macos-btn macos-btn-max";
     btnMax.title = "Maximize / Restore";
     btnMax.innerHTML = "<span class=\"macos-btn-icon\"><svg width=\"7\" height=\"7\" viewBox=\"0 0 7 7\" fill=\"none\"><path d=\"M1 6L6 1M1 3.5V1H3.5M3.5 6H6V3.5\" stroke=\"#0a3a00\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></span>";
-    btnMax.addEventListener("click", e => { e.stopPropagation(); Native.maximizeWindow(); });
+    handlers.max = e => { e.stopPropagation(); Native.maximizeWindow(); };
+    btnMax.addEventListener("click", handlers.max);
 
     container.appendChild(btnClose);
     container.appendChild(btnMin);
@@ -162,6 +167,17 @@ function pushToolbarLeft() {
 }
 
 function removeMacOsButtons() {
+    const container = document.getElementById("macos-window-controls");
+    if (container && btnHandlers) {
+        const handlers = btnHandlers;
+        const btns = container.querySelectorAll("button");
+        btns.forEach(btn => {
+            if (handlers.close) btn.removeEventListener("click", handlers.close);
+            if (handlers.min) btn.removeEventListener("click", handlers.min);
+            if (handlers.max) btn.removeEventListener("click", handlers.max);
+        });
+    }
+    btnHandlers = null;
     document.getElementById("macos-window-controls")?.remove();
     document.getElementById("macos-buttons-style")?.remove();
     document.getElementById("macos-toolbar-push")?.remove();
@@ -178,27 +194,36 @@ function removeMacOsButtons() {
 export default definePlugin({
     name: "MacOsButtons",
     description: "Replaces Windows buttons with macOS-style buttons — red, yellow, green.",
-    tags: ["Appearance", "Utility"],
+    tags: ["Appearance", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     required: false,
     patches: [],
 
     start() {
         injectMacOsButtons();
+        // Coalesce mutation bursts into a single rAF-scoped check instead of
+        // running getElementById + a reparent check on every DOM mutation.
+        (this as any)._scanQueued = false;
         (this as any)._obs = new MutationObserver(() => {
-            const controls = document.getElementById("macos-window-controls");
-            if (!controls) {
-                injectMacOsButtons();
-            } else if (controls.parentElement !== document.body) {
-                // If it was moved by a layer change, put it back at the top
-                document.body.appendChild(controls);
-            }
+            if ((this as any)._scanQueued) return;
+            (this as any)._scanQueued = true;
+            requestAnimationFrame(() => {
+                (this as any)._scanQueued = false;
+                const controls = document.getElementById("macos-window-controls");
+                if (!controls) {
+                    injectMacOsButtons();
+                } else if (controls.parentElement !== document.body) {
+                    // If it was moved by a layer change, put it back at the top
+                    document.body.appendChild(controls);
+                }
+            });
         });
-        (this as any)._obs.observe(document.body, { childList: true, subtree: true });
+        (this as any)._obs.observe(document.body, { childList: true });
     },
 
     stop() {
         removeMacOsButtons();
+        (this as any)._scanQueued = false;
         (this as any)._obs?.disconnect();
     },
 });

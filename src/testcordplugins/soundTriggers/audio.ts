@@ -12,11 +12,22 @@ type SoundTriggerMatch = SoundTrigger & {
     index: number;
 };
 
+let cachedTriggers: { regex: RegExp; trigger: SoundTrigger; }[] = [];
+let lastTriggersStr = "";
+
 export const findAndPlayTriggers = async (message: string) => {
-    const triggers = (settings.store.soundTriggers as SoundTrigger[])
-        .flatMap(trigger => {
-            const flags = trigger.caseSensitive ? "g" : "gi";
-            const regex = new RegExp(trigger.patterns.join("|"), flags);
+    const triggersStr = JSON.stringify(settings.store.soundTriggers);
+    if (triggersStr !== lastTriggersStr) {
+        lastTriggersStr = triggersStr;
+        cachedTriggers = (settings.store.soundTriggers as SoundTrigger[]).map(trigger => ({
+            regex: new RegExp(trigger.patterns.join("|"), trigger.caseSensitive ? "g" : "gi"),
+            trigger
+        }));
+    }
+
+    const triggers = cachedTriggers
+        .flatMap(({ regex, trigger }) => {
+            regex.lastIndex = 0;
             return [...message.matchAll(regex)].map(m => ({ ...trigger, index: m.index }));
         })
         .filter((t): t is SoundTriggerMatch => t.index !== undefined)
@@ -41,5 +52,3 @@ const playTrigger = async (trigger: SoundTrigger): Promise<void> => {
         audio.play();
     });
 };
-
-

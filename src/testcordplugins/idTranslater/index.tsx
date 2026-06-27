@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { ChannelStore, GuildStore, UserStore } from "@webpack/common";
@@ -159,7 +159,7 @@ function translateIds(content: string, channelId?: string): string {
 
   while ((match = idRegex.exec(content)) !== null) {
     const id = match[0];
-    const index = match.index;
+    const { index } = match;
 
     // Check if ID is in a special context
     if (isIdInContext(content, id, index)) {
@@ -267,8 +267,3 @@ export default definePlugin({
     console.log("[ID Translater] Plugin stopped");
   },
 });
-
-
-
-
-

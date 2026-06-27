@@ -7,7 +7,7 @@
 import { Logger } from "@utils/Logger";
 import { PluginNative } from "@utils/types";
 
-import type { BreachRecord, DsaAction, DsaLookupResult } from "./types";
+import type { BreachRecord, CordCatUserInfo, DsaAction, DsaLookupResult } from "./types";
 
 const logger = new Logger("DsaWarnings");
 const SUCCESS_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -55,6 +55,34 @@ function asNonEmptyString(value: string | null | undefined) {
     return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function parseUserInfo(payload: Record<string, unknown>): CordCatUserInfo | null {
+    const raw = payload.userInfo;
+    if (!isRecord(raw)) return null;
+
+    const parseGuildIdentity = (v: unknown) => {
+        if (!isRecord(v)) return null;
+        if (typeof v.tag !== "string" || typeof v.identity_guild_id !== "string") return null;
+        return {
+            tag: v.tag,
+            identity_guild_id: v.identity_guild_id,
+            identity_enabled: v.identity_enabled === true
+        };
+    };
+
+    return {
+        id: getString(raw, "id"),
+        username: asNonEmptyString(getString(raw, "username")) ?? undefined,
+        global_name: asNonEmptyString(getNullableString(raw, "global_name")) ?? undefined,
+        discriminator: asNonEmptyString(getString(raw, "discriminator")) ?? undefined,
+        avatar: asNonEmptyString(getNullableString(raw, "avatar")) ?? undefined,
+        banner: asNonEmptyString(getNullableString(raw, "banner")) ?? undefined,
+        public_flags: typeof raw.public_flags === "number" ? raw.public_flags : undefined,
+        accent_color: typeof raw.accent_color === "number" ? raw.accent_color : null,
+        clan: parseGuildIdentity(raw.clan),
+        primary_guild: parseGuildIdentity(raw.primary_guild),
+    };
+}
+
 function normalizeCordCatStatement(value: unknown, parsedId: string): DsaAction | null {
     if (!isRecord(value)) return null;
 
@@ -78,7 +106,8 @@ function normalizeCordCatStatement(value: unknown, parsedId: string): DsaAction 
         incompatibleContentExplanation: getString(value, "incompatible_content_explanation"),
         incompatibleContentIllegal: value.incompatible_content_illegal as string | boolean | null,
         category,
-        categorySpecification: (value.category_specification ?? value.category_specification_other) as string | string[] | null,
+        categorySpecification: (value.category_specification ?? null) as string | string[] | null,
+        categorySpecificationOther: getNullableString(value, "category_specification_other"),
         contentType: (value.content_type ?? value.decision_provision ?? "") as string | string[],
         applicationDate: getString(value, "application_date"),
         decisionFacts: getString(value, "decision_facts"),
@@ -120,7 +149,10 @@ export function getActiveRestrictionLabels(action: DsaAction) {
 }
 
 export function getActionTags(action: DsaAction) {
-    return parseStringArray(action.categorySpecification);
+    const specs = parseStringArray(action.categorySpecification);
+    if (specs.length > 0) return specs;
+    const other = parseStringArray(action.categorySpecificationOther);
+    return other;
 }
 
 function setCache(parsedId: string, result: DsaLookupResult) {
@@ -137,55 +169,117 @@ export function invalidateWarnings(parsedId?: string) {
     resultCache.clear();
 }
 
+function parseReadyResponse(parsedId: string, body: string): DsaLookupResult | null {
+    const payload: unknown = JSON.parse(body);
+    if (!isRecord(payload)) return null;
+
+    const userInfo = parseUserInfo(payload);
+
+    const statements: unknown[] = Array.isArray(payload.statements) ? payload.statements : [];
+    const allActions = statements
+        .map(s => normalizeCordCatStatement(s, parsedId))
+        .filter((a): a is DsaAction => a !== null)
+        .sort((a, b) => Date.parse(b.applicationDate) - Date.parse(a.applicationDate));
+
+    const activeActions = allActions.filter(a => getActiveRestrictionLabels(a).length > 0);
+
+    const breachObj = isRecord(payload.breach) ? payload.breach : null;
+    const breachSuccess = breachObj?.success === true;
+    const breachFailed = breachObj?.success === false;
+
+    let breaches: BreachRecord[] = [];
+    let breachError: string | null = null;
+    let breachCount = 0;
+
+    if (breachSuccess) {
+        const breachData = isRecord(breachObj!.data) ? breachObj!.data : null;
+        const results = Array.isArray(breachData?.results) ? breachData!.results : [];
+        breaches = results.filter(isBreachRecord);
+        breachCount = typeof breachObj!.resultsCount === "number" ? breachObj!.resultsCount : breaches.length;
+    } else if (breachFailed && isRecord(breachObj!.error)) {
+        const errObj = breachObj!.error as Record<string, unknown>;
+        breachError = `${errObj.status ?? "unknown"}: ${errObj.message ?? "unknown error"}`;
+    }
+
+    const breachStatus = breachSuccess ? "ready" as const
+        : breachFailed ? "error" as const
+        : "unavailable" as const;
+
+    return {
+        kind: "ready",
+        userInfo,
+        actions: activeActions,
+        breaches,
+        breachStatus,
+        breachError,
+        breachCount
+    };
+}
+
 export async function fetchActiveWarnings(parsedId: string): Promise<DsaLookupResult> {
+    logger.warn("fetchActiveWarnings called for", parsedId);
     const cached = resultCache.get(parsedId);
     if (cached && cached.expiresAt > Date.now()) {
+        logger.warn("Returning cached result, kind=", cached.result.kind);
         return cached.result;
     }
+    logger.warn("No cache hit, calling Native.fetchCordCatQuery");
 
     try {
         const nativeResult = await Native.fetchCordCatQuery?.(parsedId);
+
         if (!nativeResult?.ok) {
-            return setCache(parsedId, { kind: "error" });
+            const msg = (nativeResult as any)?.error ?? "Native fetch returned no result";
+            logger.warn("Native call failed:", msg);
+            return setCache(parsedId, { kind: "error", error: msg });
         }
 
+        logger.warn("Native result: status=", nativeResult.status, "bodyLen=", nativeResult.body?.length);
+
         if (nativeResult.status === 503) {
-            return setCache(parsedId, { kind: "unavailable" });
+            const msg = `CordCat returned 503: ${(nativeResult.body ?? "").slice(0, 200)}`;
+            logger.warn(msg);
+            return setCache(parsedId, { kind: "unavailable", error: msg });
+        }
+
+        if (nativeResult.status === 401 || nativeResult.status === 403) {
+            logger.warn(`CordCat returned ${nativeResult.status}, opening captcha window to authenticate`);
+            try {
+                await Native.openCaptchaWindow?.(parsedId);
+            } catch (e) {
+                logger.warn("Failed to open captcha window:", e);
+            }
+            try {
+                const retryResult = await Native.fetchCordCatQuery?.(parsedId);
+                if (retryResult?.ok && retryResult.status >= 200 && retryResult.status < 300) {
+                    const parsed = parseReadyResponse(parsedId, retryResult.body);
+                    if (parsed) return setCache(parsedId, parsed);
+                }
+                const msg = `CordCat returned ${retryResult?.ok ? retryResult.status : "unknown"} after captcha authentication`;
+                logger.warn(msg);
+                return setCache(parsedId, { kind: "error", error: msg });
+            } catch (e) {
+                const msg = `Retry failed after captcha: ${e instanceof Error ? e.message : String(e)}`;
+                logger.warn(msg);
+                return setCache(parsedId, { kind: "error", error: msg });
+            }
         }
 
         if (nativeResult.status < 200 || nativeResult.status >= 300) {
-            return setCache(parsedId, { kind: "error" });
+            const msg = `CordCat returned HTTP ${nativeResult.status}: ${(nativeResult.body ?? "").slice(0, 200)}`;
+            logger.warn(msg);
+            return setCache(parsedId, { kind: "error", error: msg });
         }
 
-        const payload: unknown = JSON.parse(nativeResult.body);
-        if (!isRecord(payload)) {
-            return setCache(parsedId, { kind: "error" });
-        }
+        const parsed = parseReadyResponse(parsedId, nativeResult.body);
+        if (parsed) return setCache(parsedId, parsed);
 
-        const statements: unknown[] = Array.isArray(payload.statements) ? payload.statements : [];
-        const actions = statements
-            .map(s => normalizeCordCatStatement(s, parsedId))
-            .filter((a): a is DsaAction => a !== null)
-            .filter(a => getActiveRestrictionLabels(a).length > 0)
-            .sort((a, b) => Date.parse(b.applicationDate) - Date.parse(a.applicationDate));
-
-        const breachObj = isRecord(payload.breach) ? payload.breach : null;
-        const breachSuccess = breachObj?.success === true;
-        let breaches: BreachRecord[] = [];
-        if (breachSuccess) {
-            const breachData = isRecord(breachObj!.data) ? breachObj!.data : null;
-            const results = Array.isArray(breachData?.results) ? breachData!.results : [];
-            breaches = results.filter(isBreachRecord);
-        }
-
-        return setCache(parsedId, {
-            kind: "ready",
-            actions,
-            breaches,
-            breachStatus: breachSuccess ? "ready" : "unavailable"
-        });
+        const msg = "CordCat response is not a valid JSON object";
+        logger.warn(msg);
+        return setCache(parsedId, { kind: "error", error: msg });
     } catch (error) {
-        logger.error(`Failed to fetch CordCat data for ${parsedId}`, error);
-        return setCache(parsedId, { kind: "error" });
+        const msg = error instanceof Error ? error.message : String(error);
+        logger.warn(`Failed to fetch CordCat data for ${parsedId}`, error);
+        return setCache(parsedId, { kind: "error", error: msg });
     }
 }

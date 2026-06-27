@@ -1,15 +1,22 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
-import { ImageIcon, SafetyIcon } from "@components/Icons";
+import { SafetyIcon } from "@components/Icons";
 import { Devs } from "@utils/constants";
 import definePlugin from "@utils/types";
-import { showCustomDurationModal, showPrefefinedDurationModal } from "./Modals";
-import { GuildMemberStore, i18n, IconUtils, Menu, SelectedGuildStore } from "@webpack/common";
+import { Menu, SelectedGuildStore } from "@webpack/common";
 // @ts-ignore
 import type { UserContextProps } from "plugins/biggerStreamPreview";
 
-/**** BEGIN CONFIG  ****/
+import { showCustomDurationModal, showPrefefinedDurationModal } from "./Modals";
+
+/** ** BEGIN CONFIG  ****/
 const GUILD_ID = "1274790619146879108"; // SERVER ID
-/****  END CONFIG  ****/
+/** **  END CONFIG  ****/
 
 const UserContext: NavContextMenuPatchCallback = (children, { user }: UserContextProps) => {
     if (!user) return;

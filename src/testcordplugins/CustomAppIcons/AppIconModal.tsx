@@ -9,7 +9,6 @@ import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, M
 import { findByProps } from "@webpack";
 import { Button, FluxDispatcher, Forms, React, showToast, Text, TextInput, Toasts, useState } from "@webpack/common";
 
-
 interface AppIcon {
     id: string,
     iconSource: string,
@@ -29,7 +28,6 @@ function AppIconModal(props: ModalProps) {
             "isPremium": false,
             "name": name
         } as AppIcon;
-
 
         appIcons.push(icon);
         findByProps("UZ", "QA").UZ.push(icon);
@@ -102,6 +100,3 @@ function AppIconModal(props: ModalProps) {
 }
 
 export default AppIconModal;
-
-
-

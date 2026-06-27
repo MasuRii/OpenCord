@@ -1,3 +1,9 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { Button, React, useEffect, useMemo, useRef, useState } from "@webpack/common";
 
 import type { GalleryItem } from "../utils/extractImages";

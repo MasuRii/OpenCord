@@ -1,13 +1,16 @@
 /*
- * Nightcord — WorldBomb Assistant Plugin
- * Inspired by "cheat worldbomb" Python scripts.
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import "./styles.css";
+
+import { addHeaderBarButton, HeaderBarButton,removeHeaderBarButton } from "@api/HeaderBar";
 import definePlugin from "@utils/types";
 import { React } from "@webpack/common";
-import { addHeaderBarButton, removeHeaderBarButton, HeaderBarButton } from "@api/HeaderBar";
-import { WordBombOverlay, toggleWordBombOverlay } from "./components/WordBombOverlay";
-import "./styles.css";
+
+import { toggleWordBombOverlay } from "./components/WordBombOverlay";
 
 const TrophyIcon = (props: any) => (
     <svg width={props.width || 24} height={props.height || 24} viewBox="0 0 24 24" fill={props.color || "currentColor"} {...props}>
@@ -18,8 +21,9 @@ const TrophyIcon = (props: any) => (
 export default definePlugin({
     name: "WordBomb",
     description: "BombParty/WordBomb assistant with persistent overlay, integrated AI, and alphabet tracking.",
-    tags: ["Fun", "Utility"],
+    tags: ["Fun", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
+    dependencies: ["HeaderBarAPI"],
 
     start() {
         addHeaderBarButton("wordbomb", () => (

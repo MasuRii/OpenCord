@@ -1,6 +1,6 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Nightcord contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -12,6 +12,9 @@ const RelationshipActions = findByPropsLazy("removeFriend", "sendFriendRequest")
 
 // RelationshipType 4 = OUTGOING_REQUEST
 const OUTGOING_REQUEST = 4;
+
+// Module-scoped so stop() can clear a pending debounce timer the observer scheduled
+let scanTimer: ReturnType<typeof setTimeout> | null = null;
 
 function cancelRequest(userId: string) {
     try {
@@ -26,6 +29,16 @@ function cancelRequest(userId: string) {
     }
 }
 
+function hasOutgoingRequests(): boolean {
+    try {
+        const rels = (RelationshipStore as any).getRelationships?.() ?? {};
+        for (const type of Object.values(rels)) {
+            if (type === OUTGOING_REQUEST) return true;
+        }
+    } catch {}
+    return false;
+}
+
 function getUserIdFromOutgoingRelationships(): string | null {
     try {
         const rels = (RelationshipStore as any).getRelationships?.() ?? {};
@@ -37,15 +50,19 @@ function getUserIdFromOutgoingRelationships(): string | null {
 }
 
 let observer: MutationObserver | null = null;
+const patchedButtons = new Set<HTMLElement>();
 
 function patchBtn(btn: HTMLElement, userId: string) {
     if (btn.dataset.cfp) return;
     btn.dataset.cfp = "1";
-    btn.addEventListener("click", (e: MouseEvent) => {
+    const handler = (e: MouseEvent) => {
         e.preventDefault();
         e.stopImmediatePropagation();
         cancelRequest(userId);
-    }, true);
+    };
+    (btn as any)._cfpHandler = handler;
+    btn.addEventListener("click", handler, true);
+    patchedButtons.add(btn);
     // Remove disabled if present so the click is possible
     btn.removeAttribute("disabled");
     btn.style.cursor = "pointer";
@@ -53,11 +70,14 @@ function patchBtn(btn: HTMLElement, userId: string) {
 }
 
 function scan(root: Document | Element = document) {
+    // Nothing to patch when there are no outgoing requests; skip the document sweeps.
+    if (!hasOutgoingRequests()) return;
+
     // ── Case 1: profile popup ─────────────────────────────────────────────────
     // aria-label="Outgoing Friend Request" — invariant regardless of UI language
     root.querySelectorAll<HTMLElement>('button[aria-label="Outgoing Friend Request"]').forEach(btn => {
         // Find the userId via the profile container
-        const profileContainer = btn.closest("[class*='profileButtons']") 
+        const profileContainer = btn.closest("[class*='profileButtons']")
             ?? btn.closest("[class*='profileHeader']")
             ?? btn.closest("[class*='inner']");
         if (!profileContainer) return;
@@ -105,16 +125,16 @@ function scan(root: Document | Element = document) {
 export default definePlugin({
     name: "CancelFriendRequestNC",
     description: "Cancels a pending friend request by clicking the button again.",
-    tags: ["Friends", "Utility"],
+    tags: ["Friends", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
 
     start() {
-        observer = new MutationObserver(mutations => {
-            for (const m of mutations) {
-                for (const node of m.addedNodes) {
-                    if (node instanceof HTMLElement) scan(node);
-                }
-            }
+        observer = new MutationObserver(() => {
+            if (scanTimer) return;
+            scanTimer = setTimeout(() => {
+                scanTimer = null;
+                scan(document);
+            }, 300);
         });
         observer.observe(document.body, { childList: true, subtree: true });
         scan(document);
@@ -122,8 +142,22 @@ export default definePlugin({
     },
 
     stop() {
+        if (scanTimer) {
+            clearTimeout(scanTimer);
+            scanTimer = null;
+        }
         observer?.disconnect();
         observer = null;
+        for (const btn of patchedButtons) {
+            const handler = (btn as any)._cfpHandler;
+            if (handler) {
+                btn.removeEventListener("click", handler, true);
+                delete (btn as any)._cfpHandler;
+            }
+            delete btn.dataset.cfp;
+        }
+        patchedButtons.clear();
+        // Catch any markers left on buttons no longer tracked
         document.querySelectorAll<HTMLElement>("[data-cfp]").forEach(el => {
             delete el.dataset.cfp;
         });

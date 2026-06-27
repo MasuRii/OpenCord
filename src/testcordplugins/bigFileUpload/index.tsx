@@ -15,9 +15,10 @@ import { Paragraph } from "@components/Paragraph";
 import { Devs } from "@utils/constants";
 import { insertTextIntoChatInputBox, sendMessage } from "@utils/discord";
 import { Margins } from "@utils/margins";
+import { parseUrl } from "@utils/misc";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { Button, DraftType, Menu, PermissionsBits, PermissionStore, React, Select, SelectedChannelStore, showToast, TextInput, Toasts, UploadManager, useEffect, useState } from "@webpack/common";
+import { Alerts, Button, DraftType, Menu, PermissionsBits, PermissionStore, React, Select, SelectedChannelStore, showToast, TextInput, Toasts, UploadManager, useEffect, useState } from "@webpack/common";
 
 import { LoggingLevel, pluginLogger as log, setLoggingLevelProvider } from "./logging";
 import { UploadProgressBar } from "./renderer/components/UploadProgressBar";
@@ -46,7 +47,6 @@ const OptionClasses = findByPropsLazy("optionName", "optionIcon", "optionLabel")
 function generateUploadId(): string {
     return `upload-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 }
-
 
 function createCloneableStore(initialState: any) {
     const store = { ...initialState };
@@ -77,7 +77,6 @@ function createCloneableStore(initialState: any) {
         subscribe
     };
 }
-
 
 // Helper function to safely get error messages
 function getErrorMessage(error: unknown): string {
@@ -497,6 +496,12 @@ function SettingsComponent(props: { setValue(v: any): void; }) {
                 description="Show Vencord notifications instead of inline toasts."
                 value={settings.store.useNotifications === "Yes"}
                 onChange={(enabled: boolean) => updateSetting("useNotifications", enabled ? "Yes" : "No")}
+            />
+            <FormSwitch
+                title="Confirm Before Upload"
+                description="Show a confirmation dialog with the file size and destination host before each upload."
+                value={settings.store.confirmBeforeUpload}
+                onChange={(enabled: boolean) => updateSetting("confirmBeforeUpload", enabled)}
             />
             <Heading tag="h5">Console Logging</Heading>
             <Paragraph className={Margins.bottom8}>
@@ -974,6 +979,12 @@ const settings = definePluginSettings({
         description: "Control how much BigFileUpload logs to the console",
         hidden: true
     },
+    confirmBeforeUpload: {
+        type: OptionType.BOOLEAN,
+        default: false,
+        description: "Ask for confirmation, showing the file size and destination host, before uploading",
+        hidden: true
+    },
     customSettings: {
         type: OptionType.COMPONENT,
         component: SettingsComponent,
@@ -1044,6 +1055,82 @@ function getEffectiveUploader(fileName: string, selectedUploader: string): strin
     return selectedUploader;
 }
 
+// Maps an uploader name to the host its files are sent to, for the confirm dialog
+const UPLOADER_HOSTS: Record<string, string> = {
+    Catbox: "catbox.moe",
+    Litterbox: "litterbox.catbox.moe",
+    "0x0.st": "0x0.st",
+    GoFile: "upload.gofile.io",
+    "tmpfiles.org": "tmpfiles.org",
+    "buzzheavier.com": "w.buzzheavier.com",
+    "temp.sh": "temp.sh",
+    "filebin.net": "filebin.net",
+};
+
+function getDestinationHost(uploader: string): string {
+    if (uploader === "Custom") {
+        const requestURL = settings.store.customUploaderRequestURL;
+        const parsed = requestURL ? parseUrl(requestURL) : undefined;
+        return parsed?.host || "custom uploader";
+    }
+    return UPLOADER_HOSTS[uploader] || uploader;
+}
+
+/**
+ * Show a confirmation dialog with the file size and destination host before uploading.
+ * Returns true when the user confirms (or when the setting is off), false to abort.
+ */
+function confirmUploadIfNeeded(uploader: string, fileName: string, fileSize: number): Promise<boolean> {
+    if (!settings.store.confirmBeforeUpload) return Promise.resolve(true);
+
+    const host = getDestinationHost(uploader);
+    return new Promise<boolean>(resolve => {
+        Alerts.show({
+            title: "Confirm upload",
+            body: `Upload ${fileName} (${formatFileSize(fileSize)}) to ${host}?`,
+            confirmText: "Upload",
+            cancelText: "Cancel",
+            onConfirm: () => resolve(true),
+            onCancel: () => resolve(false)
+        });
+    });
+}
+
+// Infer a file extension from magic bytes when the name lacks a usable one
+function inferExtFromBytes(bytes: Uint8Array): string | null {
+    if (bytes.length < 12) return null;
+
+    if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) return "png";
+    if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return "jpg";
+    if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x38) return "gif";
+    if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return "pdf";
+    if (bytes[0] === 0x50 && bytes[1] === 0x4B && bytes[2] === 0x03 && bytes[3] === 0x04) return "zip";
+    if (
+        bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+        && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50
+    ) return "webp";
+    if (bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) return "ogg";
+    if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return "mp4";
+    if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) return "webm";
+    if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return "mp3";
+
+    return null;
+}
+
+// Append an inferred extension only when the name lacks a usable one, so type-aware
+// services and Discord embeds recognize the file. Never rewrites an existing extension.
+function ensureFileNameExtension(name: string, bytes: Uint8Array): string {
+    const lastDot = name.lastIndexOf(".");
+    const ext = lastDot > 0 ? name.slice(lastDot + 1).toLowerCase() : "";
+    if (ext && ext !== "bin") return name;
+
+    const inferredExt = inferExtFromBytes(bytes);
+    if (!inferredExt) return name;
+
+    if (ext === "bin") return name.slice(0, lastDot) + "." + inferredExt;
+    return name + "." + inferredExt;
+}
+
 /**
  * SECURE: Handle drag-and-drop / paste uploads for small files
  * Renderer sends buffer to main process, no file paths exposed
@@ -1084,14 +1171,25 @@ async function handleSmallFileUpload(file: File, skipBatchStart = false) {
         const selectedUploader = settings.store.fileUploader || "Catbox";
         const effectiveUploader = getEffectiveUploader(file.name, selectedUploader);
 
+        // Optional confirmation gate before sending anything off-device
+        const confirmed = await confirmUploadIfNeeded(effectiveUploader, file.name, file.size);
+        if (!confirmed) {
+            log.info("Upload cancelled at confirmation prompt");
+            clearAndForceHide();
+            return;
+        }
+
+        // Give type-less files a sensible extension so services and embeds recognize them
+        const uploadFileName = ensureFileNameExtension(file.name, new Uint8Array(buffer));
+
         // Log upload start (Important Info level)
-        log.info(`Uploading ${file.name} (${formatFileSize(file.size)}) via ${effectiveUploader}`);
+        log.info(`Uploading ${uploadFileName} (${formatFileSize(file.size)}) via ${effectiveUploader}`);
 
         // Secure upload: send buffer to main process (no file paths exposed)
         log.debug("Calling Native.uploadFileBuffer...");
         const result = await Native.uploadFileBuffer(
             buffer,
-            file.name,
+            uploadFileName,
             mimeType,
             {
                 fileUploader: effectiveUploader,
@@ -1442,7 +1540,6 @@ setUploadFunction(handleSmallFileUpload);
 // Set the Nitro limit checker for dragDrop.ts to use
 setNitroLimitChecker(shouldUseNativeUpload);
 
-
 export default definePlugin({
     name: "BigFileUpload",
     description: "Bypass Discord's upload limit by uploading to external file uploaders via drag-drop, paste, or the Upload button.",
@@ -1450,7 +1547,6 @@ export default definePlugin({
     authors: [Devs.ScattrdBlade],
     settings,
     dependencies: ["CommandsAPI"],
-
 
     patches: [
         {
@@ -1463,7 +1559,6 @@ export default definePlugin({
             }
         }
     ],
-
 
     start() {
         // Start progress polling for the progress bar

@@ -1,11 +1,18 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import ErrorBoundary from "@components/ErrorBoundary";
-import { openModal, ModalRoot, ModalSize, ModalHeader, ModalCloseButton, ModalContent, closeModal, closeAllModals } from "@utils/modal";
-import { Button, Forms, Parser, TextInput } from "@webpack/common";
 import { classNameFactory } from "@utils/css";
-import { SelectedChannelStore, useState } from "@webpack/common";
+import { closeAllModals,ModalContent, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
+import { Button, Forms, TextInput } from "@webpack/common";
+import { SelectedChannelStore } from "@webpack/common";
 
 const cl = classNameFactory("vc-membercount-");
 import "./style.css";
+
 import { sendMessage } from "@utils/discord";
 
 export function showPrefefinedDurationModal(duration: string, id: string) {

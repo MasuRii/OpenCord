@@ -7,8 +7,8 @@
 import { PluginNative } from "@utils/types";
 import { Toasts } from "@webpack/common";
 
-import { AnalysisValue, safeToast } from "../../utils";
 import { ModularScanModule } from "../../modularScanStore";
+import { AnalysisValue, safeToast } from "../../utils";
 
 const Native = VencordNative.pluginHelpers.vAnalyzer as PluginNative<typeof import("./native")>;
 

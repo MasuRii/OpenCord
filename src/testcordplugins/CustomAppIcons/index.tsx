@@ -17,7 +17,7 @@
 */
 
 import { Link } from "@components/Link";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import { localStorage } from "@utils/localStorage";
 import { closeAllModals, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
@@ -47,7 +47,6 @@ function removeAppIcon() {
 
 }
 
-
 export default definePlugin({
     name: "CustomAppIcons",
     description: "Add/upload your own custom (In-)App Icon(s).",
@@ -66,7 +65,6 @@ export default definePlugin({
             ]
         }
     ],
-
 
     start() {
         console.log("Well hello there!, CustomAppIcons has started :)");
@@ -112,8 +110,3 @@ export default definePlugin({
         );
     }
 });
-
-
-
-
-

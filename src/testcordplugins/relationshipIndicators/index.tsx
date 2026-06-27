@@ -7,14 +7,12 @@
 import {
     addProfileBadge,
     BadgePosition,
-    ProfileBadge,
     removeProfileBadge
 } from "@api/Badges";
-import { addMemberListDecorator, removeMemberListDecorator } from "@api/MemberListDecorators";
 import { addMessageDecoration, removeMessageDecoration } from "@api/MessageDecorations";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
 import { getBadges, RelationshipIndicator } from "./utils";
@@ -22,12 +20,12 @@ import { getBadges, RelationshipIndicator } from "./utils";
 const indicatorLocations = {
     list: {
         description: "In the member list",
-        onEnable: () => addMessageDecoration("friend-indicator", props =>
+        onEnable: () => addMessageDecoration("friend-indicator-list", props =>
             <ErrorBoundary noop>
                 <RelationshipIndicator user={props.user} />
             </ErrorBoundary>
         ),
-        onDisable: () => removeMessageDecoration("friend-indicator")
+        onDisable: () => removeMessageDecoration("friend-indicator-list")
     },
     badges: {
         description: "In user profiles, as badges",
@@ -36,12 +34,12 @@ const indicatorLocations = {
     },
     messages: {
         description: "Inside messages",
-        onEnable: () => addMessageDecoration("friend-indicator", props =>
+        onEnable: () => addMessageDecoration("friend-indicator-messages", props =>
             <ErrorBoundary noop>
                 <RelationshipIndicator user={props.message?.author} wantTopMargin={true} />
             </ErrorBoundary>
         ),
-        onDisable: () => removeMessageDecoration("friend-indicator")
+        onDisable: () => removeMessageDecoration("friend-indicator-messages")
     }
 };
 
@@ -81,8 +79,3 @@ export default definePlugin({
         });
     },
 });
-
-
-
-
-

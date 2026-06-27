@@ -5,6 +5,7 @@
  */
 
 import { ChatBarButton } from "@api/ChatButtons";
+import { addChannelToolbarButton, addHeaderBarButton, ChannelToolbarButton, HeaderBarButton, removeChannelToolbarButton, removeHeaderBarButton } from "@api/HeaderBar";
 import { definePluginSettings } from "@api/Settings";
 import { classNameFactory } from "@api/Styles";
 import { TestcordDevs } from "@utils/constants";
@@ -15,6 +16,17 @@ import { Button, ContextMenuApi, Menu, React, RelationshipStore, RestAPI, Toasts
 const cl = classNameFactory("pc-friends-scrapper-");
 
 const settings = definePluginSettings({
+    location: {
+        type: OptionType.SELECT,
+        description: "Where to show the button",
+        options: [
+            { label: "Chat bar", value: "chatbar", default: true },
+            { label: "Header bar", value: "headerbar" },
+            { label: "Channel toolbar", value: "channeltoolbar" },
+            { label: "Disabled", value: "disabled" },
+        ],
+        restartNeeded: true,
+    },
     whitelist: {
         type: OptionType.STRING,
         description: "Comma-separated user IDs to keep (whitelist)",
@@ -282,26 +294,67 @@ export default definePlugin({
     description: "Adds a Scrap button to Friends > All to unfriend everyone except whitelisted.",
     tags: ["Friends", "Utility"],
     authors: [TestcordDevs.x2b],
+    dependencies: ["HeaderBarAPI"],
     settings,
-    renderChatBarButton: (({ isMainChat }) => {
-        if (!isMainChat) return null;
-        return (
-            <ChatBarButton
-                tooltip="Friends Scrapper"
-                onClick={() => openModal((props: any) => <WhitelistModal modalProps={props} /> as any)}
-                onContextMenu={e =>
-                    ContextMenuApi.openContextMenu(e, () => (
-                        <Menu.Menu navId="pc-friends-scrapper-menu" onClose={ContextMenuApi.closeContextMenu} aria-label="Friends Scrapper">
-                            <Menu.MenuItem id="pc-friends-scrapper-open" label="Open Friends Scrapper" action={() => openModal((props: any) => <WhitelistModal modalProps={props} /> as any)} />
-                        </Menu.Menu>
-                    ))
-                }
-            >
-                {/* Profile/head icon distinct from chat icon */}
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="currentColor" d="M12 12a5 5 0 1 0 0-10a5 5 0 0 0 0 10Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5Z" />
-                </svg>
-            </ChatBarButton>
-        );
-    }) as any
+    chatBarButton: {
+        icon: (() => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill="currentColor" d="M12 12a5 5 0 1 0 0-10a5 5 0 0 0 0 10Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5Z" />
+            </svg>
+        )) as any,
+        render: (({ isMainChat }) => {
+            if (!isMainChat || settings.store.location !== "chatbar") return null;
+            return (
+                <ChatBarButton
+                    tooltip="Friends Scrapper"
+                    onClick={() => openModal((props: any) => <WhitelistModal modalProps={props} /> as any)}
+                    onContextMenu={e =>
+                        ContextMenuApi.openContextMenu(e, () => (
+                            <Menu.Menu navId="pc-friends-scrapper-menu" onClose={ContextMenuApi.closeContextMenu} aria-label="Friends Scrapper">
+                                <Menu.MenuItem id="pc-friends-scrapper-open" label="Open Friends Scrapper" action={() => openModal((props: any) => <WhitelistModal modalProps={props} /> as any)} />
+                            </Menu.Menu>
+                        ))
+                    }
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                        <path fill="currentColor" d="M12 12a5 5 0 1 0 0-10a5 5 0 0 0 0 10Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5Z" />
+                    </svg>
+                </ChatBarButton>
+            );
+        }) as any,
+    },
+
+    start() {
+        const { location } = settings.store;
+        if (location === "headerbar") {
+            addHeaderBarButton("FriendsRemover", () => (
+                <HeaderBarButton
+                    icon={() => (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M12 12a5 5 0 1 0 0-10a5 5 0 0 0 0 10Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5Z" />
+                        </svg>
+                    )}
+                    tooltip="Friends Scrapper"
+                    onClick={() => openModal((props: any) => <WhitelistModal modalProps={props} /> as any)}
+                />
+            ), 5);
+        } else if (location === "channeltoolbar") {
+            addChannelToolbarButton("FriendsRemover", () => (
+                <ChannelToolbarButton
+                    icon={() => (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M12 12a5 5 0 1 0 0-10a5 5 0 0 0 0 10Zm0 2c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5Z" />
+                        </svg>
+                    )}
+                    tooltip="Friends Scrapper"
+                    onClick={() => openModal((props: any) => <WhitelistModal modalProps={props} /> as any)}
+                />
+            ), 5);
+        }
+    },
+
+    stop() {
+        removeHeaderBarButton("FriendsRemover");
+        removeChannelToolbarButton("FriendsRemover");
+    },
 });

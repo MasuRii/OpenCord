@@ -1,3 +1,9 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { Constants, RestAPI } from "@webpack/common";
 
 const FETCH_TIMEOUT_MS = 10_000;
@@ -12,7 +18,7 @@ export async function fetchMessagesPage(args: {
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
     // Prefer caller-provided abort, but still apply a hard timeout.
-    const signal = args.signal;
+    const { signal } = args;
     if (signal) {
         if (signal.aborted) controller.abort();
         else signal.addEventListener("abort", () => controller.abort(), { once: true });
@@ -38,4 +44,3 @@ export async function fetchMessagesPage(args: {
         clearTimeout(timeout);
     }
 }
-

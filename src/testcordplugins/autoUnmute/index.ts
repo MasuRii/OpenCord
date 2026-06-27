@@ -1,14 +1,19 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import {
-    UserStore,
-    PermissionStore,
-    PermissionsBits,
     ChannelStore,
+    PermissionsBits,
+    PermissionStore,
+    UserStore,
 } from "@webpack/common";
-import { RestAPI, Constants } from "@webpack/common";
-import { SelectedGuildStore } from "@webpack/common";
-import { TestcordDevs } from "@utils/constants";
+import { Constants,RestAPI } from "@webpack/common";
 
 // Retrieval of necessary stores and actions
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
@@ -49,7 +54,7 @@ async function unmuteUserViaAPI(
 
         console.log(`[AutoUnmute] Unmute via API successful for user ${userId}`);
     } catch (error) {
-        console.error(`[AutoUnmute] Error during unmute via API:`, error);
+        console.error("[AutoUnmute] Error during unmute via API:", error);
         throw error;
     }
 }
@@ -73,7 +78,7 @@ async function undeafenUserViaAPI(
 
         console.log(`[AutoUnmute] Undeafen via API successful for user ${userId}`);
     } catch (error) {
-        console.error(`[AutoUnmute] Error during undeafen via API:`, error);
+        console.error("[AutoUnmute] Error during undeafen via API:", error);
         throw error;
     }
 }
@@ -135,7 +140,7 @@ export default definePlugin({
 
                     if (hasMutePermission) {
                         console.log(
-                            `[AutoUnmute] MUTE_MEMBERS permission detected, automatic unmute via API in progress...`
+                            "[AutoUnmute] MUTE_MEMBERS permission detected, automatic unmute via API in progress..."
                         );
 
                         // Automatically unmute via Discord API
@@ -144,7 +149,7 @@ export default definePlugin({
                                 // Use Discord API to unmute via server
                                 await unmuteUserViaAPI(currentUserId, guildId);
                                 console.log(
-                                    `[AutoUnmute] Automatic unmute via API completed successfully`
+                                    "[AutoUnmute] Automatic unmute via API completed successfully"
                                 );
                             } catch (error) {
                                 console.error(
@@ -155,11 +160,11 @@ export default definePlugin({
                                 // Fallback: try with toggleSelfMute if API fails
                                 try {
                                     console.log(
-                                        `[AutoUnmute] Attempting fallback with toggleSelfMute...`
+                                        "[AutoUnmute] Attempting fallback with toggleSelfMute..."
                                     );
                                     VoiceActions.toggleSelfMute();
                                     console.log(
-                                        `[AutoUnmute] Automatic unmute via fallback completed successfully`
+                                        "[AutoUnmute] Automatic unmute via fallback completed successfully"
                                     );
                                 } catch (fallbackError) {
                                     console.error(
@@ -171,7 +176,7 @@ export default definePlugin({
                         }, 100); // Small delay to avoid conflicts
                     } else {
                         console.log(
-                            `[AutoUnmute] No MUTE_MEMBERS permission, no automatic unmute`
+                            "[AutoUnmute] No MUTE_MEMBERS permission, no automatic unmute"
                         );
                     }
                 }
@@ -190,7 +195,7 @@ export default definePlugin({
 
                     if (hasDeafenPermission) {
                         console.log(
-                            `[AutoUnmute] DEAFEN_MEMBERS permission detected, automatic undeafen via API in progress...`
+                            "[AutoUnmute] DEAFEN_MEMBERS permission detected, automatic undeafen via API in progress..."
                         );
 
                         // Automatically undeafen via Discord API
@@ -199,7 +204,7 @@ export default definePlugin({
                                 // Use Discord API to undeafen via server
                                 await undeafenUserViaAPI(currentUserId, guildId);
                                 console.log(
-                                    `[AutoUnmute] Automatic undeafen via API completed successfully`
+                                    "[AutoUnmute] Automatic undeafen via API completed successfully"
                                 );
                             } catch (error) {
                                 console.error(
@@ -210,11 +215,11 @@ export default definePlugin({
                                 // Fallback: try with toggleSelfDeaf if API fails
                                 try {
                                     console.log(
-                                        `[AutoUnmute] Attempting fallback with toggleSelfDeaf...`
+                                        "[AutoUnmute] Attempting fallback with toggleSelfDeaf..."
                                     );
                                     VoiceActions.toggleSelfDeaf();
                                     console.log(
-                                        `[AutoUnmute] Automatic undeafen via fallback completed successfully`
+                                        "[AutoUnmute] Automatic undeafen via fallback completed successfully"
                                     );
                                 } catch (fallbackError) {
                                     console.error(
@@ -226,7 +231,7 @@ export default definePlugin({
                         }, 100); // Small delay to avoid conflicts
                     } else {
                         console.log(
-                            `[AutoUnmute] No DEAFEN_MEMBERS permission, no automatic undeafen`
+                            "[AutoUnmute] No DEAFEN_MEMBERS permission, no automatic undeafen"
                         );
                     }
                 }
@@ -248,7 +253,3 @@ export default definePlugin({
         console.log("[AutoUnmute] AutoUnmute plugin stopped");
     },
 });
-
-
-
-

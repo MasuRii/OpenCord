@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { TestcordDevs } from "@utils/constants";
 
 import settings from "./settings";
 import { RelationshipStore } from "./stores";
@@ -72,8 +72,3 @@ export default definePlugin({
             || shouldBypassBlocked && hasBlockedUsers && !hasIgnoredUsers;
     }
 });
-
-
-
-
-

@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { decompressFrames, parseGIF } from "gifuct-js";
+
 import type { CaptionMedia, GifTransform } from "../types";
-import { decompressFrames, parseGIF } from "./gifDecoder";
 import { looksLikeGif } from "../utils/media";
 import GifRenderer from "./gifRenderer";
 import captionMp4 from "./mp4";

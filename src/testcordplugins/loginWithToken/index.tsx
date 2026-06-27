@@ -1,6 +1,7 @@
 /*
- * LoginWithToken — "Login with token" button on the login page
- * Uses the same login system as TokenImporter
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 import { EquicordDevs } from "@utils/constants";
@@ -113,6 +114,11 @@ function openLoginModal() {
     openModal(props => <LoginWithTokenModal rootProps={props} />);
 }
 
+function onLoginButtonClick(e: MouseEvent) {
+    e.preventDefault();
+    openLoginModal();
+}
+
 function tryInject() {
     if (document.getElementById(MOUNT_ID)) return;
 
@@ -143,7 +149,7 @@ function tryInject() {
                 "padding:0",
                 "text-decoration:underline",
             ].join(";");
-            btn.addEventListener("click", e => { e.preventDefault(); openLoginModal(); });
+            btn.addEventListener("click", onLoginButtonClick);
 
             mount.appendChild(btn);
             forgotLink.parentElement?.insertBefore(mount, forgotLink.nextSibling);
@@ -161,7 +167,7 @@ function tryInject() {
     const btn = document.createElement("button");
     btn.textContent = "Login with token";
     btn.style.cssText = "background:none;border:none;color:var(--text-link,#00b0f4);cursor:pointer;font-size:14px;font-ffriendly:inherit;padding:0;text-decoration:underline";
-    btn.addEventListener("click", e => { e.preventDefault(); openLoginModal(); });
+    btn.addEventListener("click", onLoginButtonClick);
     mount.appendChild(btn);
     form.appendChild(mount);
 }
@@ -169,8 +175,14 @@ function tryInject() {
 function startObserver() {
     stopObserver();
     tryInject();
+    if (document.getElementById(MOUNT_ID)) return;
     observer = new MutationObserver(() => {
-        if (!document.getElementById(MOUNT_ID)) tryInject();
+        if (document.getElementById(MOUNT_ID)) return;
+        tryInject();
+        if (document.getElementById(MOUNT_ID)) {
+            observer?.disconnect();
+            observer = null;
+        }
     });
     observer.observe(document.body, { childList: true, subtree: true });
 }
@@ -178,7 +190,11 @@ function startObserver() {
 function stopObserver() {
     observer?.disconnect();
     observer = null;
-    document.getElementById(MOUNT_ID)?.remove();
+    const mount = document.getElementById(MOUNT_ID);
+    if (mount) {
+        mount.querySelectorAll("button").forEach(btn => btn.removeEventListener("click", onLoginButtonClick));
+        mount.remove();
+    }
 }
 
 export default definePlugin({

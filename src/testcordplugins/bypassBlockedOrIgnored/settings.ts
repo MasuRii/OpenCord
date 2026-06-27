@@ -29,5 +29,3 @@ export default definePluginSettings({
         default: true
     }
 });
-
-

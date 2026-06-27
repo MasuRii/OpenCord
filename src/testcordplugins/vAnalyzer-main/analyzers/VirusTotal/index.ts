@@ -91,7 +91,7 @@ export async function analyzeWithVirusTotal(messageId: string, url: string, sile
         return null;
     }
 
-    const analysisId = uploadResult.analysisId;
+    const { analysisId } = uploadResult;
     if (!analysisId) {
         if (!silent) safeToast("Could not get analysis ID from VirusTotal.", Toasts.Type.FAILURE);
         return null;

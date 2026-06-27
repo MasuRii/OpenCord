@@ -10,8 +10,8 @@ import { Flex } from "@components/Flex";
 import { HeadingSecondary, HeadingTertiary } from "@components/Heading";
 import { Margins } from "@components/margins";
 import { Paragraph } from "@components/Paragraph";
-import { React, Select, TextArea, TextInput, useEffect, useState } from "@webpack/common";
 import { Switch } from "@components/Switch";
+import { React, Select, TextArea, TextInput, useEffect, useState } from "@webpack/common";
 
 import { addModule, deleteModule, getModules, ModularScanModule, updateModule } from "../modularScanStore";
 import { truncateUrl } from "../utils";

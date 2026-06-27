@@ -4,24 +4,38 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import "./style.css";
+
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
+import { classNameFactory } from "@utils/css";
+import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByCodeLazy } from "@webpack";
 import {
+    Button,
     ChannelStore,
     EmojiStore,
     GuildMemberStore,
     GuildRoleStore,
     GuildStore,
     Menu,
+    PermissionsBits,
+    PermissionStore,
+    React,
     RestAPI,
     showToast,
     StickersStore,
+    Text,
+    TextInput,
     Toasts,
     UserStore,
 } from "@webpack/common";
+
+const cl = classNameFactory("vc-guildcopier-");
+
+type Guild = NonNullable<ReturnType<typeof GuildStore.getGuild>>;
 
 const LOG = (...args: any[]) => console.log("[GuildCopier]", ...args);
 const ERR = (...args: any[]) => console.error("[GuildCopier]", ...args);
@@ -34,6 +48,13 @@ interface BackupRole {
     mentionable: boolean;
     position: number;
     id: string;
+}
+
+interface GuildRole {
+    id: string;
+    name: string;
+    managed?: boolean;
+    position?: number;
 }
 
 interface BackupChannel {
@@ -83,6 +104,35 @@ const MAX_EMOJI_SIZE_BYTES = 256 * 1024;
 const MAX_STICKER_SIZE_BYTES = 512 * 1024;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function hasAllPermissions(permissions: bigint, required: bigint) {
+    return (permissions & required) === required;
+}
+
+function getRequiredTransferPermissions() {
+    let required = 0n;
+
+    if (settings.store.copyRoles) required |= PermissionsBits.MANAGE_ROLES;
+    if (settings.store.copyChannels || settings.store.copyBots) required |= PermissionsBits.MANAGE_CHANNELS;
+    if (settings.store.copyEmojis || settings.store.copyStickers) required |= PermissionsBits.MANAGE_GUILD_EXPRESSIONS;
+
+    return required;
+}
+
+function canTransferToGuild(guild: Guild, sourceGuildId: string) {
+    if (guild.id === sourceGuildId) return false;
+    if (guild.ownerId === UserStore.getCurrentUser().id) return true;
+
+    const permissions = PermissionStore.getGuildPermissions(guild);
+    return hasAllPermissions(permissions, PermissionsBits.ADMINISTRATOR)
+        || hasAllPermissions(permissions, getRequiredTransferPermissions());
+}
+
+function getTransferGuilds(sourceGuildId: string) {
+    return Object.values(GuildStore.getGuilds())
+        .filter(guild => canTransferToGuild(guild, sourceGuildId))
+        .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 const settings = definePluginSettings({
     copyRoles: {
@@ -224,13 +274,39 @@ async function createBotsChannel(guildId: string, newGuildId: string) {
     }
 }
 
-async function copyGuild(guildId: string): Promise<void> {
+async function deleteGuildChannels(guildId: string) {
+    const { body: channels } = await RestAPI.get({ url: `/guilds/${guildId}/channels` });
+    const nonCategories = channels.filter((c: any) => c.type !== 4);
+    const categories = channels.filter((c: any) => c.type === 4);
+    for (const channel of [...nonCategories, ...categories]) {
+        await RestAPI.del({ url: `/channels/${channel.id}` });
+        await sleep(500);
+    }
+}
+
+async function deleteGuildRoles(guildId: string) {
+    const { body } = await RestAPI.get({ url: `/guilds/${guildId}/roles` });
+    const roles = (body as GuildRole[])
+        .filter(role => role.id !== guildId)
+        .sort((a, b) => (b.position ?? 0) - (a.position ?? 0));
+
+    for (const role of roles) {
+        try {
+            await RestAPI.del({ url: `/guilds/${guildId}/roles/${role.id}` });
+            await sleep(500);
+        } catch (e) {
+            ERR(`Error deleting role ${role.name}:`, e);
+        }
+    }
+}
+
+async function copyGuild(guildId: string, targetGuildId?: string): Promise<void> {
     try {
         const guild = GuildStore.getGuild(guildId);
         if (!guild) throw new Error("Guild not found");
 
         LOG(`Starting copy of guild: ${guild.name} (${guildId})`);
-        showToast("Starting guild copy process...", Toasts.Type.SUCCESS);
+        showToast(targetGuildId ? "Starting guild transfer process..." : "Starting guild copy process...", Toasts.Type.SUCCESS);
 
         // --- Roles ---
         const roles = GuildRoleStore.getSortedRoles(guildId);
@@ -304,43 +380,61 @@ async function copyGuild(guildId: string): Promise<void> {
         }));
         LOG(`Stickers to copy: ${backupStickers.length}`);
 
-        // --- Create new guild ---
-        LOG("Creating new guild...");
-        const { body: newGuild } = await RestAPI.post({
-            url: "/guilds",
-            body: {
-                name: `${guild.name} (Copy)`,
-                icon: guild.icon,
-                description: guild.description,
-            },
-        });
-        const newGuildId = newGuild.id;
-        LOG(`New guild created: ${newGuild.name} (${newGuildId})`);
-        showToast(`Created new guild: ${newGuild.name}`, Toasts.Type.SUCCESS);
+        let newGuildId = targetGuildId;
+        if (newGuildId) {
+            const targetGuild = GuildStore.getGuild(newGuildId);
+            if (!targetGuild) throw new Error("Target guild not found");
 
-        // --- Delete default channels ---
-        try {
-            const { body: defaultChannels } = await RestAPI.get({ url: `/guilds/${newGuildId}/channels` });
-            const nonCategories = defaultChannels.filter((c: any) => c.type !== 4);
-            const categories = defaultChannels.filter((c: any) => c.type === 4);
-            for (const channel of [...nonCategories, ...categories]) {
-                await RestAPI.del({ url: `/channels/${channel.id}` });
-                await sleep(500);
+            LOG(`Transferring into guild: ${targetGuild.name} (${newGuildId})`);
+            showToast(`Transferring into ${targetGuild.name}`, Toasts.Type.SUCCESS);
+            if (settings.store.copyRoles) {
+                await deleteGuildRoles(newGuildId);
+                LOG("Target roles deleted");
             }
-            LOG("Default channels deleted");
-        } catch (e) {
-            ERR("Error deleting default channels:", e);
+            if (settings.store.copyChannels) {
+                try {
+                    await deleteGuildChannels(newGuildId);
+                    LOG("Target channels deleted");
+                } catch (e) {
+                    ERR("Error deleting target channels:", e);
+                }
+            }
+        } else {
+            // --- Create new guild ---
+            LOG("Creating new guild...");
+            const { body: newGuild } = await RestAPI.post({
+                url: "/guilds",
+                body: {
+                    name: `${guild.name} (Copy)`,
+                    icon: guild.icon,
+                    description: guild.description,
+                },
+            });
+            newGuildId = newGuild.id;
+            LOG(`New guild created: ${newGuild.name} (${newGuildId})`);
+            showToast(`Created new guild: ${newGuild.name}`, Toasts.Type.SUCCESS);
+            if (!newGuildId) throw new Error("Target guild not found");
+
+            // --- Delete default channels ---
+            try {
+                await deleteGuildChannels(newGuildId);
+                LOG("Default channels deleted");
+            } catch (e) {
+                ERR("Error deleting default channels:", e);
+            }
         }
+        if (!newGuildId) throw new Error("Target guild not found");
+        const destinationGuildId = newGuildId;
 
         // --- Copy roles ---
         const roleMapping: Record<string, string> = {};
-        roleMapping[guild.id] = newGuildId;
+        roleMapping[guild.id] = destinationGuildId;
         if (settings.store.copyRoles) {
             LOG("Copying roles...");
             for (const role of backupRoles) {
                 try {
                     const { body } = await RestAPI.post({
-                        url: `/guilds/${newGuildId}/roles`,
+                        url: `/guilds/${destinationGuildId}/roles`,
                         body: {
                             name: role.name,
                             permissions: role.permissions,
@@ -353,6 +447,16 @@ async function copyGuild(guildId: string): Promise<void> {
                     await sleep(500);
                 } catch (e) {
                     ERR(`Error creating role ${role.name}:`, e);
+                }
+            }
+            const rolePositions = backupRoles
+                .map(role => ({ id: roleMapping[role.id], position: role.position }))
+                .filter((role): role is { id: string; position: number; } => Boolean(role.id));
+            if (rolePositions.length) {
+                try {
+                    await RestAPI.patch({ url: `/guilds/${destinationGuildId}/roles`, body: rolePositions });
+                } catch (e) {
+                    ERR("Error ordering roles:", e);
                 }
             }
             LOG("Roles done");
@@ -371,7 +475,7 @@ async function copyGuild(guildId: string): Promise<void> {
                         ...o, id: roleMapping[o.id] || o.id,
                     }));
                     const { body } = await RestAPI.post({
-                        url: `/guilds/${newGuildId}/channels`,
+                        url: `/guilds/${destinationGuildId}/channels`,
                         body: { name: channel.name, type: channel.type, permission_overwrites: permissionOverwrites },
                     });
                     channelMapping[channel.id] = body.id;
@@ -415,7 +519,7 @@ async function copyGuild(guildId: string): Promise<void> {
                         if (channel.video_quality_mode) channelBody.video_quality_mode = channel.video_quality_mode;
                         if (channel.default_thread_rate_limit_per_user) channelBody.default_thread_rate_limit_per_user = channel.default_thread_rate_limit_per_user;
 
-                        const { body } = await RestAPI.post({ url: `/guilds/${newGuildId}/channels`, body: channelBody });
+                        const { body } = await RestAPI.post({ url: `/guilds/${destinationGuildId}/channels`, body: channelBody });
                         channelMapping[channel.id] = body.id;
                         await sleep(500);
                     } catch (e) {
@@ -428,7 +532,7 @@ async function copyGuild(guildId: string): Promise<void> {
 
         // --- Create bots channel ---
         if (settings.store.copyBots) {
-            await createBotsChannel(guildId, newGuildId);
+            await createBotsChannel(guildId, destinationGuildId);
         }
 
         // --- Copy emojis ---
@@ -436,7 +540,7 @@ async function copyGuild(guildId: string): Promise<void> {
             LOG("Copying emojis...");
             for (const emote of backupEmotes) {
                 try {
-                    await cloneEmoji(newGuildId, emote);
+                    await cloneEmoji(destinationGuildId, emote);
                     LOG(`Emoji copied: ${emote.name}`);
                     await sleep(2500);
                 } catch (e: any) {
@@ -447,7 +551,7 @@ async function copyGuild(guildId: string): Promise<void> {
                         LOG(`Rate limited on emojis, waiting ${waitMs / 1000}s then retrying once...`);
                         await sleep(waitMs);
                         try {
-                            await cloneEmoji(newGuildId, emote);
+                            await cloneEmoji(destinationGuildId, emote);
                             LOG(`Emoji copied on retry: ${emote.name}`);
                             await sleep(2500);
                         } catch (e2) {
@@ -464,7 +568,7 @@ async function copyGuild(guildId: string): Promise<void> {
             LOG("Copying stickers...");
             for (const sticker of backupStickers) {
                 try {
-                    await cloneSticker(newGuildId, sticker);
+                    await cloneSticker(destinationGuildId, sticker);
                     LOG(`Sticker copied: ${sticker.name}`);
                     await sleep(1000);
                 } catch (e) {
@@ -475,13 +579,58 @@ async function copyGuild(guildId: string): Promise<void> {
         }
 
         LOG("Guild copy completed!");
-        showToast("Guild copy completed successfully!", Toasts.Type.SUCCESS);
+        showToast(targetGuildId ? "Guild transfer completed successfully!" : "Guild copy completed successfully!", Toasts.Type.SUCCESS);
 
     } catch (error) {
         ERR("Error during guild copy:", error);
         const errorMessage = error instanceof Error ? error.message : "An error occurred";
-        showToast(`Error copying guild: ${errorMessage}`, Toasts.Type.FAILURE);
+        showToast(`Error ${targetGuildId ? "transferring" : "copying"} guild: ${errorMessage}`, Toasts.Type.FAILURE);
     }
+}
+
+function TransferGuildModal({ modalProps, sourceGuildId }: { modalProps: ModalProps; sourceGuildId: string; }) {
+    const [query, setQuery] = React.useState("");
+    const [transferringTo, setTransferringTo] = React.useState<string | null>(null);
+    const normalizedQuery = query.trim().toLowerCase();
+    const guilds = getTransferGuilds(sourceGuildId)
+        .filter(guild => !normalizedQuery || guild.name.toLowerCase().includes(normalizedQuery));
+
+    return (
+        <ModalRoot {...modalProps} size={ModalSize.MEDIUM}>
+            <ModalHeader>
+                <Text variant="heading-lg/semibold" tag="h1">Transfer Guild To</Text>
+                <ModalCloseButton onClick={modalProps.onClose} />
+            </ModalHeader>
+            <ModalContent>
+                <TextInput
+                    value={query}
+                    onChange={setQuery}
+                    placeholder="Search servers"
+                    autoFocus
+                />
+                <div className={cl("guild-list")}>
+                    {guilds.length ? guilds.map(guild => (
+                        <div className={cl("guild-row")} key={guild.id}>
+                            <Text variant="text-md/semibold" className={cl("guild-name")}>{guild.name}</Text>
+                            <Button
+                                size={Button.Sizes.SMALL}
+                                disabled={transferringTo !== null}
+                                onClick={() => {
+                                    setTransferringTo(guild.id);
+                                    modalProps.onClose();
+                                    void copyGuild(sourceGuildId, guild.id);
+                                }}
+                            >
+                                {transferringTo === guild.id ? "Transferring" : "Transfer"}
+                            </Button>
+                        </div>
+                    )) : (
+                        <Text variant="text-sm/normal" color="text-muted" className={cl("empty")}>No servers found where you have the needed permissions.</Text>
+                    )}
+                </div>
+            </ModalContent>
+        </ModalRoot>
+    );
 }
 
 const ctxMenuPatch: NavContextMenuPatchCallback = (children, props) => {
@@ -492,6 +641,11 @@ const ctxMenuPatch: NavContextMenuPatchCallback = (children, props) => {
             id="vc-guild-copy"
             label="Copy Guild"
             action={() => copyGuild(props.guild.id)}
+        />,
+        <Menu.MenuItem
+            id="vc-guild-transfer-to"
+            label="Transfer To"
+            action={() => openModal(modalProps => <TransferGuildModal modalProps={modalProps as ModalProps} sourceGuildId={props.guild.id} />)}
         />
     );
 };

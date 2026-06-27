@@ -7,13 +7,13 @@
 import { findGroupChildrenByChildId } from "@api/ContextMenu";
 import { updateMessage } from "@api/MessageUpdater";
 import { ImageInvisible, ImageVisible } from "@components/Icons";
+import { TestcordDevs } from "@utils/constants";
 import { Logger } from "@utils/Logger";
 import { parseUrl } from "@utils/misc";
 import definePlugin from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { findByCodeLazy } from "@webpack";
 import { ChannelStore, Constants, Menu, MessageStore, React, RestAPI, showToast, Toasts } from "@webpack/common";
-import { TestcordDevs } from "@utils/constants";
 
 const logger = new Logger("ShowMessageEmbeds");
 
@@ -211,8 +211,3 @@ export default definePlugin({
         "attachment-link-context": addShowAttachmentEmbedButton
     }
 });
-
-
-
-
-

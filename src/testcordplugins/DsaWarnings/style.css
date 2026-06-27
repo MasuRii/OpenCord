@@ -9,9 +9,9 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    margin: 12px 12px 4px -12px;
+    margin: 12px 0 4px;
     color: var(--vc-dsa-warnings-title);
-    max-width: 100%;
+    width: 100%;
     overflow: visible;
 }
 
@@ -33,6 +33,7 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 12px;
+    width: 100%;
 }
 
 .vc-dsa-warnings-header-main {
@@ -109,7 +110,8 @@
     transition: border-color 0.2s ease, transform 0.2s ease, background-color 0.2s ease;
     color: var(--vc-dsa-warnings-title);
     box-shadow: inset 0 1px 0 color-mix(in srgb, var(--white-500, #fff) 4%, transparent);
-    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
     overflow: hidden;
 }
 
@@ -132,8 +134,7 @@
 .vc-dsa-warnings-card-top {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
+    gap: 12px;
     width: 100%;
     min-width: 0;
 }
@@ -142,8 +143,7 @@
     display: flex;
     align-items: flex-start;
     gap: 12px;
-    flex: 1 1 auto;
-    width: 100%;
+    flex: 1 1 0;
     min-width: 0;
 }
 
@@ -170,10 +170,9 @@
     flex-direction: column;
     align-items: flex-end;
     gap: 4px;
-    flex: 1 1 auto;
+    margin-left: auto;
+    flex-shrink: 0;
     text-align: right;
-    min-width: 0;
-    max-width: 180px;
 }
 
 .vc-dsa-warnings-date {
@@ -181,6 +180,7 @@
     font-size: 11px;
     line-height: 1.15;
     font-weight: 700;
+    white-space: nowrap;
 }
 
 .vc-dsa-warnings-id {
@@ -193,8 +193,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    flex: 1 1 auto;
-    width: 100%;
+    flex: 1 1 0;
     min-width: 0;
 }
 
@@ -241,6 +240,11 @@
     color: color-mix(in srgb, #fbbf24 82%, white);
 }
 
+.vc-dsa-warnings-chip-illegal {
+    background: color-mix(in srgb, #7b0000 55%, transparent);
+    color: #ff9999;
+}
+
 .vc-dsa-warnings-category {
     color: var(--vc-dsa-warnings-title);
     font-size: 30px;
@@ -248,7 +252,6 @@
     letter-spacing: -0.02em;
     line-height: 1.08;
     margin: 0;
-    width: 100%;
     word-break: keep-all;
     overflow-wrap: break-word;
     white-space: normal;
@@ -260,10 +263,100 @@
     font-weight: 500;
     line-height: 1.45;
     margin: 0;
-    width: 100%;
     word-break: normal;
     overflow-wrap: break-word;
     white-space: normal;
+}
+
+.vc-dsa-warnings-details {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 0 2px;
+}
+
+.vc-dsa-warnings-detail-row {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.35;
+}
+
+.vc-dsa-warnings-detail-label {
+    color: var(--vc-dsa-warnings-muted);
+    min-width: 90px;
+    flex-shrink: 0;
+    font-size: 12px;
+}
+
+.vc-dsa-warnings-detail-value {
+    color: var(--vc-dsa-warnings-body);
+    font-size: 12px;
+    word-break: normal;
+    overflow-wrap: break-word;
+}
+
+.vc-dsa-warnings-user-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--background-secondary-alt) 60%, transparent);
+    border: 1px solid color-mix(in srgb, var(--white-500, #fff) 6%, transparent);
+}
+
+.vc-dsa-warnings-user-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid color-mix(in srgb, var(--white-500, #fff) 12%, transparent);
+}
+
+.vc-dsa-warnings-user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.vc-dsa-warnings-user-display {
+    color: var(--vc-dsa-warnings-title);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.vc-dsa-warnings-user-handle {
+    color: var(--vc-dsa-warnings-muted);
+    font-size: 13px;
+}
+
+.vc-dsa-warnings-user-id {
+    color: var(--vc-dsa-warnings-muted);
+    font-size: 11px;
+    font-family: var(--font-code);
+    opacity: 0.8;
+}
+
+.vc-dsa-warnings-user-flags {
+    color: var(--vc-dsa-warnings-muted);
+    font-size: 11px;
+}
+
+.vc-dsa-warnings-user-clan {
+    color: var(--vc-dsa-warnings-muted);
+    font-size: 11px;
+}
+
+.vc-dsa-warnings-settings-notice {
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-warning) 22%, transparent);
+    color: var(--vc-dsa-warnings-title);
 }
 
 @media (width <= 700px) {
@@ -273,12 +366,20 @@
 
     .vc-dsa-warnings-card-meta {
         align-items: flex-start;
+        margin-left: 0;
         text-align: left;
-        min-width: 0;
-        max-width: none;
     }
 
     .vc-dsa-warnings-category {
         font-size: 24px;
+    }
+
+    .vc-dsa-warnings-detail-row {
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .vc-dsa-warnings-detail-label {
+        min-width: unset;
     }
 }

@@ -17,7 +17,6 @@
 */
 
 import { types } from "../../philsPluginLibrary";
-import { Devs } from "@utils/constants";
 
 export const PluginInfo = {
     PLUGIN_NAME: "BetterMicrophone",

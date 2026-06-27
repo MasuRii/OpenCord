@@ -16,7 +16,7 @@ export const settings = definePluginSettings({
     },
     discoverQuestsViaProxies: {
         type: OptionType.BOOLEAN,
-        description: "Use configured proxies to discover active claimable quests available in each region.",
+        description: "Use configured proxies to discover active claimable quests available in each region. Only runs from commands, not automatically.",
         default: false,
         restartNeeded: false,
     },
