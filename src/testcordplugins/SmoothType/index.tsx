@@ -146,6 +146,7 @@ function applyCaretPosition() {
 
 let observer: MutationObserver | null = null;
 let caretScanQueued = false;
+let caretScanFrame: number | null = null;
 
 function startObserver() {
     // The caret only matters while a slate editor is focused. Bail immediately
@@ -155,8 +156,10 @@ function startObserver() {
         if (caretScanQueued) return;
         if (!document.activeElement?.closest("[data-slate-editor]")) return;
         caretScanQueued = true;
-        requestAnimationFrame(() => {
+        caretScanFrame = requestAnimationFrame(() => {
+            caretScanFrame = null;
             caretScanQueued = false;
+            if (!observer) return;
             applyCaretPosition();
         });
     });
@@ -166,6 +169,10 @@ function startObserver() {
 function stopObserver() {
     observer?.disconnect();
     observer = null;
+    if (caretScanFrame !== null) {
+        cancelAnimationFrame(caretScanFrame);
+        caretScanFrame = null;
+    }
     caretScanQueued = false;
 }
 
