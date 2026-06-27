@@ -19,6 +19,10 @@ const LASTFM_API = "https://ws.audioscrobbler.com/2.0";
 const logger = new Logger("LastFMRichPresence");
 
 let updateInterval: NodeJS.Timeout | undefined;
+let abortController: AbortController | undefined;
+let active = false;
+let generation = 0;
+let updateInFlight = false;
 let lastTrackKey = "";
 let trackStart = 0;
 
@@ -75,7 +79,7 @@ async function getAsset(appId: string, key: string): Promise<string> {
     return (await ApplicationAssetUtils.fetchAssetIds(appId, [key]))[0];
 }
 
-async function fetchNowPlaying(): Promise<LFMTrack | null> {
+async function fetchNowPlaying(signal?: AbortSignal): Promise<LFMTrack | null> {
     const { apiKey, username } = settings.store;
     if (!apiKey || !username) return null;
 
@@ -84,7 +88,8 @@ async function fetchNowPlaying(): Promise<LFMTrack | null> {
             `${LASTFM_API}/?method=user.getRecentTracks` +
             `&user=${encodeURIComponent(username)}` +
             `&api_key=${encodeURIComponent(apiKey)}` +
-            "&format=json&limit=1"
+            "&format=json&limit=1",
+            { signal }
         );
         if (!res.ok) return null;
 
@@ -98,60 +103,76 @@ async function fetchNowPlaying(): Promise<LFMTrack | null> {
         if (!track || track["@attr"]?.nowplaying !== "true") return null;
         return track;
     } catch (e) {
+        if (signal?.aborted) return null;
         logger.error("Failed to fetch Last.fm now playing:", e);
         return null;
     }
 }
 
-async function updatePresence() {
-    const track = await fetchNowPlaying();
+async function updatePresence(updateGeneration = generation) {
+    if (!active || updateGeneration !== generation || updateInFlight) return;
+    updateInFlight = true;
+    const controller = new AbortController();
+    abortController = controller;
 
-    if (!track) {
-        if (lastTrackKey !== "") {
-            lastTrackKey = "";
-            trackStart = 0;
-            setActivity(null);
+    try {
+        const track = await fetchNowPlaying(controller.signal);
+
+        if (!active || updateGeneration !== generation) return;
+
+        if (!track) {
+            if (lastTrackKey !== "") {
+                lastTrackKey = "";
+                trackStart = 0;
+                setActivity(null);
+            }
+            return;
         }
-        return;
+
+        const appId = settings.store.discordAppId;
+        if (!appId) return;
+
+        const trackKey = `${track.artist["#text"]}::${track.name}`;
+        if (trackKey !== lastTrackKey) {
+            lastTrackKey = trackKey;
+            trackStart = Math.floor(Date.now() / 1000);
+        }
+
+        const artworkUrl = track.image?.find(img => img.size === "large")?.["#text"] ?? "";
+        const largeImage = artworkUrl
+            ? await getAsset(appId, artworkUrl)
+            : await getAsset(appId, "lastfm");
+        const smallImage = await getAsset(appId, "lastfm");
+
+        if (!active || updateGeneration !== generation) return;
+
+        const buttons: ActivityButton[] = [];
+        if (settings.store.showTrackLink)
+            buttons.push({ label: "Listen on Last.fm", url: track.url });
+
+        const activity: Activity = {
+            application_id: appId,
+            name: "Last.fm",
+            details: track.name,
+            state: track.artist["#text"],
+            timestamps: { start: trackStart },
+            assets: {
+                large_image: largeImage,
+                large_text: track.album?.["#text"] || track.name,
+                small_image: smallImage,
+                small_text: "Last.fm",
+            },
+            buttons: buttons.length ? buttons.map(b => b.label) : undefined,
+            metadata: buttons.length ? { button_urls: buttons.map(b => b.url) } : undefined,
+            type: settings.store.useListeningStatus ? ActivityType.LISTENING : ActivityType.PLAYING,
+            flags: ActivityFlags.INSTANCE,
+        };
+
+        setActivity(activity);
+    } finally {
+        if (abortController === controller) abortController = undefined;
+        if (updateGeneration === generation) updateInFlight = false;
     }
-
-    const appId = settings.store.discordAppId;
-    if (!appId) return;
-
-    const trackKey = `${track.artist["#text"]}::${track.name}`;
-    if (trackKey !== lastTrackKey) {
-        lastTrackKey = trackKey;
-        trackStart = Math.floor(Date.now() / 1000);
-    }
-
-    const artworkUrl = track.image?.find(img => img.size === "large")?.["#text"] ?? "";
-    const largeImage = artworkUrl
-        ? await getAsset(appId, artworkUrl)
-        : await getAsset(appId, "lastfm");
-
-    const buttons: ActivityButton[] = [];
-    if (settings.store.showTrackLink)
-        buttons.push({ label: "Listen on Last.fm", url: track.url });
-
-    const activity: Activity = {
-        application_id: appId,
-        name: "Last.fm",
-        details: track.name,
-        state: track.artist["#text"],
-        timestamps: { start: trackStart },
-        assets: {
-            large_image: largeImage,
-            large_text: track.album?.["#text"] || track.name,
-            small_image: await getAsset(appId, "lastfm"),
-            small_text: "Last.fm",
-        },
-        buttons: buttons.length ? buttons.map(b => b.label) : undefined,
-        metadata: buttons.length ? { button_urls: buttons.map(b => b.url) } : undefined,
-        type: settings.store.useListeningStatus ? ActivityType.LISTENING : ActivityType.PLAYING,
-        flags: ActivityFlags.INSTANCE,
-    };
-
-    setActivity(activity);
 }
 
 export default definePlugin({
@@ -178,11 +199,18 @@ export default definePlugin({
     },
 
     start() {
-        updatePresence();
-        updateInterval = setInterval(updatePresence, (settings.store.refreshInterval ?? 15) * 1000);
+        active = true;
+        generation++;
+        updateInFlight = false;
+        updatePresence(generation);
+        updateInterval = setInterval(() => updatePresence(generation), (settings.store.refreshInterval ?? 15) * 1000);
     },
 
     stop() {
+        active = false;
+        generation++;
+        abortController?.abort();
+        abortController = undefined;
         clearInterval(updateInterval);
         updateInterval = undefined;
         lastTrackKey = "";
