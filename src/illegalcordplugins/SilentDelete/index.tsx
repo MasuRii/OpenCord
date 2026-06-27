@@ -13,7 +13,6 @@ import { sleep } from "@utils/misc";
 import definePlugin, { OptionType } from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { ChannelStore, Constants, Menu, RestAPI, UserStore } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 interface SilentDeleteMessage extends Message {
     deleted?: boolean;
@@ -144,9 +143,9 @@ export default definePlugin({
     description: "\"Silently\" deletes a message. Bypass message loggers by replacing the message with a placeholder.",
     tags: ["Chat", "Privacy"],
     authors: [
-        IllegalcordDevs.Aurick,
-        IllegalcordDevs.appleflyer,
-        IllegalcordDevs.irritably
+        { name: "Aurick", id: 1348025017233047634n },
+        { name: "appleflyer", id: 1209096766075703368n },
+        { name: "irritably", id: 928787166916640838n }
     ],
     dependencies: ["MessagePopoverAPI", "CommandsAPI"],
     settings,

@@ -20,7 +20,6 @@ import { settings } from "./settings";
 import { state } from "./store";
 import { compareVersions } from "./utils/helpers";
 import { cleanupContainer } from "./utils/notifications";
-import { IllegalcordDevs } from "@utils/constants";
 
 async function checkForUpdates(): Promise<void> {
     if (!UPDATE_CHECK_ENABLED) return;
@@ -88,7 +87,7 @@ const guildContextMenuPatch: NavContextMenuPatchCallback = (children: any[], pro
 export default definePlugin({
     name: "ServerCloner",
     description: "Clone servers with channels, roles, permissions and community features",
-    authors: [IllegalcordDevs.Moret],
+    authors: [{ name: "Moret", id: 1449096170646536233n }],
     tags: ["Utility", "Customisation"],
     settings,
 

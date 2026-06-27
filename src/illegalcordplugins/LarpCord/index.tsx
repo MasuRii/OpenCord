@@ -17,7 +17,6 @@ import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalRoot, op
 import definePlugin, { OptionType } from "@utils/types";
 import type { ProfileEffect } from "@vencord/discord-types";
 import { AuthenticationStore, Button, FluxDispatcher, IconUtils, Menu, OAuth2AuthorizeModal, React, Select, SettingsRouter, SnowflakeUtils, Toasts, UserStore } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 const LarpSettings = Settings as typeof Settings & {
     seeAllCustomProfile?: boolean;
@@ -333,7 +332,7 @@ let storedData: CustomProfileData = {};
 let isEnabled = false;
 let domObserver: MutationObserver | null = null;
 
-const publicProfilesCache = new Map<string, { fetched: boolean, data: CustomProfileData | null, timestamp: number }>();
+const publicProfilesCache = new Map<string, { fetched: boolean, data: CustomProfileData | null, timestamp: number; }>();
 const PUBLIC_CACHE_TTL = 1000 * 30;
 
 let _lastSeeAll = false;
@@ -362,7 +361,7 @@ async function fetchPublicProfileIfNeeded(userId: string) {
 
         const US = (Vencord as any).Webpack?.findByStoreName("UserStore");
         if (US && US.emitChange) US.emitChange();
-    } catch {}
+    } catch { }
 }
 
 let cachedOriginalUser: any = null;
@@ -1152,7 +1151,7 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
                                     permissions={0n}
                                     clientId={clientId}
                                     cancelCompletesFlow={false}
-                                    callback={async ({ location }: { location: string }) => {
+                                    callback={async ({ location }: { location: string; }) => {
                                         try {
                                             const res = await fetch(location);
                                             const json = await res.json();
@@ -1203,7 +1202,7 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
             if (LarpSettings.syncOwnCustomProfile) {
                 getStoredToken().then(token => {
                     if (token) {
-                        saveOwnPluginConfig("customProfile", token, { private: true }).catch(() => {});
+                        saveOwnPluginConfig("customProfile", token, { private: true }).catch(() => { });
                         publicProfilesCache.delete(myId);
                     }
                 });
@@ -1451,8 +1450,9 @@ function CPDMNotice({ userId }: { userId: string; }) {
 
 export default definePlugin({
     name: "LarpCord",
-    description: "Visually customize your local Discord profile preview with names, avatars, banners, badges and effects.",
-    authors: [IllegalcordDevs.irritably],
+    enabledByDefault: true,
+    description: t("Visually customize your local Discord profile preview with names, avatars, banners, badges and effects."),
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     dependencies: ["HeaderBarAPI", "ContextMenuAPI"],
     settings,
 

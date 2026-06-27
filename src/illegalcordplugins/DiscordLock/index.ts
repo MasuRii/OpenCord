@@ -1,13 +1,12 @@
 /*
- * DiscordLock — Vencord plugin
- * Author: vejcowski
- * Do not remove or modify this header when redistributing.
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { ChannelStore, FluxDispatcher, IconUtils, UserStore } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 const OVERLAY_ID = "vcl-overlay";
 const LOCKED_EVENT = "vencord-discordlock-locked";
@@ -525,7 +524,7 @@ export default definePlugin({
     name: "DiscordLock",
     description: "Locks Discord on startup, on inactivity, and on specified servers/channels/DMs.",
     tags: ["Privacy", "Utility"],
-    authors: [IllegalcordDevs.vejcowski],
+    authors: [{ name: "vejcowski", id: 1375544683908042862n }],
     settings,
 
     start() {

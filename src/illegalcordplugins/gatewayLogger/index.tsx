@@ -6,7 +6,6 @@
 
 import { Logger } from "@utils/Logger";
 import definePlugin from "@utils/types";
-import { IllegalcordDevs } from "@utils/constants";
 
 const logger = new Logger("GatewayLogger");
 
@@ -15,8 +14,8 @@ export default definePlugin({
     description: "logs gateway events to the console",
     tags: ["Developers", "Utility"],
     authors: [
-        IllegalcordDevs.zastix,
-        IllegalcordDevs.Death
+        { id: 253302259696271360n, name: "zastix" },
+        { id: 1003477997728313405n, name: "Death" }
     ],
     patches: [
         {

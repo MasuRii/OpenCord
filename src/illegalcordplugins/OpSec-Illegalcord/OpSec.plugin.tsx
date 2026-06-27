@@ -9,7 +9,6 @@ import { definePluginSettings } from "@api/Settings";
 import { escapeRegExp } from "@utils/text";
 import definePlugin, { OptionType } from "@utils/types";
 import { MessageStore } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 interface ReplacementRule {
     pattern: RegExp;
@@ -557,8 +556,8 @@ export default definePlugin({
     dependencies: ["MessageEventsAPI"],
     tags: ["Chat", "Utility"],
     authors: [
-        IllegalcordDevs.Solace,
-        IllegalcordDevs.irritably
+        { name: "Solace", id: 1472732509241479218n },
+        { name: "irritably", id: 928787166916640838n }
     ],
     settings,
     onBeforeMessageSend,

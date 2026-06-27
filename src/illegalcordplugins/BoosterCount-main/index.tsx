@@ -13,7 +13,6 @@ import { Logger } from "@utils/Logger";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
 import { FluxDispatcher, GuildMemberStore, Menu, Modal, openModal, ScrollerThin, Text, useEffect, UserStore, useStateFromStores } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 const cl = classNameFactory("bc-");
 
@@ -66,7 +65,9 @@ export default definePlugin({
     description: "Shows all the boosters in the server and the number of boosts for each booster.",
     tags: ["Servers", "Appearance"],
     dependencies: ["MessagePopoverAPI"],
-    authors: [IllegalcordDevs.Raf],
+    authors: [{
+        name: "Raf", id: 121253596753952768n
+    }],
     contextMenus: {
         "guild-context": MakeContextCallback()
     }

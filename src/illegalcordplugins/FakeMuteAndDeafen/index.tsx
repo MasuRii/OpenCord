@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { IllegalcordDevs } from "@utils/constants";
+import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
 import { Menu } from "@webpack/common";
@@ -62,7 +62,7 @@ export default definePlugin({
     name: "FakeMuteAndDeafen",
     description: "You can fake mute and deafen yourself. You can continue speaking and being heard during this time.",
     tags: ["Voice", "Privacy"],
-    authors: [IllegalcordDevs.feelslove],
+    authors: [Devs.feelslove],
     settings,
     modifyVoiceState(e) {
         for (let i = 0; i < StateKeys.length; i++) {

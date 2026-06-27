@@ -6,7 +6,6 @@
 
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
-import { IllegalcordDevs } from "@utils/constants";
 
 const TEXT_STYLES = {
     fraktur: {
@@ -143,7 +142,7 @@ function transformMessage(text: string, style: TextStyle): string {
 export default definePlugin({
     name: "AutoModBypass",
     description: "Transforms your messages into various text styles (Fraktur, Zalgo, Squared, etc.) for automod bypass & Fun",
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     tags: ["Chat", "Fun", "Utility"],
     enabledByDefault: false,
     settings,

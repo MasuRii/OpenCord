@@ -18,7 +18,7 @@
 
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { IllegalcordDevs } from "@utils/constants";
+import { Devs } from "@utils/constants";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType } from "@utils/types";
 import { ChannelStore, Constants, FluxDispatcher, GuildStore, React, RelationshipStore, UserStore } from "@webpack/common";
@@ -246,7 +246,7 @@ const settings = definePluginSettings({
 export default definePlugin({
     name: "TypingFriends",
     description: "See which of your friends are typing anywhere",
-    authors: [IllegalcordDevs.Xylen],
+    authors: [Devs.Xylen],
     tags: ["Friends", "Notifications"],
     settings: settings,
 

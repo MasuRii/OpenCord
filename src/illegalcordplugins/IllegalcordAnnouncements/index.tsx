@@ -15,7 +15,6 @@ import { classNameFactory } from "@utils/css";
 import definePlugin, { OptionType } from "@utils/types";
 import type { RenderModalProps } from "@vencord/discord-types";
 import { closeModal, Modal, openModal } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 const TELEGRAM_URL = "https://t.me/Illegalcord";
 const GITHUB_URL = "https://github.com/ImHisako/Illegalcord";
@@ -155,7 +154,9 @@ export default definePlugin({
     name: "IllegalcordAnnouncements",
     description: "Shows Illegalcord Telegram and GitHub announcements.",
     tags: ["Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
+    required: true,
+    enabledByDefault: true,
     settings,
     settingsAboutComponent: SafeIllegalcordAnnouncementSettings,
     toolboxActions: {
