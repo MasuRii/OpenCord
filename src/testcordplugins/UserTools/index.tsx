@@ -610,6 +610,8 @@ export default definePlugin({
                 <HeaderBarIcon
                     tooltip={tooltip}
                     icon={DisconnectIcon}
+                    className="vc-plugin-icon-button"
+                    iconClassName="vc-plugin-icon-button"
                     onClick={() => openUserToolsModal()}
                     onContextMenu={e => {
                         e.preventDefault();
