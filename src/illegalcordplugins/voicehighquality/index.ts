@@ -5,7 +5,6 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { IllegalcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
 const settings = definePluginSettings({
@@ -52,8 +51,8 @@ export default definePlugin({
     description: "🎙️ Professional studio-grade audio quality for Discord. 510kbps OPUS @ 48kHz with maximum quality settings. Optimized for 192kHz microphones.",
     tags: ["Voice", "Customisation"],
     authors: [
-        IllegalcordDevs.irritably,
-        IllegalcordDevs.rz30,
+        { name: "irritably", id: 928787166916640838n },
+        { name: "rz30", id: 0n },
     ],
 
     settings,
@@ -112,7 +111,7 @@ export default definePlugin({
             find: "priority:",
             replacement: {
                 match: /priority:"low"/,
-                replace: 'priority:$self.getAudioPriority()'
+                replace: "priority:$self.getAudioPriority()"
             }
         },
         {

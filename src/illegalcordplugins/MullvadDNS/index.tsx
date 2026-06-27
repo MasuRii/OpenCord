@@ -10,7 +10,6 @@ import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { showToast, Toasts } from "@webpack/common";
 
 import type { DnsFamily, MullvadResolveResult, ResolveProtocol } from "./native";
-import { IllegalcordDevs } from "@utils/constants";
 
 const Native = VencordNative.pluginHelpers.MullvadDNS as PluginNative<typeof import("./native")>;
 
@@ -371,7 +370,7 @@ export default definePlugin({
     name: "MullvadDNS",
     description: "Resolve Discord hosts through Mullvad DNS.",
     tags: ["Privacy", "Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
 
     start() {

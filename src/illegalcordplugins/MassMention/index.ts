@@ -22,7 +22,6 @@ import { definePluginSettings } from "@api/Settings";
 import { sendMessage } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
 import { GuildMemberStore, UserStore } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 const settings = definePluginSettings({
     delayBetweenMessages: {
@@ -42,7 +41,7 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 export default definePlugin({
     name: "MassMention",
     description: "Mention multiple users in a server with configurable batch sizes. Use /massmention to start.",
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     tags: ["Utility", "Chat"],
     settings,
     dependencies: ["CommandsAPI"],

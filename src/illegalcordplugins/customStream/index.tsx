@@ -25,7 +25,6 @@ import definePlugin, { OptionType } from "@utils/types";
 import type { RenderModalProps } from "@vencord/discord-types";
 import { findComponentByCodeLazy } from "@webpack";
 import { Alerts, Button, Menu, Modal, openModal, React, showToast, Text, Toasts, useEffect, useRef,UserStore, useState } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 // Компонент кнопки в панели
 const PanelButton = findComponentByCodeLazy(".GREEN,positionKeyStemOverride:");
@@ -2161,7 +2160,10 @@ export default definePlugin({
     description: "Custom stream preview images with profiles & slideshow. GitHub: https://github.com/MrTopQ/customStream-Vencord",
     tags: ["Voice", "Media"],
     authors: [
-        IllegalcordDevs.TopQ
+        {
+            name: "TopQ",
+            id: 523800559791374356n
+        }
     ],
 
     settings,

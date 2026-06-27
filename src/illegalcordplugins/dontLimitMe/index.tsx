@@ -5,13 +5,12 @@
  */
 
 import definePlugin from "@utils/types";
-import { IllegalcordDevs } from "@utils/constants";
 
 export default definePlugin({
     name: "DontLimitMe",
     description: "removes the limit on message sending. spam away! (Bannable)",
     tags: ["Utility", "Chat"],
-    authors: [IllegalcordDevs.Death],
+    authors: [{ name: "Death", id: 1003477997728313405n }],
     patches: [
         {
             find: "cancelQueueMetricTimers",

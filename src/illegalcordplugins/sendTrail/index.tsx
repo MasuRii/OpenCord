@@ -7,7 +7,7 @@
 import type { MessageObject, MessageOptions } from "@api/MessageEvents";
 import { ClockIcon } from "@components/Icons";
 import SettingsPlugin from "@plugins/_core/settings";
-import { IllegalcordDevs } from "@utils/constants";
+import { Devs } from "@utils/constants";
 import { removeFromArray, sleep } from "@utils/misc";
 import definePlugin from "@utils/types";
 import { ChannelStore, GuildStore, MessageStore, UserStore } from "@webpack/common";
@@ -252,8 +252,9 @@ function registerSendTrailSettingsTab() {
 export default definePlugin({
     name: "SendTrail",
     description: "Tracks your newly sent messages, lets you select them, and purges them in a dedicated Illegalcord settings page.",
-    authors: [IllegalcordDevs.clrxxo],
+    authors: [Devs.clrxxo],
     dependencies: ["Settings", "MessageEventsAPI"],
+    enabledByDefault: true,
     tags: ["Chat", "Utility"],
     requiresRestart: false,
     settings,

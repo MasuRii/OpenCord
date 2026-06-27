@@ -9,7 +9,6 @@ import { definePluginSettings } from "@api/Settings";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { Message } from "@vencord/discord-types";
-import { IllegalcordDevs } from "@utils/constants";
 
 const logger = new Logger("ScamLinkDetector", "#ff4444");
 
@@ -27,7 +26,7 @@ interface IMessageCreate {
     message: Message;
 }
 
-const urlRegex = /(?:https?:\/\/)?(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi;
+const urlRegex = /(?:https?:\/\/)?(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&//=]*)/gi;
 
 const settings = definePluginSettings({
     enableDebugLogs: {
@@ -103,14 +102,14 @@ function extractDomains(content: string): string[] {
             let cleanedUrl = url.replace(/[)>.,;:!?'"]+$/, "");
 
             // Add protocol if missing for URL parsing
-            if (!cleanedUrl.startsWith('http://') && !cleanedUrl.startsWith('https://')) {
-                cleanedUrl = 'https://' + cleanedUrl;
+            if (!cleanedUrl.startsWith("http://") && !cleanedUrl.startsWith("https://")) {
+                cleanedUrl = "https://" + cleanedUrl;
             }
 
             const hostname = new URL(cleanedUrl).hostname.toLowerCase();
 
             // Remove www. prefix if present
-            const domain = hostname.replace(/^www\./, '');
+            const domain = hostname.replace(/^www\./, "");
 
             domains.push(domain);
             if (settings.store.enableDebugLogs) {
@@ -171,7 +170,7 @@ export default definePlugin({
     name: "ScamLinkDetector",
     description: "Detects and warns about scam links using the Discord AntiScam database",
     tags: ["Privacy", "Chat"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
 
     flux: {

@@ -6,7 +6,7 @@
 
 import { MagnifyingGlassIcon } from "@components/Icons";
 import SettingsPlugin from "@plugins/_core/settings";
-import { IllegalcordDevs } from "@utils/constants";
+import { Devs } from "@utils/constants";
 import { removeFromArray } from "@utils/misc";
 import definePlugin from "@utils/types";
 
@@ -39,8 +39,9 @@ function registerMutualScannerSettingsTab() {
 export default definePlugin({
     name: "MutualScanner",
     description: "Scans selected servers for members that share at least one mutual friend with your account and saves the results locally.",
-    authors: [IllegalcordDevs.clrxxo],
+    authors: [Devs.clrxxo],
     dependencies: ["Settings"],
+    enabledByDefault: true,
     tags: ["Friends", "Utility"],
     requiresRestart: false,
 
