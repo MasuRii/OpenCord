@@ -1,7 +1,7 @@
 {
     "name": "opencord",
     "private": "true",
-    "version": "1.14.15.0",
+    "version": "1.14.15.1",
     "description": "The other cutest Discord client mod",
     "homepage": "https://github.com/MasuRii/OpenCord#readme",
     "bugs": {
