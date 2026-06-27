@@ -792,6 +792,9 @@ export default definePlugin({
     fetchQueue: [] as Array<{ target: RequestInfo | URL; init?: RequestInit; resolve: (v: Response) => void; reject: (v: unknown) => void }>,
     originalScrollTo: null as typeof window.scrollTo | null,
     rICMessagePort: null as MessagePort | null,
+    rICMessagePort1: null as MessagePort | null,
+    rICCallbacks: null as Map<number, { cb: IdleRequestCallback; options?: IdleRequestOptions }> | null,
+    cacheTrimActivityHandler: null as (() => void) | null,
     suppressConsoleWarnEl: null as HTMLStyleElement | null,
     reactionStyleEl: null as HTMLStyleElement | null,
     canvasSuppressEl: null as HTMLStyleElement | null,
@@ -2190,8 +2193,10 @@ export default definePlugin({
         this.originalIdleCallback = window.requestIdleCallback.bind(window);
         this.originalCancelIdleCallback = window.cancelIdleCallback.bind(window);
         const channel = new MessageChannel();
+        this.rICMessagePort1 = channel.port1;
         this.rICMessagePort = channel.port2;
         const callbacks = new Map<number, { cb: IdleRequestCallback; options?: IdleRequestOptions }>();
+        this.rICCallbacks = callbacks;
         let nextId = 1;
         channel.port1.onmessage = () => {
             const now = performance.now();
@@ -2229,6 +2234,13 @@ export default definePlugin({
             this.rICMessagePort.close();
             this.rICMessagePort = null;
         }
+        if (this.rICMessagePort1) {
+            this.rICMessagePort1.onmessage = null;
+            this.rICMessagePort1.close();
+            this.rICMessagePort1 = null;
+        }
+        this.rICCallbacks?.clear();
+        this.rICCallbacks = null;
     },
 
     installMessageCacheTrimmer() {
@@ -2241,7 +2253,8 @@ export default definePlugin({
             if (id) lastActivity.set(id, Date.now());
         };
         trackActivity();
-        const unsub = FluxDispatcher.subscribe("CHANNEL_SELECT", trackActivity);
+        FluxDispatcher.subscribe("CHANNEL_SELECT", trackActivity);
+        this.cacheTrimActivityHandler = trackActivity;
 
         this.cacheTrimTimer = setInterval(() => {
             try {
@@ -2272,7 +2285,6 @@ export default definePlugin({
                 if (settings.store.verboseLogging) logger.warn("Message cache trim failed", err);
             }
         }, intervalMs);
-        (this as any).__trimUnsub = unsub;
     },
 
     teardownMessageCacheTrimmer() {
@@ -2280,10 +2292,9 @@ export default definePlugin({
             clearInterval(this.cacheTrimTimer);
             this.cacheTrimTimer = null;
         }
-        const unsub = (this as any).__trimUnsub;
-        if (typeof unsub === "function") {
-            unsub();
-            (this as any).__trimUnsub = undefined;
+        if (this.cacheTrimActivityHandler) {
+            FluxDispatcher.unsubscribe("CHANNEL_SELECT", this.cacheTrimActivityHandler);
+            this.cacheTrimActivityHandler = null;
         }
     },
 
