@@ -20,6 +20,17 @@ export interface MullvadResolveResult {
 }
 
 const DEFAULT_TIMEOUT_MS = 5000;
+const MAX_TIMEOUT_MS = 15000;
+const MAX_PRELOAD_HOSTNAMES = 100;
+const MAX_DOH_RESPONSE_BYTES = 4096;
+const ALLOWED_DOH_HOSTS = new Set([
+    "dns.mullvad.net",
+    "adblock.dns.mullvad.net",
+    "base.dns.mullvad.net",
+    "extended.dns.mullvad.net",
+    "family.dns.mullvad.net",
+    "all.dns.mullvad.net"
+]);
 const DNS_HEADER_LENGTH = 12;
 const DNS_CLASS_IN = 1;
 const DNS_TYPE_A = 1;
@@ -34,6 +45,33 @@ function getErrorMessage(error: unknown) {
     if (!(error instanceof Error)) return String(error);
     if (error.cause instanceof Error) return `${error.message}: ${error.cause.message}`;
     return error.message;
+}
+
+function getTimeoutMs(timeoutMs: number) {
+    return Math.max(1000, Math.min(timeoutMs, MAX_TIMEOUT_MS));
+}
+
+function isAllowedDohEndpoint(endpoint: string) {
+    try {
+        const url = new URL(endpoint);
+        return url.protocol === "https:" && url.pathname === "/dns-query" && ALLOWED_DOH_HOSTS.has(url.hostname);
+    } catch {
+        return false;
+    }
+}
+
+async function readArrayBuffer(response: Response) {
+    const length = Number(response.headers.get("content-length"));
+    if (Number.isFinite(length) && length > MAX_DOH_RESPONSE_BYTES) {
+        throw new Error("DNS response was too large.");
+    }
+
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > MAX_DOH_RESPONSE_BYTES) {
+        throw new Error("DNS response was too large.");
+    }
+
+    return buffer;
 }
 
 function pushUint16(bytes: number[], value: number) {
@@ -204,10 +242,9 @@ function resolvePlainDns(hostname: string, server: string, family: DnsFamily) {
 }
 
 async function resolveDoh(hostname: string, endpoint: string, family: DnsFamily, timeoutMs: number): Promise<MullvadResolveResult> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
     try {
+        if (!isAllowedDohEndpoint(endpoint)) throw new Error("DoH endpoint is not allowed.");
+
         const response = await fetch(endpoint, {
             method: "POST",
             headers: {
@@ -215,14 +252,14 @@ async function resolveDoh(hostname: string, endpoint: string, family: DnsFamily,
                 "Content-Type": "application/dns-message"
             },
             body: encodeDnsQuery(hostname, family),
-            signal: controller.signal
+            signal: AbortSignal.timeout(getTimeoutMs(timeoutMs))
         });
 
         if (!response.ok) {
             throw new Error(`Mullvad DNS returned ${response.status}.`);
         }
 
-        const addresses = parseDnsResponse(new Uint8Array(await response.arrayBuffer()), family);
+        const addresses = parseDnsResponse(new Uint8Array(await readArrayBuffer(response)), family);
 
         return {
             success: addresses.length > 0,
@@ -243,14 +280,12 @@ async function resolveDoh(hostname: string, endpoint: string, family: DnsFamily,
             protocol: "doh",
             error: getErrorMessage(error)
         };
-    } finally {
-        clearTimeout(timeout);
     }
 }
 
 async function resolvePlain(hostname: string, endpoint: string, server: string, family: DnsFamily, timeoutMs: number): Promise<MullvadResolveResult> {
     try {
-        const addresses = await withTimeout(resolvePlainDns(hostname, server, family), timeoutMs);
+        const addresses = await withTimeout(resolvePlainDns(hostname, server, family), getTimeoutMs(timeoutMs));
 
         return {
             success: addresses.length > 0,
@@ -308,7 +343,7 @@ export async function preloadDNS(
     protocol: ResolveProtocol = "automatic",
     plainDnsServer = ""
 ) {
-    const results = await Promise.all(hostnames.map(async hostname => {
+    const results = await Promise.all(hostnames.slice(0, MAX_PRELOAD_HOSTNAMES).map(async hostname => {
         const result = await resolveDNS(_event, hostname, endpoint, family, timeoutMs, protocol, plainDnsServer);
         return [hostname, result.addresses] as const;
     }));
