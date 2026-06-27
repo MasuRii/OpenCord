@@ -109,13 +109,16 @@ function interceptAddMember(originalMethod: any) {
                     );
 
                     // Schedule kick after 100ms
-                    setTimeout(async () => {
+                    scheduleKick(async () => {
                         try {
+                            const generation = pluginGeneration;
                             debugLog(`🦶 Attempting automatic kick of ${targetUserId}`);
 
                             await RestAPI.del({
                                 url: `/channels/${channelId}/recipients/${targetUserId}`,
                             });
+
+                            if (!pluginActive || generation !== pluginGeneration) return;
 
                             log(
                                 `✅ User ${targetUserId} automatically kicked from locked group`
@@ -277,6 +280,17 @@ const GroupContextMenuPatch: NavContextMenuPatchCallback = (
 
 // Variable to store the original method
 let originalPutMethod: any = null;
+let pluginActive = false;
+let pluginGeneration = 0;
+const pendingKickTimeouts = new Set<ReturnType<typeof setTimeout>>();
+
+function scheduleKick(callback: () => void, ms: number) {
+    const timeout = setTimeout(() => {
+        pendingKickTimeouts.delete(timeout);
+        if (pluginActive) callback();
+    }, ms);
+    pendingKickTimeouts.add(timeout);
+}
 
 export default definePlugin({
     name: "LockGroup",
@@ -332,9 +346,11 @@ export default definePlugin({
             // If someone else added, kick
             if (addedUserId && addedByUserId !== currentUserId) {
                 debugLog(`🚫 Unauthorized addition by ${addedByUserId} - Kick scheduled`);
-                setTimeout(async () => {
+                scheduleKick(async () => {
                     try {
+                        const generation = pluginGeneration;
                         await RestAPI.del({ url: `/channels/${channelId}/recipients/${addedUserId}` });
+                        if (!pluginActive || generation !== pluginGeneration) return;
                         log(`🔒 Security kick performed for ${addedUserId} (added by ${addedByUserId})`);
                     } catch (error) {
                         debugLog(`Security kick error: ${error}`);
@@ -352,6 +368,8 @@ export default definePlugin({
     },
 
     start() {
+        pluginActive = true;
+        pluginGeneration++;
         log("🚀 LockGroup plugin started");
         debugLog(`Current configuration:
 - Notifications: ${settings.store.showNotifications ? "ON" : "OFF"}
@@ -374,6 +392,8 @@ export default definePlugin({
     },
 
     stop() {
+        pluginActive = false;
+        pluginGeneration++;
         log("🛑 LockGroup plugin stopped");
 
         // Restore original method
@@ -385,6 +405,8 @@ export default definePlugin({
 
         // Clean up state
         lockedGroups.clear();
+        for (const timeout of pendingKickTimeouts) clearTimeout(timeout);
+        pendingKickTimeouts.clear();
 
         if (settings.store.showNotifications) {
             showNotification({
