@@ -228,6 +228,7 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
     const searchInputRef = useRef<HTMLInputElement>(null);
     const resultsRef = useRef<HTMLDivElement>(null);
     const searchRunIdRef = useRef(0);
+    const abortRef = useRef<AbortController | null>(null);
 
     const currentGuildId = SelectedGuildStore.getGuildId() as string | undefined;
 
@@ -250,6 +251,9 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
 
     const doSearch = useCallback(async (q: string, f: FilterState) => {
         if (!currentGuildId) return;
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         const searchRunId = ++searchRunIdRef.current;
         const trimmed = q.trim();
         const hasAnyFilter = f.authorId || f.channelId || f.mentions ||
@@ -268,7 +272,7 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
         try {
             const res = await deepSearch(currentGuildId, trimmed, f, settings.store.maxResults ?? 100, progress => {
                 if (searchRunIdRef.current === searchRunId) setResults(progress);
-            });
+            }, controller.signal);
             if (searchRunIdRef.current === searchRunId) setResults(res);
         } catch (e) {
             console.error("[DeepSearch] Search failed:", e);
@@ -277,6 +281,11 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
             if (searchRunIdRef.current === searchRunId) setLoading(false);
         }
     }, [currentGuildId]);
+
+    useEffect(() => () => {
+        searchRunIdRef.current++;
+        abortRef.current?.abort();
+    }, []);
 
     const exportResults = useCallback(async () => {
         if (results.length === 0) {
@@ -304,8 +313,10 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
     // Save query and run search on changes (debounced)
     useEffect(() => {
         if (!loaded) return;
-        saveLastQuery(query, filters);
-        const timeout = setTimeout(() => doSearch(query, filters), settings.store.searchTimeout ?? 300);
+        const timeout = setTimeout(() => {
+            saveLastQuery(query, filters);
+            doSearch(query, filters);
+        }, settings.store.searchTimeout ?? 300);
         return () => clearTimeout(timeout);
     }, [query, filters, loaded, doSearch]);
 
@@ -388,6 +399,7 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
                                     className={cl("search-clear")}
                                     onClick={() => {
                                         searchRunIdRef.current++;
+                                        abortRef.current?.abort();
                                         setQuery("");
                                         setResults([]);
                                         setSelectedIndex(-1);

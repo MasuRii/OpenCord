@@ -204,10 +204,13 @@ export async function deepSearch(
     content: string,
     filters: FilterState,
     limit: number = 100,
-    onProgress?: (results: SearchResult[]) => void
+    onProgress?: (results: SearchResult[]) => void,
+    signal?: AbortSignal
 ): Promise<SearchResult[]> {
+    if (signal?.aborted) return [];
     const cacheKey = getCacheKey(guildId, content, filters);
     const cached = await getCachedResults(cacheKey);
+    if (signal?.aborted) return [];
     if (cached) return cached;
 
     const results: SearchResult[] = [];
@@ -217,6 +220,7 @@ export async function deepSearch(
     const hasClientSideFilters = filters.hasAttachments || filters.hasEmbeds || filters.isPinned || filters.linkDomain || filters.linkContains || filters.excludeKeywords || filters.excludeDomains || filters.dateFrom || filters.dateTo;
 
     while (results.length < limit && offset < 5000) {
+        if (signal?.aborted) break;
         const query = buildApiQuery(filters, content, offset);
 
         try {
@@ -227,6 +231,7 @@ export async function deepSearch(
             }) as { body?: { messages?: Message[][]; total_results?: number; }; };
 
             const { body } = response;
+            if (signal?.aborted) break;
             if (!body?.messages || body.messages.length === 0) break;
 
             const resultCountBeforePage = results.length;
@@ -261,6 +266,7 @@ export async function deepSearch(
             if (body.messages.length < pageSize) break;
             offset += pageSize;
         } catch (e: any) {
+            if (signal?.aborted) break;
             if (e?.status === 429) {
                 await sleep(1000);
                 continue;
@@ -273,6 +279,6 @@ export async function deepSearch(
         // already filtered in the loop
     }
 
-    await setCachedResults(cacheKey, results);
+    if (!signal?.aborted) await setCachedResults(cacheKey, results);
     return results;
 }
