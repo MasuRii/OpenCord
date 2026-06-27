@@ -398,8 +398,11 @@ export async function parseFile(fileName: string, seen = new Set<string>(), entr
 
         const target = getPluginTarget(entryFileName);
         if (target) {
-            if (!["web", "discordDesktop", "vesktop", "equibop", "desktop", "dev"].includes(target)) throw fail(`invalid target ${target}`);
-            data.target = target as any;
+            if (!["web", "discordDesktop", "vesktop", "equibop", "desktop", "dev"].includes(target)) {
+                console.warn(`[plugin-list] Skipping unknown target '${target}' for ${entryFileName}`);
+            } else {
+                data.target = target as any;
+            }
         }
 
         data.filePath = posixNormalize(entryFileName)
