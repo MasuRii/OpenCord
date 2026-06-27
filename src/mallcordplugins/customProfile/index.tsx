@@ -23,12 +23,8 @@ import { MallCordDevs } from "@utils/constants";
 import { AuthenticationStore, Button, FluxDispatcher, IconUtils, Menu, React, Select, SnowflakeUtils, UserStore } from "@webpack/common";
 import virtualMerge from "virtual-merge";
 
-// Labels are authored in English; this is a passthrough so the strings stay
-// inline without a translation runtime.
 const t = (s: string) => s;
 
-// The legacy modal helpers are typed `as never`, so alias them to renderable
-// components for JSX.
 const ModalRoot = ModalRoot_ as React.ComponentType<any>;
 const ModalHeader = ModalHeader_ as React.ComponentType<any>;
 const ModalContent = ModalContent_ as React.ComponentType<any>;
@@ -89,15 +85,15 @@ const BOOST_LABELS_RAW = [
 const BOOST_LABELS = BOOST_LABELS_RAW.map(l => t(l));
 const BOOST_MONTHS = [1, 2, 3, 6, 9, 12, 15, 18, 24];
 const BOOST_ICONS = [
-    "https://cdn.discordapp.com/badge-icons/51040c70d4f20a921ad6674ff86fc95c.png", // 1 month
-    "https://cdn.discordapp.com/badge-icons/0e4080d1d333bc7ad29ef6528b6f2fb7.png", // 2 months
-    "https://cdn.discordapp.com/badge-icons/72bed924410c304dbe3d00a6e593ff59.png", // 3 months
-    "https://cdn.discordapp.com/badge-icons/df199d2050d3ed4ebf84d64ae83989f8.png", // 6 months
-    "https://cdn.discordapp.com/badge-icons/996b3e870e8a22ce519b3a50e6bdd52f.png", // 9 months
-    "https://cdn.discordapp.com/badge-icons/991c9f39ee33d7537d9f408c3e53141e.png", // 12 months
-    "https://cdn.discordapp.com/badge-icons/cb3ae83c15e970e8f3d410bc62cb8b99.png", // 15 months
-    "https://cdn.discordapp.com/badge-icons/7142225d31238f6387d9f09efaa02759.png", // 18 months
-    "https://cdn.discordapp.com/badge-icons/ec92202290b48d0879b7413d2dde3bab.png", // 24 months
+    "https://cdn.discordapp.com/badge-icons/51040c70d4f20a921ad6674ff86fc95c.png",
+    "https://cdn.discordapp.com/badge-icons/0e4080d1d333bc7ad29ef6528b6f2fb7.png",
+    "https://cdn.discordapp.com/badge-icons/72bed924410c304dbe3d00a6e593ff59.png",
+    "https://cdn.discordapp.com/badge-icons/df199d2050d3ed4ebf84d64ae83989f8.png",
+    "https://cdn.discordapp.com/badge-icons/996b3e870e8a22ce519b3a50e6bdd52f.png",
+    "https://cdn.discordapp.com/badge-icons/991c9f39ee33d7537d9f408c3e53141e.png",
+    "https://cdn.discordapp.com/badge-icons/cb3ae83c15e970e8f3d410bc62cb8b99.png",
+    "https://cdn.discordapp.com/badge-icons/7142225d31238f6387d9f09efaa02759.png",
+    "https://cdn.discordapp.com/badge-icons/ec92202290b48d0879b7413d2dde3bab.png",
 ];
 
 const AVATAR_DECORATIONS = [
@@ -124,11 +120,68 @@ const AVATAR_DECORATIONS = [
     { id: "1220514048068812901", label: "Summer" },
     { id: "1427463138634109026", label: "Autumn" },
     { id: "1341506443865489408", label: "Darkness" },
+    { id: "1144003752978829455", label: "Flaming Sword" },
+    { id: "1144006094134456352", label: "Magical Potion" },
+    { id: "1144046002110738634", label: "Fairy Sprites" },
+    { id: "1144048390594908212", label: "Wizard's Staff" },
+    { id: "1144048977138946230", label: "Glowing Runes" },
+    { id: "1144049316009353338", label: "Defensive Shield" },
+    { id: "1144049603109470370", label: "Skull Medallion" },
+    { id: "1144049924397334651", label: "Treasure and Key" },
+    { id: "1207047014769234001", label: "Fire Element" },
+    { id: "1207047597294886923", label: "Water" },
+    { id: "1207047808838799410", label: "Air" },
+    { id: "1207048049571139584", label: "Earth" },
+    { id: "1207048289610899526", label: "Lightning" },
+    { id: "1207048656289534022", label: "Balance" },
+    { id: "1232070870093008937", label: "Stardust" },
+    { id: "1232071157746765906", label: "Black Hole" },
+    { id: "1232071712695386162", label: "Constellations" },
+    { id: "1232072121950146560", label: "Solar Orbit" },
+    { id: "1232072520249643028", label: "UFO" },
+    { id: "1232072859485208687", label: "Astronaut Helmet" },
+    { id: "1197344326133502032", label: "Glitch" },
+    { id: "1197344396983664670", label: "Cybernetic" },
+    { id: "1197344575832981605", label: "Digital Sunrise" },
+    { id: "1197344636558114986", label: "Implant" },
 ];
 
 function getDecorationUrl(assetId: string, animated = false): string {
     return `https://cdn.discordapp.com/media/v1/collectibles-shop/${assetId}/${animated ? "animated" : "static"}`;
 }
+
+const PROFILE_EFFECTS = [
+    { id: "1139323092645183591", label: "Hydro Blast" },
+    { id: "1139323093991575696", label: "Sakura Dreams" },
+    { id: "1139323099251232828", label: "Mystic Vines" },
+    { id: "1139323099687436419", label: "Pixie Dust" },
+    { id: "1212582298893946880", label: "Dreamy" },
+    { id: "1212582372877541427", label: "Ki Detonate" },
+    { id: "1212582452640350238", label: "Sushi Mania" },
+    { id: "1139323100568244355", label: "Magic Hearts" },
+    { id: "1139323093551165533", label: "Shatter" },
+    { id: "1139323101008642101", label: "Shuriken Strike" },
+    { id: "1139323101881061466", label: "Power Surge" },
+    { id: "1158572178179108968", label: "Ghoulish Graffiti" },
+    { id: "1158572275507937342", label: "Dark Omens" },
+    { id: "1197344693630009424", label: "Nightrunner" },
+    { id: "1197344764174008452", label: "Uplink Error" },
+    { id: "1217626509737459852", label: "Petal Serenade" },
+    { id: "1217627051217911848", label: "Fellowship of the Spring" },
+    { id: "1217627230818009171", label: "Spring Bloom" },
+    { id: "1228233390260486164", label: "Study Spot" },
+    { id: "1228234634379132958", label: "All Nighter" },
+    { id: "1237654783209508904", label: "Jolly Roger" },
+    { id: "1237654867330469949", label: "Forgotten Treasure" },
+    { id: "1237654942202990602", label: "Haunted Man O' War" },
+    { id: "1232073286582538261", label: "Shooting Stars" },
+    { id: "1232073608168472638", label: "Twilight" },
+    { id: "1207049115339591681", label: "Rock Slide" },
+    { id: "1207049364464345158", label: "Vortex" },
+    { id: "1207049498065375343", label: "Mastery" },
+    { id: "1245088205330710539", label: "Turbo Drive" },
+    { id: "1245088254647205991", label: "Twinkle Trails" },
+];
 
 interface CustomProfileData {
     username?: string;
@@ -149,8 +202,16 @@ interface CustomProfileData {
     customBadgeIds?: string[];
     oldName?: string;
     decorationAsset?: string;
+    profileEffectId?: string;
     copiedUserId?: string;
 }
+
+interface SavedPreset {
+    name: string;
+    data: CustomProfileData;
+}
+
+const DS_PRESETS = "customProfile_presets";
 
 const LS_KEY_DATA = "MallCordCP_data";
 const LS_KEY_ENABLED = "MallCordCP_enabled";
@@ -170,6 +231,10 @@ let _trueOriginalUser: any = null;
 let _dataVersion: number = 0;
 let allAccountsData: Record<string, CustomProfileData> = {};
 let allAccountsEnabled: Record<string, boolean> = {};
+// presets: keyed by accountId → array of saved presets
+let allPresetsData: Record<string, SavedPreset[]> = {};
+
+const LS_PRESETS = "MallCordCP_presets";
 
 function saveDataSync(data: CustomProfileData, enabled: boolean) {
     try {
@@ -183,6 +248,21 @@ function saveAllDataSync() {
         localStorage.setItem(LS_ALL_DATA, JSON.stringify(allAccountsData));
         localStorage.setItem(LS_ALL_ENABLED, JSON.stringify(allAccountsEnabled));
     } catch { }
+}
+
+function savePresetsSync() {
+    try {
+        localStorage.setItem(LS_PRESETS, JSON.stringify(allPresetsData));
+    } catch { }
+}
+
+function loadPresetsSync() {
+    try {
+        const raw = localStorage.getItem(LS_PRESETS);
+        if (raw) {
+            try { allPresetsData = JSON.parse(raw); } catch { allPresetsData = {}; }
+        }
+    } catch { allPresetsData = {}; }
 }
 
 function syncCurrentUserData() {
@@ -239,6 +319,7 @@ function onAccountSwitch() {
 }
 
 loadDataSync();
+loadPresetsSync();
 
 const HIDE_STYLE_ID = "cp-hide-during-load";
 function injectHideStyle() {
@@ -294,21 +375,27 @@ async function loadData() {
             syncCurrentUserData();
             saveAllDataSync();
             saveDataSync(storedData, isEnabled);
-            return;
+        } else {
+            const d = await DataStore.get(DS_KEY) as CustomProfileData | null;
+            const e = await DataStore.get(DS_ENABLED) as boolean | null;
+            if (d !== null) storedData = d;
+            if (e !== null) isEnabled = e === true;
+            const myId = AuthenticationStore?.getId?.();
+            if (myId && storedData && Object.keys(storedData).length > 0) {
+                allAccountsData[myId] = storedData;
+                allAccountsEnabled[myId] = isEnabled;
+                DataStore.set(DS_ALL_DATA, allAccountsData).catch(() => { });
+                DataStore.set(DS_ALL_ENABLED, allAccountsEnabled).catch(() => { });
+                saveAllDataSync();
+            }
+            saveDataSync(storedData, isEnabled);
         }
-        const d = await DataStore.get(DS_KEY) as CustomProfileData | null;
-        const e = await DataStore.get(DS_ENABLED) as boolean | null;
-        if (d !== null) storedData = d;
-        if (e !== null) isEnabled = e === true;
-        const myId = AuthenticationStore?.getId?.();
-        if (myId && storedData && Object.keys(storedData).length > 0) {
-            allAccountsData[myId] = storedData;
-            allAccountsEnabled[myId] = isEnabled;
-            DataStore.set(DS_ALL_DATA, allAccountsData).catch(() => { });
-            DataStore.set(DS_ALL_ENABLED, allAccountsEnabled).catch(() => { });
-            saveAllDataSync();
+        // load presets from DataStore
+        const presetsData = await DataStore.get(DS_PRESETS) as Record<string, SavedPreset[]> | null;
+        if (presetsData && typeof presetsData === "object") {
+            allPresetsData = presetsData;
+            savePresetsSync();
         }
-        saveDataSync(storedData, isEnabled);
     } catch (err) { }
 }
 
@@ -608,6 +695,96 @@ function TrashIcon() {
 function SaveIcon() {
     return <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4Zm-5 16a3 3 0 1 1 0-6 3 3 0 0 1 0 6Zm3-10H5V5h10v4Z" /></svg>;
 }
+function BookmarkIcon() {
+    return <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17 2H7a2 2 0 0 0-2 2v18l7-3 7 3V4a2 2 0 0 0-2-2Z" /></svg>;
+}
+function AddPresetIcon() {
+    return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>;
+}
+
+function PresetsBar({ accountId, currentData, onLoad }: {
+    accountId: string;
+    currentData: CustomProfileData;
+    onLoad: (data: CustomProfileData) => void;
+}) {
+    const [presets, setPresets] = React.useState<SavedPreset[]>(() => allPresetsData[accountId] ?? []);
+    const [naming, setNaming] = React.useState(false);
+    const [newName, setNewName] = React.useState("");
+    const inputRef = React.useRef<HTMLInputElement>(null);
+
+    React.useEffect(() => {
+        setPresets(allPresetsData[accountId] ?? []);
+        setNaming(false);
+        setNewName("");
+    }, [accountId]);
+
+    function savePreset() {
+        const name = newName.trim();
+        if (!name) return;
+        const updated: SavedPreset[] = [...presets, { name, data: { ...currentData } }];
+        allPresetsData[accountId] = updated;
+        DataStore.set(DS_PRESETS, allPresetsData).catch(() => { });
+        savePresetsSync();
+        setPresets(updated);
+        setNaming(false);
+        setNewName("");
+    }
+
+    function deletePreset(idx: number) {
+        const updated = presets.filter((_, i) => i !== idx);
+        allPresetsData[accountId] = updated;
+        DataStore.set(DS_PRESETS, allPresetsData).catch(() => { });
+        savePresetsSync();
+        setPresets(updated);
+    }
+
+    if (presets.length === 0 && !naming) {
+        return (
+            <div className="cp-presets-bar cp-presets-bar--empty">
+                <BookmarkIcon />
+                <span className="cp-presets-hint">{t("No saved presets")}</span>
+                <button className="cp-preset-add" onClick={() => { setNaming(true); setTimeout(() => inputRef.current?.focus(), 50); }} title={t("Save current as preset")}>
+                    <AddPresetIcon /><span>{t("Save preset")}</span>
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="cp-presets-bar">
+            <div className="cp-presets-scroll">
+                {presets.map((p, i) => (
+                    <div key={i} className="cp-preset-chip" title={t("Click to load")} onClick={() => onLoad({ ...p.data })}>
+                        <BookmarkIcon />
+                        <span className="cp-preset-name">{p.name}</span>
+                        <button className="cp-preset-del" title={t("Delete preset")} onClick={e => { e.stopPropagation(); deletePreset(i); }}>
+                            <CloseIcon />
+                        </button>
+                    </div>
+                ))}
+                {naming ? (
+                    <div className="cp-preset-naming">
+                        <input
+                            ref={inputRef}
+                            className="cp-input cp-preset-name-input"
+                            placeholder={t("Preset name...")}
+                            value={newName}
+                            onChange={e => setNewName(e.target.value)}
+                            onKeyDown={e => { if (e.key === "Enter") savePreset(); if (e.key === "Escape") { setNaming(false); setNewName(""); } }}
+                            maxLength={32}
+                        />
+                        <button className="cp-btn cp-btn-primary cp-preset-confirm" onClick={savePreset} title={t("Confirm")}><SaveIcon /></button>
+                        <button className="cp-clear-btn" onClick={() => { setNaming(false); setNewName(""); }} title={t("Cancel")}><CloseIcon /></button>
+                    </div>
+                ) : (
+                    <button className="cp-preset-add" onClick={() => { setNaming(true); setTimeout(() => inputRef.current?.focus(), 50); }} title={t("Save current as preset")}>
+                        <AddPresetIcon /><span>{t("Save preset")}</span>
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 function SectionLabel({ children, style }: { children: React.ReactNode; style?: React.CSSProperties; }) {
     return <div className="cp-section-label" style={style}>{children}</div>;
@@ -694,8 +871,6 @@ function BadgePicker({ selected, onChange, nitroType, onNitroType, boostLevel, o
                 {NITRO_LEVELS.map((n, i) => (
                     <BadgeBtn key={i} label={n.label} icon={n.icon} active={nitroType === i} onClick={() => {
                         onNitroType(i);
-                        // Reset boost when selecting nitro type manually if desired,
-                        // but usually these are separate.
                     }} />
                 ))}
             </div>
@@ -711,6 +886,34 @@ function BadgePicker({ selected, onChange, nitroType, onNitroType, boostLevel, o
                     onClick={() => onCustomIds(customIds.includes("orbs") ? customIds.filter(x => x !== "orbs") : [...customIds, "orbs"])} />
                 <BadgeBtn label={t("Old username")} icon={OLD_NAME_BADGE_ICON} active={hasOldName}
                     onClick={() => onCustomIds(hasOldName ? customIds.filter(x => x !== "oldname") : [...customIds, "oldname"])} />
+                <BadgeBtn label={t("Last Meadow Online")}
+                    icon="https://cdn.discordapp.com/badge-icons/ca105ad9cfc8580c765101d17bbb2323.png"
+                    active={customIds.includes("meadow")}
+                    onClick={() => onCustomIds(customIds.includes("meadow") ? customIds.filter(x => x !== "meadow") : [...customIds, "meadow"])} />
+                <BadgeBtn label={t("Gifting — Patron")}
+                    icon="https://i.imgur.com/tI4GCxR.png"
+                    active={customIds.includes("gift_patron")}
+                    onClick={() => onCustomIds(customIds.includes("gift_patron") ? customIds.filter(x => x !== "gift_patron") : [...customIds, "gift_patron"])} />
+                <BadgeBtn label={t("Gifting — Champion")}
+                    icon="https://i.imgur.com/Jynm4dV.png"
+                    active={customIds.includes("gift_champion")}
+                    onClick={() => onCustomIds(customIds.includes("gift_champion") ? customIds.filter(x => x !== "gift_champion") : [...customIds, "gift_champion"])} />
+                <BadgeBtn label={t("Gifting — Luminary")}
+                    icon="https://i.imgur.com/3GRyXIR.png"
+                    active={customIds.includes("gift_luminary")}
+                    onClick={() => onCustomIds(customIds.includes("gift_luminary") ? customIds.filter(x => x !== "gift_luminary") : [...customIds, "gift_luminary"])} />
+                <BadgeBtn label={t("Gifting — Icon")}
+                    icon="https://i.imgur.com/chM1tvZ.png"
+                    active={customIds.includes("gift_icon")}
+                    onClick={() => onCustomIds(customIds.includes("gift_icon") ? customIds.filter(x => x !== "gift_icon") : [...customIds, "gift_icon"])} />
+                <BadgeBtn label={t("Gifting — Hero")}
+                    icon="https://i.imgur.com/7bJJJWl.png"
+                    active={customIds.includes("gift_hero")}
+                    onClick={() => onCustomIds(customIds.includes("gift_hero") ? customIds.filter(x => x !== "gift_hero") : [...customIds, "gift_hero"])} />
+                <BadgeBtn label={t("Gifting — Legendary")}
+                    icon="https://i.imgur.com/gQg96nV.png"
+                    active={customIds.includes("gift_legendary")}
+                    onClick={() => onCustomIds(customIds.includes("gift_legendary") ? customIds.filter(x => x !== "gift_legendary") : [...customIds, "gift_legendary"])} />
             </div>
             {hasOldName && (
                 <div className="cp-field" style={{ marginTop: 6 }}>
@@ -739,19 +942,14 @@ function forceAccountPanelRerender() {
         const UserStore = WP?.findByStoreName("UserStore");
         if (UserStore && UserStore.emitChange) UserStore.emitChange();
 
-        // Force UserProfileStore (side profile panel and popouts)
         const UPS = WP?.findByStoreName("UserProfileStore");
         if (UPS && UPS.emitChange) UPS.emitChange();
 
-        // Force MultiAccountStore to re-notify the "Switch Account" switcher
         const MAS = WP?.findByProps?.("getUsers", "getValidUsers", "getHasLoggedInAccounts");
         if (MAS && MAS.emitChange) MAS.emitChange();
 
-        // Dispatch local update without corrupting global store
-        // Forces React to re-calculate useCurrentUser hooks
         FluxDispatcher.dispatch({ type: "USER_SETTINGS_PROTO_UPDATE", settings: { type: 1, proto: {} } });
 
-        // Restart full DOM scan
         if (isEnabled) startDomObserver();
         else stopDomObserver();
     } catch { }
@@ -766,18 +964,14 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
     const boostLevel = data.boostMonths ?? -1;
     const customIds = data.customBadgeIds ?? [];
     const oldName = data.oldName ?? "";
-
-    // Retrieve all connected accounts
     const accounts = React.useMemo(() => {
         try {
-            // Tentative 1: via MultiAccountStore global
             const MAS = (window as any).Vencord?.Webpack?.findByProps?.("getUsers", "getValidUsers");
             if (MAS?.getUsers) {
                 const users = MAS.getUsers();
                 if (Array.isArray(users) && users.length > 0) return users;
             }
 
-            // Tentative 2: via le store interne
             const internalStore = (window as any).Vencord?.Webpack?.findStore?.("MultiAccountStore");
             if (internalStore?.getUsers) {
                 const users = internalStore.getUsers();
@@ -786,11 +980,9 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
         } catch (e) { console.error("[CustomProfile] Failed to fetch accounts:", e); }
 
         const me = UserStore.getCurrentUser();
-        // Pour debug: si on ne trouve qu'un compte, on simule quand même pour voir si la barre s'affiche
         return me ? [me, { ...me, id: "debug-placeholder", username: "Second Account?", globalName: "Simulation" }] : [];
     }, []);
 
-    // When changing selected account, load its data
     React.useEffect(() => {
         const newData = allAccountsData[selectedAccountId] || {};
         setData({ ...newData });
@@ -800,16 +992,18 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
         setData(d => ({ ...d, [key]: val }));
     }
 
+    function loadPreset(presetData: CustomProfileData) {
+        setData({ ...presetData });
+    }
+
     async function save() {
         try {
             setSaving(true);
             const savedData = { ...data };
 
-            // Save in multi-accounts storage
             allAccountsData[selectedAccountId] = savedData;
             allAccountsEnabled[selectedAccountId] = true;
 
-            // If it's the active account, update globals
             if (selectedAccountId === myId) {
                 storedData = savedData;
                 isEnabled = true;
@@ -819,7 +1013,6 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
                 _dataVersion++;
             }
 
-            // Save all in localStorage + IndexedDB
             saveAllDataSync();
             DataStore.set(DS_ALL_DATA, allAccountsData).catch(() => { });
             DataStore.set(DS_ALL_ENABLED, allAccountsEnabled).catch(() => { });
@@ -902,8 +1095,10 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
                 </div>
                 <ModalCloseButton onClick={rootProps.onClose} />
             </ModalHeader>
+            <div className="cp-presets-wrapper">
+                <PresetsBar accountId={selectedAccountId} currentData={data} onLoad={loadPreset} />
+            </div>
             <ModalContent className="cp-content">
-                {/* Account selector bar removed since it's now a Select in the header */}
                 <Field label={t("Username")} value={data.username ?? ""} placeholder="my_username_00" onChange={v => set("username", v)} />
                 <Field label={t("Display name")} value={data.globalName ?? ""} placeholder="My Name" onChange={v => set("globalName", v)} />
                 <ImageUpload label={t("Profile picture")} value={data.avatar ?? ""} onChange={v => set("avatar", v)} />
@@ -939,8 +1134,6 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
                     selected={data.badgeFlags ?? 0} onChange={v => set("badgeFlags", v)}
                     nitroType={nitroLevel} onNitroType={v => {
                         set("nitroLevel", v as any);
-                        // Levels 1+ (Bronze to Opal) automatically enable Simulate Nitro
-                        // Level 0 (Nitro without months) and None (-1) do not enable it
                         if (v >= 1) set("nitro", true);
                     }}
                     boostLevel={boostLevel} onBoostLevel={v => set("boostMonths", v)}
@@ -966,6 +1159,24 @@ function CustomProfileModal({ rootProps }: { rootProps: any; }) {
                         </button>
                     ))}
                 </div>
+                <div className="cp-divider" />
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <SectionLabel>{t("Profile Effect")}</SectionLabel>
+                </div>
+                <div className="cp-badges" style={{ flexWrap: "wrap", gap: 6 }}>
+                    <button onClick={() => set("profileEffectId", undefined)}
+                        className={`cp-badge ${!data.profileEffectId ? "cp-badge--on" : ""}`} style={{ minWidth: 60 }}>
+                        {t("None")}
+                    </button>
+                    {PROFILE_EFFECTS.map(eff => (
+                        <button key={eff.id}
+                            onClick={() => set("profileEffectId", data.profileEffectId === eff.id ? undefined : eff.id)}
+                            className={`cp-badge ${data.profileEffectId === eff.id ? "cp-badge--on" : ""}`}
+                            title={eff.label} style={{ padding: 4, minWidth: 60, fontSize: 11, textAlign: "center" }}>
+                            {eff.label}
+                        </button>
+                    ))}
+                </div>
                 <div className="cp-hint">{t("Visual and local modifications only — persistent between restarts.")}</div>
             </ModalContent>
             <ModalFooter className="cp-footer">
@@ -981,9 +1192,67 @@ function CustomProfileButton() {
     return <HeaderBarButton icon={() => <EditIcon size={18} />} tooltip="Custom Profile" onClick={() => openModal(props => <CustomProfileModal rootProps={props} />)} />;
 }
 
+// ── Badge tooltip component — renders the new Discord-style big tooltip ────────
+function BadgeTooltipContent({ name, rarity, subtitle, icon }: { name: string; rarity?: string; subtitle?: string; icon: string; }) {
+    const rarityColor = rarity === "MYTHIC" ? "#b77ee0" : rarity === "RARE" ? "#5865f2" : "#99aab5";
+    const rarityBg = rarity === "MYTHIC" ? "rgba(183,126,224,0.15)" : rarity === "RARE" ? "rgba(88,101,242,0.15)" : "rgba(153,170,181,0.1)";
+    const rarityIcon = rarity === "MYTHIC"
+        ? <path fill="currentColor" d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z" />
+        : <path fill="currentColor" d="M10.16 4.06a2.13 2.13 0 0 1 3.68 0l8 13.77c.81 1.41-.2 3.17-1.84 3.17H4a2.11 2.11 0 0 1-1.84-3.17l8-13.77Z" />;
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, padding: "6px 4px", textAlign: "center" }}>
+            <img src={icon} alt="" style={{ width: 48, height: 48, objectFit: "contain", borderRadius: "50%" }} />
+            {rarity && (
+                <div style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    fontSize: 11, fontWeight: 700, textTransform: "uppercase" as const,
+                    letterSpacing: "0.05em", color: rarityColor,
+                    background: rarityBg, borderRadius: 20,
+                    padding: "3px 10px", border: `1px solid ${rarityColor}40`,
+                }}>
+                    <svg width="10" height="10" fill="none" viewBox="0 0 24 24">{rarityIcon}</svg>
+                    {rarity}
+                </div>
+            )}
+            <div style={{ fontWeight: 700, fontSize: 15, color: "#fff", lineHeight: 1.2 }}>{name}</div>
+            {subtitle && <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginTop: -4 }}>{subtitle}</div>}
+        </div>
+    );
+}
+
+// ── Badge builder ─────────────────────────────────────────────────────────────
+const badgeStyle: React.CSSProperties = { borderRadius: "50%", width: "22px", height: "22px" };
+
+function mkBadge(id: string, name: string, icon: string, rarity?: string, subtitle?: string): ProfileBadge {
+    if (!rarity && !subtitle) {
+        return { id, description: name, iconSrc: icon, position: BadgePosition.START, props: { style: badgeStyle } };
+    }
+
+    const Tooltip = (Vencord as any).Webpack.Common?.Tooltip;
+    if (!Tooltip) {
+        return { id, description: subtitle ? `${name}\n${subtitle}` : name, iconSrc: icon, position: BadgePosition.START, props: { style: badgeStyle } };
+    }
+
+    return {
+        id,
+        description: name,
+        iconSrc: icon,
+        position: BadgePosition.START,
+        component: () => (
+            <Tooltip text={<BadgeTooltipContent name={name} rarity={rarity} subtitle={subtitle} icon={icon} />}>
+                {(tooltipProps: any) => (
+                    <img {...tooltipProps} src={icon} alt={name} style={{ ...badgeStyle, cursor: "pointer" }} />
+                )}
+            </Tooltip>
+        ),
+    };
+}
+
 export default definePlugin({
     name: "CustomProfile",
-    description: "Visually customize your Discord profile (username, PFP, banner, badges, bio...) — persistent, only visible to you.",
+    enabledByDefault: true,
+    description: t("Visually customize your Discord profile (username, PFP, banner, badges, bio...) — persistent, only visible to you."),
     authors: [MallCordDevs.pepsify],
     dependencies: ["HeaderBarAPI", "ContextMenuAPI"],
 
@@ -995,10 +1264,20 @@ export default definePlugin({
                 replace: "$self.patchBannerUrl(arguments[0])||$&"
             }
         },
-        // UserProfileStore patch removed — caused invisible channels for members
-        // with high permissions. getUserProfile is called by Discord to calculate
-        // VIEW_CHANNEL and other permissions. virtualMerge with premiumType:2 corrupted
-        // these calculations even with isMe() guard. DomObserver + fakeCurrentUser are enough.
+        {
+            find: "UserProfileStore",
+            replacement: {
+                match: /(?<=getUserProfile\(\i\){return )(.+?)(?=})/,
+                replace: "$self.profileEffectHook(arguments[0],$1)"
+            }
+        },
+        {
+            find: "=!1,canUsePremiumCustomization:",
+            replacement: {
+                match: /(\i)\.premiumType/,
+                replace: "$self.premiumTypeHook($1)||$&"
+            }
+        },
         {
             find: ".WIDGETS_RTC_UPSELL_COACHMARK)",
             replacement: {
@@ -1085,30 +1364,25 @@ export default definePlugin({
     fakeCurrentUser(user: any) {
         if (!user || (!isEnabled && this._forceNative !== true) || !isMe(user.id)) return user;
 
-        // Fast cache: if same user + same data, return existing clone
         if (cachedOriginalUser === user && cachedFakeUser && cachedDataHash === _dataVersion) {
             return cachedFakeUser;
         }
 
-        // Retrieve real original user (never a clone)
         const realUser = (user as any).__cp_isClone ? _trueOriginalUser || user : user;
         if (!realUser.__cp_isClone) _trueOriginalUser = realUser;
 
-        // Read real values once
         const realUsername = realUser.__cp_isClone ? (realUser._realUsername || realUser.username) : realUser.username;
         const realGlobalName = realUser.__cp_isClone ? (realUser._realGlobalName ?? realUser.globalName) : realUser.globalName;
         const realDisplayName = realUser.__cp_isClone ? (realUser._realDisplayName ?? realUser.displayName) : realUser.displayName;
 
         const clone = Object.create(Object.getPrototypeOf(realUser));
 
-        // Copy properties except username/globalName/displayName
         for (const key of Reflect.ownKeys(realUser)) {
             if (key === "username" || key === "globalName" || key === "displayName" || key === "__cp_isClone") continue;
             const desc = Object.getOwnPropertyDescriptor(realUser, key);
             if (desc) Object.defineProperty(clone, key, desc);
         }
         Object.defineProperty(clone, "__cp_isClone", { value: true, enumerable: false, configurable: true });
-        // Store real values on clone for next cycles
         clone._realUsername = realUsername;
         clone._realGlobalName = realGlobalName;
         clone._realDisplayName = realDisplayName;
@@ -1149,9 +1423,6 @@ export default definePlugin({
         clone.getGlobalName = () => isEnabled ? fakeGlobal : realGlobalName;
         clone.toString = () => fakeDisplay;
 
-        // Override createdAt: Discord calculates it from the Snowflake ID via a prototype getter
-        // We redefine it directly on the clone so Discord displays the fake date
-        // without needing to scan the DOM.
         if (storedData.createdAt) {
             const fakeCreatedAt = new Date(storedData.createdAt + "T12:00:00Z");
             Object.defineProperty(clone, "createdAt", {
@@ -1170,7 +1441,6 @@ export default definePlugin({
             clone.avatarDecorationData = decoData;
         }
 
-        // Override flags/nitro/boost so Discord doesn't show real native badges
         const wantedFlags = (isEnabled && storedData.badgeFlags != null) ? storedData.badgeFlags : realUser.publicFlags;
         clone.publicFlags = wantedFlags;
         clone.flags = wantedFlags;
@@ -1192,8 +1462,6 @@ export default definePlugin({
                 clone.premiumGuildSince = null;
             }
         } else if (isEnabled) {
-            // Si le plugin est activé mais Nitro simulation OFF
-            // On force la suppression des badges Nitro/Boost si demandés ou si simulés par erreur
             if (storedData.nitro === false) {
                 clone.premiumType = 0;
                 clone.premiumSince = null;
@@ -1201,7 +1469,6 @@ export default definePlugin({
             }
         }
 
-        // Save real values for next cloning cycle
         if (!realUser.__cp_isClone) {
             clone._realPremiumType = realUser.premiumType;
             clone._realPremiumSince = realUser.premiumSince;
@@ -1221,7 +1488,6 @@ export default definePlugin({
 
     hookUserProfile(profile: any) {
         if (!profile || !isEnabled) return profile;
-        // Cache: if same profile + same data version
         if (this._cachedProfileInput === profile && this._cachedProfile && this._cachedProfileVersion === _dataVersion) {
             return this._cachedProfile;
         }
@@ -1240,6 +1506,12 @@ export default definePlugin({
                 };
                 merged.avatarDecoration = null;
                 merged.avatarDecorationData = decoData;
+            }
+
+            if (storedData.profileEffectId) {
+                merged.profileEffectId = storedData.profileEffectId;
+                merged.profileEffect = { expireAt: null, skuId: storedData.profileEffectId };
+                if (!merged.premiumType) merged.premiumType = 2;
             }
 
             if (isEnabled && (storedData.nitro || storedData.badgeFlags != null)) {
@@ -1270,16 +1542,13 @@ export default definePlugin({
                     merged.premiumGuildSince = null;
                 }
 
-                // On s'assure que les badges originaux sont écrasés dans le profil
                 merged.publicFlags = (storedData.badgeFlags != null) ? storedData.badgeFlags : profile.publicFlags;
-                merged.badges = []; // Force Discord à recalculer la liste à partir de publicFlags et premiumType
+                merged.badges = [];
             } else if (isEnabled && storedData.nitro === false) {
-                // Si Nitro simulation est OFF, on force la suppression des badges simulés
                 merged.premiumType = profile.premiumType ?? 0;
                 merged.premiumSince = profile.premiumSince ?? null;
                 merged.premiumGuildSince = profile.premiumGuildSince ?? null;
             } else {
-                // BACKPORT FIX : Never force to 0 or null if Nitro is not simulated.
                 if (profile.premiumType) merged.premiumType = profile.premiumType;
                 if (profile.premiumSince) merged.premiumSince = profile.premiumSince;
                 if (profile.premiumGuildSince) merged.premiumGuildSince = profile.premiumGuildSince;
@@ -1297,7 +1566,6 @@ export default definePlugin({
 
     fakeObfuscatedEmail(real: string | null) {
         if (!isEnabled || !storedData.email || !real) return real;
-        // Discord often expects to see s***@d***.com format
         const fake = storedData.email;
         const atIdx = fake.indexOf("@");
         if (atIdx <= 1) return fake;
@@ -1316,29 +1584,51 @@ export default definePlugin({
         try { return isMe(displayProfile?.userId) ? storedData.banner : null; } catch { return null; }
     },
 
+    profileEffectHook(userId: string, original: any) {
+        try {
+            if (!isEnabled || !storedData.profileEffectId || !isMe(userId) || !original) return original;
+            return Object.assign(
+                Object.create(Object.getPrototypeOf(original)),
+                original,
+                {
+                    profileEffectId: storedData.profileEffectId,
+                    profileEffect: {
+                        expireAt: null,
+                        skuId: storedData.profileEffectId,
+                    },
+                    premiumType: original.premiumType ?? 2
+                }
+            );
+        } catch {
+            return original;
+        }
+    },
+
+    premiumTypeHook({ userId }: any) {
+        if (!isEnabled || !storedData.profileEffectId) return undefined;
+        try { return isMe(userId) ? 2 : undefined; } catch { return undefined; }
+    },
+
     toolboxActions: {
         [t("Open Custom Profile")]() { openModal(props => <CustomProfileModal rootProps={props} />); },
     },
 
     _origGetUserAvatarURL: null as any,
     _origExtractTimestamp: null as any,
-    _forceNative: false, // Tool variable for local reset
+    _forceNative: false,
 
     async start() {
         applyAvatarPatchEarly();
         addHeaderBarButton("custom-profile-btn", () => <CustomProfileButton />, 10);
         addContextMenuPatch("user-context", userContextMenuPatch);
 
-        // Listen for account changes to sync data
         FluxDispatcher.subscribe("CONNECTION_OPEN", onAccountSwitch);
 
-        // PERFECT AND SECURE NATIVE INTERCEPTION ON USER STORE.
         try {
             const US = (Vencord as any).Webpack?.findByProps?.("getCurrentUser", "getUser");
             if (US && !US._cp_perfect_hook) {
                 const origCurrent = US.getCurrentUser.bind(US);
 
-                // Fast-path cache: skip clone work if user object + data version are unchanged
                 let _lastRealUser: any = null;
                 let _lastFakeResult: any = null;
                 let _lastCacheVersion = -1;
@@ -1346,12 +1636,10 @@ export default definePlugin({
                 US.getCurrentUser = () => {
                     const realUser = origCurrent();
                     if (realUser) {
-                        // Update name cache only when the user object itself changes
                         if (realUser !== _lastRealUser) {
                             if (realUser.username) _realUsername = realUser.username;
                             if (realUser.globalName) _realGlobalName = realUser.globalName;
                         }
-                        // Return cached clone if nothing changed
                         if (realUser === _lastRealUser && _lastCacheVersion === _dataVersion && _lastFakeResult) {
                             return _lastFakeResult;
                         }
@@ -1369,7 +1657,6 @@ export default definePlugin({
             }
         } catch { }
 
-        // INTERCEPTION ON UserProfileStore (for native Nitro/Boost badges in popout/modal profile)
         try {
             const UPS = (Vencord as any).Webpack?.findByProps?.("getUserProfile", "getGuildMemberProfile");
             if (UPS && !UPS._cp_profile_hook) {
@@ -1399,8 +1686,6 @@ export default definePlugin({
             }
         } catch { }
 
-        // INTERCEPTION ON MULTI ACCOUNT STORE (For the "Switch Account" menu)
-        // Applies custom usernames for ALL accounts in the switcher
         try {
             const WP = (Vencord as any).Webpack;
             const MAS = WP?.findByProps?.("getUsers", "getValidUsers", "getHasLoggedInAccounts");
@@ -1439,7 +1724,6 @@ export default definePlugin({
             }
         } catch { }
 
-        // Patch SnowflakeUtils.extractTimestamp pour faker la date de création
         try {
             if (SnowflakeUtils?.extractTimestamp && !this._origExtractTimestamp) {
                 this._origExtractTimestamp = SnowflakeUtils.extractTimestamp;
@@ -1464,7 +1748,6 @@ export default definePlugin({
             }
         });
 
-        // Patch getAvatarDecorationURL pour injecter notre déco uniquement sur notre user
         try {
             const decoMod = (Vencord as any).Webpack?.findByProps?.("getAvatarDecorationURL");
             if (decoMod?.getAvatarDecorationURL) {
@@ -1509,23 +1792,18 @@ export default definePlugin({
                 if (userId !== UserStore.getCurrentUser()?.id) return nativeBadges || [];
 
                 let badges: ProfileBadge[] = [...(nativeBadges || [])];
-                const style: React.CSSProperties = { borderRadius: "50%", width: "22px", height: "22px" };
 
-                // Determine which fake badges are active to filter real ones (avoid duplicates)
-                // Default to level 0 (base Nitro badge) when nitro is enabled but no level was picked
-                const nl = storedData.nitroLevel != null ? storedData.nitroLevel : (storedData.nitro ? 0 : -1);
+                const nl = storedData.nitroLevel ?? -1;
                 const bm = storedData.boostMonths ?? -1;
-                const hasNitroFake = storedData.nitro === true || (nl >= 0 && nl < NITRO_LEVELS.length);
+                const hasNitroFake = nl >= 0 && nl < NITRO_LEVELS.length;
                 const hasBoostFake = bm >= 0 && bm < BOOST_ICONS.length;
                 const wantedFlags = storedData.badgeFlags ?? 0;
 
-                // Robust filtering of native badges to avoid duplicates (multi-language support)
                 badges = badges.filter(b => {
                     const desc = (b.description || "").toLowerCase();
                     const icon = (b.iconSrc || "").toLowerCase();
 
-                    // Nitro / Subscriber
-                    if (isEnabled) { // ALWAYS filter native nitro/boost if plugin is enabled for this user
+                    if (isEnabled) {
                         const nitroKeywords = ["nitro", "subscriber", "abonn", "premium", "inscrit"];
                         if (nitroKeywords.some(k => desc.includes(k))) return false;
                         if (icon.includes("nitro") || icon.includes("premium")) return false;
@@ -1534,7 +1812,6 @@ export default definePlugin({
                         if (boostKeywords.some(k => desc.includes(k))) return false;
                         if (icon.includes("boost") || icon.includes("leveling")) return false;
                     }
-                    // Logic for other flags (Staff, Partner, HypeSquad, etc.)
                     for (const badge of BADGES) {
                         if (wantedFlags & badge.flag) {
                             const badgeKeywords = badge.label.toLowerCase().split(" ");
@@ -1551,86 +1828,86 @@ export default definePlugin({
                 const badgeList: ProfileBadge[] = [];
 
                 // 1. Discord Staff
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.STAFF)) {
-                    badgeList.push({ id: "cp-badge-0", description: t("Discord Staff"), iconSrc: "https://cdn.discordapp.com/badge-icons/5e74e9b61934fc1f67c65515d1f7e60d.png", position: BadgePosition.START, props: { style } });
-                }
+                if (wantedFlags & FLAG.STAFF)
+                    badgeList.push(mkBadge("cp-badge-0", "Discord Staff", "https://cdn.discordapp.com/badge-icons/5e74e9b61934fc1f67c65515d1f7e60d.png"));
 
                 // 2. Partner
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.PARTNER)) {
-                    badgeList.push({ id: "cp-badge-1", description: t("Partnered Server Owner"), iconSrc: "https://cdn.discordapp.com/badge-icons/3f9748e53446a137a052f3454e2de41e.png", position: BadgePosition.START, props: { style } });
-                }
+                if (wantedFlags & FLAG.PARTNER)
+                    badgeList.push(mkBadge("cp-badge-1", "Partnered Server Owner", "https://cdn.discordapp.com/badge-icons/3f9748e53446a137a052f3454e2de41e.png"));
 
-                // 3. NITRO (Image 2 shows it here)
-                if (hasNitroFake) {
-                    badgeList.push({ id: "cp-badge-2", description: "NITRO\nSubscriber since 10/22/21", iconSrc: NITRO_LEVELS[nl].icon, position: BadgePosition.START, props: { style, title: "Nitro" } });
-                }
+                // 3. Nitro
+                if (hasNitroFake)
+                    badgeList.push(mkBadge("cp-badge-2", `Nitro ${NITRO_LEVELS[nl].label.split(" ")[0]}`, NITRO_LEVELS[nl].icon, "RARE", "Subscriber since 10/22/21"));
 
                 // 4. HypeSquad Events
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.HYPESQUAD)) {
-                    badgeList.push({ id: "cp-badge-3", description: t("HypeSquad Events"), iconSrc: "https://cdn.discordapp.com/badge-icons/bf01d1073931f921909045f3a39fd264.png", position: BadgePosition.START, props: { style } });
-                }
+                if (wantedFlags & FLAG.HYPESQUAD)
+                    badgeList.push(mkBadge("cp-badge-3", "HypeSquad Events", "https://cdn.discordapp.com/badge-icons/bf01d1073931f921909045f3a39fd264.png", "RARE"));
 
                 // 5. Bug Hunter 2
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.BUG_HUNTER_2)) {
-                    badgeList.push({ id: "cp-badge-4", description: t("Bug Hunter Lvl 2"), iconSrc: "https://cdn.discordapp.com/badge-icons/848f79194d4be5ff5f81505cbd0ce1e6.png", position: BadgePosition.START, props: { style } });
-                }
+                if (wantedFlags & FLAG.BUG_HUNTER_2)
+                    badgeList.push(mkBadge("cp-badge-4", "Pro Bug Hunter", "https://cdn.discordapp.com/badge-icons/848f79194d4be5ff5f81505cbd0ce1e6.png", "RARE"));
 
-                // 6. House Badges (HypeSquad Houses)
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.BALANCE)) {
-                    badgeList.push({ id: "cp-badge-5", description: t("HypeSquad Balance"), iconSrc: "https://cdn.discordapp.com/badge-icons/3aa41de486fa12454c3761e8e223442e.png", position: BadgePosition.START, props: { style } });
-                }
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.BRAVERY)) {
-                    badgeList.push({ id: "cp-badge-6", description: t("HypeSquad Bravery"), iconSrc: "https://cdn.discordapp.com/badge-icons/8a88d63823d8a71cd5e390baa45efa02.png", position: BadgePosition.START, props: { style } });
-                }
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.BRILLIANCE)) {
-                    badgeList.push({ id: "cp-badge-7", description: t("HypeSquad Brilliance"), iconSrc: "https://cdn.discordapp.com/badge-icons/011940fd013da3f7fb926e4a1cd2e618.png", position: BadgePosition.START, props: { style } });
-                }
+                // 6. House Badges
+                if (wantedFlags & FLAG.BALANCE)
+                    badgeList.push(mkBadge("cp-badge-5", "HypeSquad Balance", "https://cdn.discordapp.com/badge-icons/3aa41de486fa12454c3761e8e223442e.png", "RARE"));
+                if (wantedFlags & FLAG.BRAVERY)
+                    badgeList.push(mkBadge("cp-badge-6", "HypeSquad Bravery", "https://cdn.discordapp.com/badge-icons/8a88d63823d8a71cd5e390baa45efa02.png", "RARE"));
+                if (wantedFlags & FLAG.BRILLIANCE)
+                    badgeList.push(mkBadge("cp-badge-7", "HypeSquad Brilliance", "https://cdn.discordapp.com/badge-icons/011940fd013da3f7fb926e4a1cd2e618.png", "RARE"));
 
                 // 7. Bug Hunter 1
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.BUG_HUNTER_1)) {
-                    badgeList.push({ id: "cp-badge-8", description: t("Bug Hunter Lvl 1"), iconSrc: "https://cdn.discordapp.com/badge-icons/2717692c7dca7289b35297368a940dd0.png", position: BadgePosition.START, props: { style } });
-                }
+                if (wantedFlags & FLAG.BUG_HUNTER_1)
+                    badgeList.push(mkBadge("cp-badge-8", "Bug Hunter", "https://cdn.discordapp.com/badge-icons/2717692c7dca7289b35297368a940dd0.png", "RARE"));
 
-                // 8. Developer (Verified)
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.DEV_VERIFIED)) {
-                    badgeList.push({ id: "cp-badge-9", description: t("Verified Developer"), iconSrc: "https://cdn.discordapp.com/badge-icons/6df5892e0f35b051f8b61eace34f4967.png", position: BadgePosition.START, props: { style } });
-                }
+                // 8. Verified Developer
+                if (wantedFlags & FLAG.DEV_VERIFIED)
+                    badgeList.push(mkBadge("cp-badge-9", "Early Verified Bot Developer", "https://cdn.discordapp.com/badge-icons/6df5892e0f35b051f8b61eace34f4967.png"));
 
-                // 9. Former Moderator
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.MOD_ALUMNI)) {
-                    badgeList.push({ id: "cp-badge-10", description: t("Former Moderator"), iconSrc: "https://cdn.discordapp.com/badge-icons/fee1624003e2fee35cb398e125dc479b.png", position: BadgePosition.START, props: { style } });
-                }
+                // 9. Moderator Alumni
+                if (wantedFlags & FLAG.MOD_ALUMNI)
+                    badgeList.push(mkBadge("cp-badge-10", "Moderator Program Alumni", "https://cdn.discordapp.com/badge-icons/fee1624003e2fee35cb398e125dc479b.png"));
 
                 // 10. Early Supporter
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.EARLY_SUPPORTER)) {
-                    badgeList.push({ id: "cp-badge-11", description: t("Early Supporter"), iconSrc: "https://cdn.discordapp.com/badge-icons/7060786766c9c840eb3019e725d2b358.png", position: BadgePosition.START, props: { style } });
-                }
+                if (wantedFlags & FLAG.EARLY_SUPPORTER)
+                    badgeList.push(mkBadge("cp-badge-11", "Early Supporter", "https://cdn.discordapp.com/badge-icons/7060786766c9c840eb3019e725d2b358.png"));
 
-                // 11. SERVER BOOST (Right after Early Supporter on image 2)
-                if (hasBoostFake) {
-                    badgeList.push({ id: "cp-badge-12", description: `Server Booster — ${BOOST_LABELS[bm]}`, iconSrc: BOOST_ICONS[bm], position: BadgePosition.START, props: { style, title: `Server Booster — ${BOOST_LABELS[bm]}` } });
-                }
+                // 11. Server Boost
+                if (hasBoostFake)
+                    badgeList.push(mkBadge("cp-badge-12", "Server Booster", BOOST_ICONS[bm], "RARE", BOOST_LABELS[bm]));
 
                 // 12. Active Developer
-                if (storedData.badgeFlags && (storedData.badgeFlags & FLAG.ACTIVE_DEVELOPER)) {
-                    badgeList.push({ id: "cp-badge-13", description: t("Active Developer"), iconSrc: "https://cdn.discordapp.com/badge-icons/6bdc42827a38498929a4920da12695d9.png", position: BadgePosition.START, props: { style } });
-                }
+                if (wantedFlags & FLAG.ACTIVE_DEVELOPER)
+                    badgeList.push(mkBadge("cp-badge-13", "Active Developer", "https://cdn.discordapp.com/badge-icons/6bdc42827a38498929a4920da12695d9.png"));
 
-                // 13. Old Name (Ancien nom d'utilisateur)
+                // 13. Legacy Username
                 if (storedData.customBadgeIds?.includes("oldname")) {
-                    const oldNameText = storedData.oldName ? `Old username\u00a0: ${storedData.oldName}` : "Old username";
-                    badgeList.push({ id: "cp-badge-14", description: oldNameText, iconSrc: OLD_NAME_BADGE_ICON, position: BadgePosition.START, props: { style, title: oldNameText } });
+                    const oldNameText = storedData.oldName || "OldUser#0000";
+                    badgeList.push(mkBadge("cp-badge-14", "Legacy Username", OLD_NAME_BADGE_ICON, undefined, oldNameText));
                 }
 
-                // 14. Completed Quest (Quêtes)
-                if (storedData.customBadgeIds?.includes("quest")) {
-                    badgeList.push({ id: "cp-badge-15", description: "Completed a quest", iconSrc: "https://cdn.discordapp.com/badge-icons/7d9ae358c8c5e118768335dbe68b4fb8.png", position: BadgePosition.START, props: { style } });
-                }
+                // 14. Quests
+                if (storedData.customBadgeIds?.includes("quest"))
+                    badgeList.push(mkBadge("cp-badge-15", "Quests", "https://cdn.discordapp.com/badge-icons/7d9ae358c8c5e118768335dbe68b4fb8.png"));
 
                 // 15. Orbs
-                if (storedData.customBadgeIds?.includes("orbs")) {
-                    badgeList.push({ id: "cp-badge-16", description: "Orbs — Apprentice", iconSrc: "https://cdn.discordapp.com/badge-icons/83d8a1eb09a8d64e59233eec5d4d5c2d.png", position: BadgePosition.START, props: { style } });
-                }
+                if (storedData.customBadgeIds?.includes("orbs"))
+                    badgeList.push(mkBadge("cp-badge-16", "Orbs Apprentice", "https://cdn.discordapp.com/badge-icons/83d8a1eb09a8d64e59233eec5d4d5c2d.png"));
+
+                // 16. Last Meadow
+                if (storedData.customBadgeIds?.includes("meadow"))
+                    badgeList.push(mkBadge("cp-badge-17", "Last Meadow", "https://cdn.discordapp.com/badge-icons/ca105ad9cfc8580c765101d17bbb2323.png", "RARE", "Level 100 Reached"));
+
+                // 17. Gifting badges
+                const giftStyle: React.CSSProperties = { width: "24px", height: "24px", objectFit: "contain", mixBlendMode: "screen" as any, borderRadius: 0 };
+                const mkGift = (id: string, name: string, icon: string): ProfileBadge => ({
+                    id, description: name, iconSrc: icon, position: BadgePosition.START, props: { style: giftStyle }
+                });
+                if (storedData.customBadgeIds?.includes("gift_patron")) badgeList.push(mkGift("cp-badge-18", "Gifting Patron", "https://i.imgur.com/tI4GCxR.png"));
+                if (storedData.customBadgeIds?.includes("gift_champion")) badgeList.push(mkGift("cp-badge-19", "Gifting Champion", "https://i.imgur.com/Jynm4dV.png"));
+                if (storedData.customBadgeIds?.includes("gift_luminary")) badgeList.push(mkGift("cp-badge-20", "Gifting Luminary", "https://i.imgur.com/3GRyXIR.png"));
+                if (storedData.customBadgeIds?.includes("gift_icon")) badgeList.push(mkGift("cp-badge-21", "Gifting Icon", "https://i.imgur.com/chM1tvZ.png"));
+                if (storedData.customBadgeIds?.includes("gift_hero")) badgeList.push(mkGift("cp-badge-22", "Gifting Hero", "https://i.imgur.com/7bJJJWl.png"));
+                if (storedData.customBadgeIds?.includes("gift_legendary")) badgeList.push(mkGift("cp-badge-23", "Gifting Legendary", "https://i.imgur.com/gQg96nV.png"));
 
                 badges.push(...badgeList);
                 return badges;
@@ -1652,7 +1929,6 @@ export default definePlugin({
             (IconUtils as any).getUserAvatarURL = this._origGetUserAvatarURL;
             this._origGetUserAvatarURL = null;
         }
-        // Nettoyer le patch avatarDecoration
         try {
             const myUser = UserStore.getCurrentUser() as any;
             if (myUser) {
