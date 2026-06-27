@@ -31,7 +31,7 @@ jobs:
         steps:
             - uses: actions/checkout@v6
               with:
-                  ref: ${{ github.event_name == 'schedule' && 'dev' || github.ref }}
+                  ref: ${{ github.event_name == 'schedule' && 'main' || github.ref }}
 
             - uses: pnpm/action-setup@v6 # Install pnpm using packageManager key in package.json
 

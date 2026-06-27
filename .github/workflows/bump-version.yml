@@ -34,7 +34,9 @@ jobs:
 
             - name: Bump version and push tag
               run: |
-                  pnpm version patch --no-git-tag-version
+                  # OpenCord uses a 4-segment version (MAJOR.MINOR.PATCH.FORK);
+                  # pnpm/npm version reject it, so bump the fork segment manually.
+                  node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const s=p.version.split('.').map(Number);while(s.length<4)s.push(0);s[3]+=1;p.version=s.join('.');fs.writeFileSync('package.json',JSON.stringify(p,null,4)+'\n')"
                   VERSION=$(jq -r .version < package.json)
                   git add package.json
                   git commit -m "chore(release): bump version to v${VERSION}"
