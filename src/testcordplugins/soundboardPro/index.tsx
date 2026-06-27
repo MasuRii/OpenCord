@@ -218,6 +218,7 @@ function playSyntheticSound(sound: Sound) {
 
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + sound.duration);
+        oscillator.onended = () => void audioContext.close();
 
         return true;
     } catch (error) {
@@ -228,17 +229,21 @@ function playSyntheticSound(sound: Sound) {
 
 // Function to play a sound from URL
 async function playUrlSound(sound: Sound) {
+    let audioContext: AudioContext | undefined;
     try {
         if (!sound.url) return false;
 
-        const audioContext = new (window.AudioContext ||
+        audioContext = new (window.AudioContext ||
             (window as any).webkitAudioContext)();
         const response = await fetch(sound.url, {
             mode: "cors",
             credentials: "omit",
         });
 
-        if (!response.ok) return false;
+        if (!response.ok) {
+            void audioContext.close();
+            return false;
+        }
 
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -256,9 +261,11 @@ async function playUrlSound(sound: Sound) {
         );
 
         source.start();
+        source.onended = () => void audioContext?.close();
 
         return true;
     } catch (error) {
+        void audioContext?.close();
         console.error("[SoundboardPro] URL error:", error);
         return false;
     }
