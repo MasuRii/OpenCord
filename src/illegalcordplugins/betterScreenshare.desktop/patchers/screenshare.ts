@@ -115,7 +115,7 @@ export class ScreensharePatcher extends Patcher {
                 removeConnectedListener = Emitter.addListener(connection.emitter, "on", "connected", () => {
                     this.forceUpdateTransportationOptions();
                     this.forceUpdateDesktopEncodingOptions();
-                    this.forceUpdateDesktopSourceOptions();
+                    if (this.hasActiveDesktopSource()) this.forceUpdateDesktopSourceOptions();
                 }, PluginInfo.PLUGIN_NAME);
 
                 removeDestroyListener = Emitter.addListener(connection.emitter, "on", "destroy", () => {

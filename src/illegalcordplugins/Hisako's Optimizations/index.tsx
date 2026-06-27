@@ -10,7 +10,6 @@ import { Logger } from "@utils/Logger";
 import { isObject } from "@utils/misc";
 import definePlugin, { OptionType } from "@utils/types";
 import { findAll } from "@webpack";
-import { IllegalcordDevs } from "@utils/constants";
 
 type DomMethodName = "appendChild" | "removeChild";
 type ElementChildMethod = typeof Element.prototype.appendChild;
@@ -166,7 +165,7 @@ function restoreDomThrottling() {
 export default definePlugin({
     name: "Hisako's Optimizations",
     description: "Reduces expensive Discord UI animations and activity updates.",
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     tags: ["Utility", "Appearance"],
     searchTerms: ["performance", "optimization", "lag", "activity", "animation"],
     settings,

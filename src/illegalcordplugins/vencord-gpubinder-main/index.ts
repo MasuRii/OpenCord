@@ -10,7 +10,6 @@ import definePlugin, { OptionType, type PluginNative } from "@utils/types";
 import { Forms, React, Select, Toasts, useState } from "@webpack/common";
 
 import type { GpuInfo, GpuState } from "./native";
-import { IllegalcordDevs } from "@utils/constants";
 
 const Native = VencordNative.pluginHelpers.GpuBinder as PluginNative<typeof import("./native")> | undefined;
 
@@ -113,7 +112,7 @@ export default definePlugin({
     name: "GpuBinder",
     description: "Forces Discord to stay bound to a specific GPU even after updates by managing Windows Registry keys.",
     tags: ["Utility"],
-    authors: [IllegalcordDevs.unclide],
+    authors: [{ name: "unclide", id: 395504896817758210n }],
 
     // Safety check: registry access is only possible on Desktop
     desktopOnly: true,

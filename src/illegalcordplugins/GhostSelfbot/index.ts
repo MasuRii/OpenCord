@@ -11,7 +11,6 @@ import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import type { CommandArgument, CommandContext } from "@vencord/discord-types";
 import { findByPropsLazy } from "@webpack";
-import { IllegalcordDevs } from "@utils/constants";
 
 const logger = new Logger("GhostSelfbot");
 
@@ -169,7 +168,7 @@ async function launchGhostSource(): Promise<void> {
 export default definePlugin({
     name: "GhostSelfbot",
     description: "Launch Ghost Selfbot (exe or source code) with optional auto-token fill from your current Discord session",
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     tags: ["Utility", "Customisation"],
     enabledByDefault: false,
     settings,

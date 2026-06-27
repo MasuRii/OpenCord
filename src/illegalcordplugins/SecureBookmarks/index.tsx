@@ -6,7 +6,6 @@
 
 import "./styles.css";
 
-import { EquicordDevs, IllegalcordDevs } from "@utils/constants";
 import { Logger } from "@utils/Logger";
 import definePlugin, { ReporterTestable } from "@utils/types";
 import type { Message } from "@vencord/discord-types";
@@ -54,7 +53,7 @@ export default definePlugin({
     name: "SecureBookmarks",
     description: "Saves encrypted message bookmarks from the message context menu.",
     tags: ["Chat", "Privacy", "Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     dependencies: ["EquicordToolbox"],
     reporterTestable: ReporterTestable.None,
     settings,

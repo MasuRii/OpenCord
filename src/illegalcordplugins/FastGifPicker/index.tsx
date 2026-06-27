@@ -13,7 +13,6 @@ import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { React, useEffect, useMemo, useRef, UserSettingsActionCreators, useState } from "@webpack/common";
 import type { ElementType, MutableRefObject, ReactElement, ReactNode, Ref, SyntheticEvent } from "react";
-import { IllegalcordDevs } from "@utils/constants";
 
 const PREVIEW_CACHE_LIMIT = 500;
 const DEFAULT_CONCURRENT_LOADS = 6;
@@ -226,7 +225,7 @@ export default definePlugin({
     name: "FastGifPicker",
     description: "Makes the GIF picker load lighter previews, retry failures, and avoid starting too many GIFs at once.",
     tags: ["Media", "Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
 
     patches: [

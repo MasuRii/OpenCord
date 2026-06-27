@@ -8,7 +8,6 @@ import { addMessagePreEditListener, addMessagePreSendListener, MessageEditListen
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { showToast, Toasts } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 const settings = definePluginSettings({
     sanitizeOutgoing: {
@@ -56,7 +55,7 @@ export default definePlugin({
     name: "ZeroWidthSanitizer",
     description: "Removes invisible zero-width characters from messages to prevent fingerprinting and tracking",
     tags: ["Privacy", "Chat"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
 
     // Richiede l'API MessageEvents

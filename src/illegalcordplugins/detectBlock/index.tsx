@@ -14,7 +14,6 @@ import { ChannelActionCreators, ChannelActions, ChannelStore, UserProfileStore, 
 import { openBlockedWarningModal } from "./BlockedWarningModal";
 import { DetectBlockBadge } from "./DetectBlockBadge";
 import { clearDetectionState, detectBlockedUsers, primeClear } from "./detection";
-import { IllegalcordDevs } from "@utils/constants";
 
 interface VoiceState {
     userId: string;
@@ -257,8 +256,8 @@ export default definePlugin({
     name: "DetectBlock",
     description: "Detects users who have blocked you and warns when they appear in voice channels or group DMs.",
     authors: [
-        IllegalcordDevs.justjxke,
-        IllegalcordDevs.irritably
+        { name: "justjxke", id: 852558183087472640n },
+        { name: "irritably", id: 928787166916640838n }
     ],
     flux: {
         USER_PROFILE_FETCH_SUCCESS({ userProfile }: { userProfile: { user: User; user_profile: unknown | null; }; }) {

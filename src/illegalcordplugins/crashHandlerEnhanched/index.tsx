@@ -29,16 +29,16 @@ import { Flex } from "@components/Flex";
 import { CopyIcon, OpenExternalIcon, WarningIcon } from "@components/Icons";
 import { classNameFactory } from "@utils/css";
 import { copyWithToast } from "@utils/discord";
+import { SYM_LAZY_GET } from "@utils/lazy";
 import { Logger } from "@utils/Logger";
 import { relaunch } from "@utils/native";
-import definePlugin, { OptionType, PluginNative } from "@utils/types";
-import { maybePromptToUpdate } from "@utils/updater";
+import definePlugin, { OptionType, type Plugin, type PluginNative } from "@utils/types";
+import { checkForUpdates, isNewer, maybePromptToUpdate, update as updateIllegalcord } from "@utils/updater";
 import type { RenderModalProps } from "@vencord/discord-types";
 import { filters, findBulk, proxyLazyWebpack } from "@webpack";
-import { closeAllModals, closeModal, DraftType, ExpressionPickerStore, FluxDispatcher, Modal, NavigationRouter, openModal, SelectedChannelStore } from "@webpack/common";
+import { Alerts, closeAllModals, closeModal, DraftType, ExpressionPickerStore, FluxDispatcher, Modal, NavigationRouter, openModal, React, SelectedChannelStore } from "@webpack/common";
 
 import type * as NativeModule from "./native";
-import { IllegalcordDevs } from "@utils/constants";
 
 const PLUGIN_NAME = "CrashHandlerEnhanced";
 const TELEGRAM_URL = "https://t.me/Illegalcord";
@@ -47,11 +47,22 @@ const cl = classNameFactory("vc-crash-handler-enhanced-");
 const logger = new Logger("CrashHandlerEnhanced");
 const SETTINGS_KEYS: Array<"lastCrashAt" | "crashCount"> = ["lastCrashAt", "crashCount"];
 const PROTECTED_PLUGIN_NAMES = new Set([PLUGIN_NAME, "CrashHandler"]);
+const BREADCRUMB_LIMIT = 40;
+const BREADCRUMB_MAX_AGE = 15000;
+const BREADCRUMB_DETECTION_AGE = 5000;
+const REPEATED_PLUGIN_CRASH_AGE = 20000;
 const NO_PLUGIN_DETECTED = "No plugin detected";
 const NO_PLUGIN_DETECTION_REASON = "The crash stack did not match any enabled plugin.";
 const NO_PLUGIN_DISABLED = "None";
 const NO_PLUGIN_DISABLE_REASON = "No plugin was disabled.";
+const MESSAGE_SEND_FORBIDDEN_RE = /^POST \/channels\/(?:\d+|xxx)\/messages \[403\]$/;
+const GUILD_VANITY_FORBIDDEN_RE = /^GET \/guilds\/(?:\d+|xxx)\/vanity-url \[403\]$/;
+const USER_PROFILE_UNAVAILABLE_RE = /^GET \/users\/(?:\d+|xxx)\/profile \[(?:404|409)\]$/;
+const SOCKET_ALIVE_TIMEOUT_RE = /^(?:Max tries exceeded, last error: Error: )?socket alive timeout$/;
 const Native = VencordNative.pluginHelpers.CrashHandlerEnhanced as PluginNative<typeof NativeModule> | undefined;
+
+type DetectionConfidence = "none" | "low" | "medium" | "high";
+type DetectionSource = "none" | "stack-path" | "stack-name" | "breadcrumb" | "repeated-crash";
 
 interface CrashBoundary {
     setState(state: CrashErrorState | RecoveredCrashState): void;
@@ -79,8 +90,12 @@ interface CrashReport {
     recovered: boolean;
     suspectedPlugin: string;
     suspectedPluginReason: string;
+    suspectedPluginConfidence: DetectionConfidence;
+    suspectedPluginSource: DetectionSource;
     disabledPlugin: string;
     disableReason: string;
+    breadcrumbs: string[];
+    enabledPlugins: string[];
     logFilePath?: string;
 }
 
@@ -110,6 +125,20 @@ interface CrashSupportModalProps {
 interface PluginDetection {
     name: string;
     reason: string;
+    confidence: DetectionConfidence;
+    source: DetectionSource;
+}
+
+interface PluginBreadcrumb {
+    timestamp: number;
+    pluginName: string;
+    surface: string;
+    detail?: string;
+}
+
+interface PluginCrashAttribution {
+    timestamp: number;
+    pluginName: string;
 }
 
 const { DraftManager, ModalStack } = proxyLazyWebpack<LazyModules>(() => {
@@ -155,9 +184,19 @@ const settings = definePluginSettings({
         description: "Automatically disable a plugin when the crash report strongly points to it.",
         default: true
     },
+    captureGlobalErrors: {
+        type: OptionType.BOOLEAN,
+        description: "Log window errors and unhandled promise rejections for debugging.",
+        default: false
+    },
     showRecoveryToast: {
         type: OptionType.BOOLEAN,
         description: "Show a small recovery notification after the crash is handled.",
+        default: true
+    },
+    notifyOncePerPlugin: {
+        type: OptionType.BOOLEAN,
+        description: "Only show one crash notification per suspected plugin each session.",
         default: true
     },
     lastCrashReport: {
@@ -186,7 +225,14 @@ let crashModalOpen = false;
 let latestReport: CrashReport | null = null;
 let queuedPopupReport: CrashReport | null = null;
 let recentCrashTimes: number[] = [];
+let recentPluginCrashes: PluginCrashAttribution[] = [];
+let pluginBreadcrumbs: PluginBreadcrumb[] = [];
+const notifiedPluginNames = new Set<string>();
 let crashLogWriteQueue: Promise<void> = Promise.resolve();
+let instrumentationIntervalId: number | undefined;
+let globalListenersInstalled = false;
+const breadcrumbWrappedFunctions = new WeakSet<object>();
+const breadcrumbInstrumentedMethods = new WeakMap<object, Set<PropertyKey>>();
 
 function isDraftTypes(value: unknown): value is DraftTypes {
     if (!value || typeof value !== "object") return false;
@@ -201,18 +247,58 @@ function isDraftTypes(value: unknown): value is DraftTypes {
     );
 }
 
+function getErrorText(value: unknown) {
+    if (value instanceof Error) return value.message || value.name;
+    if (typeof value === "string" && value && value !== "[object Object]") return value;
+}
+
+function getObjectErrorMessage(error: unknown) {
+    const record = asRecord(error);
+    if (!record) return undefined;
+
+    return getErrorText(record.message) ?? getErrorText(record.error) ?? getErrorText(record.reason);
+}
+
+function stringifyErrorObject(error: unknown) {
+    const seen = new WeakSet<object>();
+
+    try {
+        const serialized = JSON.stringify(error, (_key, value: unknown) => {
+            if (typeof value === "bigint") return value.toString();
+            if (typeof value !== "object" || value === null) return value;
+            if (seen.has(value)) return "[Circular]";
+
+            seen.add(value);
+            return value;
+        });
+
+        if (serialized && serialized !== "{}") return serialized;
+    } catch {
+        return String(error);
+    }
+}
+
 function getErrorMessage(error: unknown) {
-    if (error instanceof Error) return error.message || error.name;
-    if (typeof error === "string") return error;
+    const text = getErrorText(error);
+    if (text) return text;
     if (error == null) return "Unknown crash.";
+
+    const message = getObjectErrorMessage(error);
+    if (message) return message;
+
+    const serialized = stringifyErrorObject(error);
+    if (serialized) return serialized;
 
     return String(error);
 }
 
 function getErrorStack(error: unknown) {
-    if (!(error instanceof Error)) return undefined;
+    if (error instanceof Error) return error.stack;
 
-    return error.stack;
+    const record = asRecord(error);
+    if (typeof record?.stack === "string") return record.stack;
+
+    return undefined;
 }
 
 function getComponentStack(info: unknown) {
@@ -241,6 +327,162 @@ function getChannelId() {
     }
 }
 
+function isPluginRuntimeEnabled(pluginName: string, plugin: Plugin) {
+    return Boolean(plugin.required || plugin.isDependency || Settings.plugins[pluginName]?.enabled);
+}
+
+function getEnabledPluginSnapshot() {
+    return Object.entries(Plugins)
+        .filter(([pluginName, plugin]) => isPluginRuntimeEnabled(pluginName, plugin))
+        .map(([pluginName]) => pluginName)
+        .sort((a, b) => a.localeCompare(b));
+}
+
+function formatBreadcrumb({ timestamp, pluginName, surface, detail }: PluginBreadcrumb) {
+    const time = new Date(timestamp).toISOString();
+    return detail
+        ? `${time} ${pluginName}.${surface}: ${detail}`
+        : `${time} ${pluginName}.${surface}`;
+}
+
+function trimBreadcrumbs(now = Date.now()) {
+    pluginBreadcrumbs = pluginBreadcrumbs
+        .filter(breadcrumb => now - breadcrumb.timestamp <= BREADCRUMB_MAX_AGE)
+        .slice(-BREADCRUMB_LIMIT);
+}
+
+function addPluginBreadcrumb(pluginName: string, surface: string, detail?: string) {
+    if (PROTECTED_PLUGIN_NAMES.has(pluginName)) return;
+
+    pluginBreadcrumbs.push({ timestamp: Date.now(), pluginName, surface, detail });
+    trimBreadcrumbs();
+}
+
+function getRecentBreadcrumbs() {
+    trimBreadcrumbs();
+    return pluginBreadcrumbs.map(formatBreadcrumb);
+}
+
+function isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+    return Boolean(value && typeof value === "object" && "then" in value && typeof value.then === "function");
+}
+
+function asRecord(value: unknown) {
+    if ((typeof value !== "object" && typeof value !== "function") || value === null) return null;
+    return value as Record<PropertyKey, unknown>;
+}
+
+function isLazyProxy(value: unknown) {
+    const record = asRecord(value);
+    return typeof record?.[SYM_LAZY_GET] === "function";
+}
+
+function wrapPluginCallback<T extends (this: unknown, ...args: unknown[]) => unknown>(pluginName: string, surface: string, original: T): T {
+    const wrapped = function (this: unknown, ...args: unknown[]) {
+        addPluginBreadcrumb(pluginName, surface);
+
+        try {
+            const result = Reflect.apply(original, this, args) as unknown;
+
+            if (isPromiseLike(result)) {
+                void Promise.resolve(result).catch(error => addPluginBreadcrumb(pluginName, `${surface} rejected`, getErrorMessage(error)));
+            }
+
+            return result;
+        } catch (error) {
+            addPluginBreadcrumb(pluginName, `${surface} threw`, getErrorMessage(error));
+            throw error;
+        }
+    } as T;
+
+    breadcrumbWrappedFunctions.add(wrapped);
+    return wrapped;
+}
+
+function wrapObjectMethod(owner: Record<PropertyKey, unknown>, key: string, pluginName: string, surface: string) {
+    const instrumentedKeys = breadcrumbInstrumentedMethods.get(owner);
+    if (instrumentedKeys?.has(key)) return;
+
+    const original = owner[key];
+    if (typeof original !== "function" || breadcrumbWrappedFunctions.has(original) || isLazyProxy(original)) return;
+
+    owner[key] = wrapPluginCallback(pluginName, surface, original as (this: unknown, ...args: unknown[]) => unknown);
+    breadcrumbInstrumentedMethods.set(owner, new Set([...(instrumentedKeys ?? []), key]));
+}
+
+function instrumentPlugin(plugin: Plugin) {
+    if (PROTECTED_PLUGIN_NAMES.has(plugin.name)) return;
+
+    const pluginRecord = asRecord(plugin);
+    if (!pluginRecord) return;
+
+    wrapObjectMethod(pluginRecord, "start", plugin.name, "start");
+    wrapObjectMethod(pluginRecord, "stop", plugin.name, "stop");
+    wrapObjectMethod(pluginRecord, "onBeforeMessageSend", plugin.name, "message send");
+    wrapObjectMethod(pluginRecord, "onBeforeMessageEdit", plugin.name, "message edit");
+    wrapObjectMethod(pluginRecord, "onMessageClick", plugin.name, "message click");
+    wrapObjectMethod(pluginRecord, "renderMessageAccessory", plugin.name, "message accessory");
+    wrapObjectMethod(pluginRecord, "renderMessageDecoration", plugin.name, "message decoration");
+    wrapObjectMethod(pluginRecord, "renderMemberListDecorator", plugin.name, "member list decorator");
+    wrapObjectMethod(pluginRecord, "renderNicknameIcon", plugin.name, "nickname icon");
+    wrapObjectMethod(pluginRecord, "audioProcessor", plugin.name, "audio processor");
+
+    for (const command of plugin.commands ?? []) {
+        const commandRecord = asRecord(command);
+        if (commandRecord) wrapObjectMethod(commandRecord, "execute", plugin.name, "command");
+    }
+
+    const fluxRecord = asRecord(plugin.flux);
+    if (fluxRecord) {
+        for (const event of Object.keys(fluxRecord)) {
+            wrapObjectMethod(fluxRecord, event, plugin.name, `flux ${event}`);
+        }
+    }
+
+    const contextMenuRecord = asRecord(plugin.contextMenus);
+    if (contextMenuRecord) {
+        for (const menu of Object.keys(contextMenuRecord)) {
+            wrapObjectMethod(contextMenuRecord, menu, plugin.name, `context menu ${menu}`);
+        }
+    }
+
+    const renderFields = [
+        ["chatBarButton", "render", "chat bar button"],
+        ["chatBarButtonWrapper", "wrapper", "chat bar wrapper"],
+        ["messagePopoverButton", "render", "message popover"],
+        ["headerBarButton", "render", "header bar button"],
+        ["userAreaButton", "render", "user area button"],
+        ["renderProfileCollection", "render", "profile collection"],
+        ["renderProfileSection", "render", "profile section"]
+    ] as const;
+
+    for (const [field, key, surface] of renderFields) {
+        const owner = asRecord(pluginRecord[field]);
+        if (owner) wrapObjectMethod(owner, key, plugin.name, surface);
+    }
+
+    if (typeof plugin.toolboxActions === "function") {
+        wrapObjectMethod(pluginRecord, "toolboxActions", plugin.name, "toolbox actions");
+    } else {
+        const toolboxRecord = asRecord(plugin.toolboxActions);
+        if (toolboxRecord) {
+            for (const label of Object.keys(toolboxRecord)) {
+                wrapObjectMethod(toolboxRecord, label, plugin.name, `toolbox ${label}`);
+            }
+        }
+    }
+
+    for (const key of Object.keys(pluginRecord)) {
+        wrapObjectMethod(pluginRecord, key, plugin.name, key);
+    }
+}
+
+function instrumentPlugins() {
+    for (const plugin of Object.values(Plugins)) {
+        instrumentPlugin(plugin);
+    }
+}
+
 function createReport(errorState: CrashErrorState): CrashReport {
     const now = Date.now();
     recentCrashTimes = recentCrashTimes.filter(time => now - time < 10000);
@@ -260,8 +502,12 @@ function createReport(errorState: CrashErrorState): CrashReport {
         recovered: false,
         suspectedPlugin: NO_PLUGIN_DETECTED,
         suspectedPluginReason: NO_PLUGIN_DETECTION_REASON,
+        suspectedPluginConfidence: "none",
+        suspectedPluginSource: "none",
         disabledPlugin: NO_PLUGIN_DISABLED,
-        disableReason: NO_PLUGIN_DISABLE_REASON
+        disableReason: NO_PLUGIN_DISABLE_REASON,
+        breadcrumbs: getRecentBreadcrumbs(),
+        enabledPlugins: getEnabledPluginSnapshot()
     };
 }
 
@@ -275,8 +521,12 @@ function createPlaceholderReport(): CrashReport {
         recovered: false,
         suspectedPlugin: NO_PLUGIN_DETECTED,
         suspectedPluginReason: NO_PLUGIN_DETECTION_REASON,
+        suspectedPluginConfidence: "none",
+        suspectedPluginSource: "none",
         disabledPlugin: NO_PLUGIN_DISABLED,
-        disableReason: NO_PLUGIN_DISABLE_REASON
+        disableReason: NO_PLUGIN_DISABLE_REASON,
+        breadcrumbs: getRecentBreadcrumbs(),
+        enabledPlugins: getEnabledPluginSnapshot()
     };
 }
 
@@ -290,14 +540,18 @@ function formatReport(report: CrashReport) {
         `Channel: ${report.channelId ?? "Unknown"}`,
         `Error: ${report.message}`,
         `Suspected plugin: ${report.suspectedPlugin}`,
+        `Detection confidence: ${report.suspectedPluginConfidence}`,
+        `Detection source: ${report.suspectedPluginSource}`,
         `Suspected plugin reason: ${report.suspectedPluginReason}`,
         `Disabled plugin: ${report.disabledPlugin}`,
         `Disable reason: ${report.disableReason}`,
         `Log file: ${report.logFilePath ?? "Not written yet"}`,
         `Illegalcord version: ${VERSION}`,
         `User agent: ${navigator.userAgent}`,
+        `Enabled plugins: ${report.enabledPlugins.join(", ") || "None"}`,
     ];
 
+    if (report.breadcrumbs.length) parts.push(`Recent plugin activity:\n${report.breadcrumbs.join("\n")}`);
     if (report.stack) parts.push(`Stack:\n${report.stack}`);
     if (report.componentStack) parts.push(`Component stack:\n${report.componentStack}`);
 
@@ -325,6 +579,59 @@ function openExternal(url: string) {
     VencordNative.native.openExternal(url);
 }
 
+async function checkAndUpdateIllegalcord() {
+    if (IS_WEB || IS_UPDATER_DISABLED) {
+        showNotification({
+            color: "#f23f43",
+            title: "Illegalcord updater is not available.",
+            body: "Use the installer or repository to update this build.",
+            noPersist: true
+        });
+        return;
+    }
+
+    try {
+        const outdated = await checkForUpdates();
+
+        if (!outdated) {
+            showNotification({
+                title: "Illegalcord is already up to date.",
+                body: "No updates were found.",
+                noPersist: true
+            });
+            return;
+        }
+
+        if (isNewer) {
+            showNotification({
+                color: "#f23f43",
+                title: "Illegalcord cannot update automatically.",
+                body: "Your local copy has newer commits than the remote.",
+                noPersist: true
+            });
+            return;
+        }
+
+        if (!await updateIllegalcord()) return;
+
+        Alerts.show({
+            title: "Illegalcord updated.",
+            body: "Restart the client to apply the update.",
+            confirmText: "Restart now",
+            cancelText: "Later",
+            onConfirm: relaunch
+        });
+    } catch (err) {
+        logger.error("Failed to update Illegalcord from the crash popup.", err);
+        showNotification({
+            color: "#f23f43",
+            title: "Illegalcord update failed.",
+            body: "Try the Updater settings tab or reinstall from the repository.",
+            noPersist: true
+        });
+    }
+}
+
 function normalizeSearchText(value: string) {
     return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
@@ -337,13 +644,64 @@ function getCrashSearchText(errorState: CrashErrorState) {
     ].filter(Boolean).join("\n").toLowerCase();
 }
 
+function getLatestBreadcrumbDetection(): PluginDetection | undefined {
+    const now = Date.now();
+    const breadcrumb = [...pluginBreadcrumbs]
+        .reverse()
+        .find(entry => {
+            if (now - entry.timestamp > BREADCRUMB_DETECTION_AGE) return false;
+
+            const plugin = Plugins[entry.pluginName];
+            return Boolean(plugin && isPluginRuntimeEnabled(entry.pluginName, plugin));
+        });
+
+    if (!breadcrumb) return undefined;
+
+    return {
+        name: breadcrumb.pluginName,
+        confidence: "low",
+        source: "breadcrumb",
+        reason: `The plugin ran recently: ${breadcrumb.surface}.`
+    };
+}
+
+function applyRepeatedCrashBoost(detection: PluginDetection) {
+    const now = Date.now();
+    recentPluginCrashes = recentPluginCrashes.filter(entry => now - entry.timestamp <= REPEATED_PLUGIN_CRASH_AGE);
+
+    const recentSamePluginCrashes = recentPluginCrashes.filter(entry => entry.pluginName === detection.name).length;
+    if (recentSamePluginCrashes >= 2 && detection.confidence !== "high") {
+        return {
+            ...detection,
+            confidence: "high" as const,
+            source: "repeated-crash" as const,
+            reason: `${detection.reason} The same plugin was suspected repeatedly.`
+        };
+    }
+
+    if (recentSamePluginCrashes >= 1 && detection.confidence === "low") {
+        return {
+            ...detection,
+            confidence: "medium" as const,
+            source: "repeated-crash" as const,
+            reason: `${detection.reason} The same plugin was suspected in a recent crash.`
+        };
+    }
+
+    return detection;
+}
+
+function rememberPluginCrash(pluginName: string) {
+    recentPluginCrashes.push({ pluginName, timestamp: Date.now() });
+}
+
 function detectSuspectedPlugin(errorState: CrashErrorState): PluginDetection | undefined {
     const searchText = getCrashSearchText(errorState);
     const compactSearchText = normalizeSearchText(searchText);
 
     for (const [pluginName, plugin] of Object.entries(Plugins)) {
-        if (PROTECTED_PLUGIN_NAMES.has(pluginName) || plugin.required || plugin.isDependency) continue;
-        if (!Settings.plugins[pluginName]?.enabled) continue;
+        if (PROTECTED_PLUGIN_NAMES.has(pluginName)) continue;
+        if (!isPluginRuntimeEnabled(pluginName, plugin)) continue;
 
         const normalizedName = normalizeSearchText(pluginName);
         const lowerName = pluginName.toLowerCase();
@@ -357,25 +715,34 @@ function detectSuspectedPlugin(errorState: CrashErrorState): PluginDetection | u
         ];
 
         if (pathTokens.some(token => searchText.includes(token))) {
-            return {
+            return applyRepeatedCrashBoost({
                 name: pluginName,
+                confidence: "high",
+                source: "stack-path",
                 reason: "The crash stack references this plugin path."
-            };
+            });
         }
 
         if (normalizedName.length >= 6 && compactSearchText.includes(normalizedName)) {
-            return {
+            return applyRepeatedCrashBoost({
                 name: pluginName,
+                confidence: "medium",
+                source: "stack-name",
                 reason: "The crash stack references this plugin name."
-            };
+            });
         }
     }
 
-    return undefined;
+    const breadcrumbDetection = getLatestBreadcrumbDetection();
+    return breadcrumbDetection ? applyRepeatedCrashBoost(breadcrumbDetection) : undefined;
 }
 
 function maybeDisableSuspectedPlugin(report: CrashReport) {
     if (!settings.store.autoDisableCrashedPlugins || report.suspectedPlugin === NO_PLUGIN_DETECTED) return;
+    if (report.suspectedPluginConfidence !== "high") {
+        report.disableReason = "The detection confidence was not high enough to disable a plugin automatically.";
+        return;
+    }
 
     const plugin = Plugins[report.suspectedPlugin];
     const pluginSettings = Settings.plugins[report.suspectedPlugin];
@@ -423,6 +790,18 @@ function writeCrashLog(report: CrashReport) {
         });
 }
 
+function shouldNotifyCrash(report: CrashReport) {
+    if (!settings.store.notifyOncePerPlugin || report.suspectedPlugin === NO_PLUGIN_DETECTED) return true;
+
+    return !notifiedPluginNames.has(report.suspectedPlugin);
+}
+
+function rememberCrashNotification(report: CrashReport) {
+    if (!settings.store.notifyOncePerPlugin || report.suspectedPlugin === NO_PLUGIN_DETECTED) return;
+
+    notifiedPluginNames.add(report.suspectedPlugin);
+}
+
 function openCrashLogsFolder() {
     if (!Native?.openCrashLogDir) {
         showNotification({
@@ -448,6 +827,9 @@ function handleCrash(boundary: CrashBoundary, errorState: CrashErrorState) {
     if (suspectedPlugin) {
         report.suspectedPlugin = suspectedPlugin.name;
         report.suspectedPluginReason = suspectedPlugin.reason;
+        report.suspectedPluginConfidence = suspectedPlugin.confidence;
+        report.suspectedPluginSource = suspectedPlugin.source;
+        rememberPluginCrash(suspectedPlugin.name);
         maybeDisableSuspectedPlugin(report);
     }
 
@@ -476,9 +858,10 @@ function handleCrash(boundary: CrashBoundary, errorState: CrashErrorState) {
         writeCrashLog(report);
         isRecovering = false;
         const popupReport = queuedPopupReport ?? report;
+        const shouldNotify = shouldNotifyCrash(popupReport);
         queuedPopupReport = null;
 
-        if (settings.store.showRecoveryToast) {
+        if (shouldNotify && settings.store.showRecoveryToast) {
             try {
                 showNotification({
                     color: report.recovered ? "#43b581" : "#f23f43",
@@ -491,8 +874,89 @@ function handleCrash(boundary: CrashBoundary, errorState: CrashErrorState) {
             }
         }
 
-        openCrashSupportModal(popupReport);
+        if (shouldNotify && (settings.store.showRecoveryToast || settings.store.showSupportPopup)) {
+            rememberCrashNotification(popupReport);
+        }
+
+        if (shouldNotify) {
+            openCrashSupportModal(popupReport);
+        }
     }, 50);
+}
+
+function normalizeGlobalError(error: unknown, fallback: string) {
+    if (error instanceof Error) return error;
+    if (typeof error === "string") return new Error(error);
+    if (error == null) return new Error(fallback);
+
+    return error;
+}
+
+function isIgnorableGlobalError(error: unknown) {
+    const message = getErrorMessage(error);
+
+    return message.startsWith("The play() request was interrupted ") ||
+        message.startsWith("ResizeObserver loop ");
+}
+
+function isIgnorableDiscordRejection(error: unknown) {
+    const message = getErrorMessage(error);
+
+    if (message === "Aborted") return true;
+    if (message.startsWith("Request has been terminated\n")) return true;
+    if (message === "This gift has been redeemed already.") return true;
+
+    return MESSAGE_SEND_FORBIDDEN_RE.test(message) ||
+        GUILD_VANITY_FORBIDDEN_RE.test(message) ||
+        USER_PROFILE_UNAVAILABLE_RE.test(message) ||
+        SOCKET_ALIVE_TIMEOUT_RE.test(message);
+}
+
+function isIgnorableUnhandledRejection(error: unknown) {
+    if (isIgnorableGlobalError(error)) return true;
+    if (error == null) return true;
+    if (isIgnorableDiscordRejection(error)) return true;
+    if (error instanceof Error || typeof error === "string") return false;
+
+    const record = asRecord(error);
+    if (typeof record?.stack === "string") return false;
+
+    return !getObjectErrorMessage(error);
+}
+
+function handleGlobalError(event: ErrorEvent) {
+    if (!settings.store.captureGlobalErrors) return;
+
+    const error = normalizeGlobalError(event.error, event.message || "Window error.");
+    if (isIgnorableGlobalError(error)) return;
+
+    logger.debug("Window error outside Discord crash boundary.", error);
+}
+
+function handleUnhandledRejection(event: PromiseRejectionEvent) {
+    if (!settings.store.captureGlobalErrors) return;
+
+    if (isIgnorableUnhandledRejection(event.reason)) return;
+
+    const error = normalizeGlobalError(event.reason, "Unhandled promise rejection.");
+
+    logger.debug("Unhandled rejection outside Discord crash boundary.", error);
+}
+
+function installGlobalListeners() {
+    if (globalListenersInstalled) return;
+
+    window.addEventListener("error", handleGlobalError);
+    window.addEventListener("unhandledrejection", handleUnhandledRejection);
+    globalListenersInstalled = true;
+}
+
+function removeGlobalListeners() {
+    if (!globalListenersInstalled) return;
+
+    window.removeEventListener("error", handleGlobalError);
+    window.removeEventListener("unhandledrejection", handleUnhandledRejection);
+    globalListenersInstalled = false;
 }
 
 function triggerTestCrash() {
@@ -509,9 +973,15 @@ function triggerTestCrash() {
 
 function CrashSupportModal({ modalProps, report }: CrashSupportModalProps) {
     const isLooping = report.recentCrashCount >= 3;
+    const [isCheckingUpdate, setIsCheckingUpdate] = React.useState(false);
     const recoveredText = report.recovered
         ? "Illegalcord recovered the screen, but the crash can happen again if the install or a plugin is broken."
         : "Illegalcord could not confirm a clean recovery. Restart or reinstall the client before continuing.";
+    const runUpdate = async () => {
+        setIsCheckingUpdate(true);
+        await checkAndUpdateIllegalcord();
+        setIsCheckingUpdate(false);
+    };
 
     return (
         <Modal
@@ -556,6 +1026,18 @@ function CrashSupportModal({ modalProps, report }: CrashSupportModalProps) {
 
                         <section className={cl("action")}>
                             <div className={cl("action-copy")}>
+                                <BaseText size="md" weight="semibold">Update Illegalcord</BaseText>
+                                <BaseText tag="p" size="sm" color="text-muted" className={cl("text")}>
+                                    Check for updates and install them without opening the settings updater.
+                                </BaseText>
+                            </div>
+                            <Button variant="secondary" disabled={isCheckingUpdate} onClick={() => void runUpdate()} className={cl("action-button")}>
+                                {isCheckingUpdate ? "Checking..." : "Check updates"}
+                            </Button>
+                        </section>
+
+                        <section className={cl("action")}>
+                            <div className={cl("action-copy")}>
                                 <BaseText size="md" weight="semibold">Telegram group</BaseText>
                                 <BaseText tag="p" size="sm" color="text-muted" className={cl("text")}>
                                     Check announcements, recent fixes, and support messages from the maintainer.
@@ -575,6 +1057,9 @@ function CrashSupportModal({ modalProps, report }: CrashSupportModalProps) {
                         </BaseText>
                         <BaseText tag="p" size="sm" color="text-muted" className={cl("error")}>
                             Suspected plugin: {report.suspectedPlugin}
+                        </BaseText>
+                        <BaseText tag="p" size="sm" color="text-muted" className={cl("error")}>
+                            Confidence: {report.suspectedPluginConfidence} via {report.suspectedPluginSource}
                         </BaseText>
                         <BaseText tag="p" size="sm" color="text-muted" className={cl("error")}>
                             Detection: {report.suspectedPluginReason}
@@ -702,7 +1187,9 @@ export default definePlugin({
     name: "CrashHandlerEnhanced",
     description: "Adds Illegalcord crash recovery, support guidance, and a copyable crash report.",
     tags: ["Utility", "Developers"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
+    required: true,
+    enabledByDefault: true,
     settings,
     settingsAboutComponent: SafeCrashHandlerSettings,
     toolboxActions: {
@@ -710,6 +1197,21 @@ export default definePlugin({
         "Copy latest crash report": copyLatestReport,
         "Open crash logs folder": openCrashLogsFolder,
         "Trigger test crash": triggerTestCrash
+    },
+
+    start() {
+        instrumentPlugins();
+        installGlobalListeners();
+        instrumentationIntervalId = window.setInterval(instrumentPlugins, 10000);
+    },
+
+    stop() {
+        removeGlobalListeners();
+
+        if (instrumentationIntervalId !== undefined) {
+            clearInterval(instrumentationIntervalId);
+            instrumentationIntervalId = undefined;
+        }
     },
 
     patches: [

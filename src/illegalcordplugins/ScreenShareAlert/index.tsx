@@ -9,7 +9,6 @@ import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import type { VoiceState } from "@vencord/discord-types";
 import { ChannelRouter, ChannelStore, SelectedChannelStore, UserStore, VoiceStateStore } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 interface StoredVoiceState {
     channelId?: string;
@@ -147,7 +146,7 @@ export default definePlugin({
     name: "ScreenShareAlert",
     description: "Sends native notifications when someone starts sharing their screen in voice.",
     tags: ["Voice", "Notifications", "Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
 
     start() {

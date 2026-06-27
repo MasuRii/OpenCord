@@ -7,7 +7,6 @@
 import { definePluginSettings } from "@api/Settings";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
-import { IllegalcordDevs } from "@utils/constants";
 
 const logger = new Logger("WebCordHardened");
 
@@ -400,7 +399,7 @@ export default definePlugin({
     name: "WebCordHardened",
     description: "Adds WebCord privacy hardening with network, permission, and WebRTC protections.",
     tags: ["Privacy", "Utility", "Voice"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
     startAt: StartAt.Init,
 

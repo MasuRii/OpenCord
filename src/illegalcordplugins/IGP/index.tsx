@@ -15,7 +15,6 @@ import { ChannelStore, showToast, Toasts, UserStore } from "@webpack/common";
 
 import { buildDecryptModal } from "./decryptModal";
 import { buildModal } from "./modal";
-import { IllegalcordDevs } from "@utils/constants";
 
 const ChatBarIcon: ChatBarButtonFactory = ({ isMainChat, channel }) => {
     if (!isMainChat) return null;
@@ -705,7 +704,7 @@ const keyManager = new KeyManager();
 export default definePlugin({
     name: "IGP",
     description: "Illegalcord PGP encryption.",
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
 
     start() {

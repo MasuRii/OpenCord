@@ -7,7 +7,6 @@
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType, type PluginNative, ReporterTestable } from "@utils/types";
 import { ChannelStore, DraftType, FluxDispatcher, SelectedChannelStore, showToast, Toasts, UploadHandler } from "@webpack/common";
-import { IllegalcordDevs } from "@utils/constants";
 
 const Native = VencordNative?.pluginHelpers?.SecureZipper as PluginNative<typeof import("./native")> | undefined;
 const allowedFiles = new WeakSet<File>();
@@ -159,7 +158,7 @@ function interceptUploadAddFiles(event: unknown): void {
 export default definePlugin({
     name: "SecureZipper",
     description: "Encrypts Discord uploads into 7z archives with AES-256 before sending. (Required 7zip & Windows)",
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     tags: ["Privacy", "Utility"],
     reporterTestable: ReporterTestable.None,
     settings,

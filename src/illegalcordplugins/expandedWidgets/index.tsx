@@ -1,4 +1,10 @@
-import { IllegalcordDevs } from "@utils/constants";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { Devs } from "@utils/constants";
 import definePlugin from "@utils/types";
 
 export default definePlugin({
@@ -6,7 +12,7 @@ export default definePlugin({
     description: "Enables setting multiple of the same tags for a game in your profile",
     tags: ["Chat", "Appearance"],
     authors: [
-        IllegalcordDevs.sadie
+        Devs.sadie
     ],
     patches: [
         {

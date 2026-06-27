@@ -1,21 +1,19 @@
 /*
-Made with ❤️ by neoarz
-I am not responsible for any damage caused by this plugin; use at your own risk
-Vencord does not endorse/support this plugin (Works with Equicord as well)
-dm @neoarz if u need help or have any questions
-https://github.com/neoarz/NitroSniper
-*/
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
 
+import { showNotification } from "@api/Notifications";
 import { Logger } from "@utils/Logger";
 import definePlugin from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { findByPropsLazy } from "@webpack";
-import { UserStore } from "@webpack/common";
+import { ChannelStore, UserStore } from "@webpack/common";
 
 import { settings } from "./settings";
 import type { ClaimRequest, WebhookResult } from "./types";
 import { sendClaimWebhook } from "./webhook";
-import { IllegalcordDevs } from "@utils/constants";
 
 const GIFT_LINK_REGEX = /(?:discord\.gift\/|discord\.com\/gifts?\/)([a-zA-Z0-9]{16,24})/;
 
@@ -25,10 +23,12 @@ const GiftActions = findByPropsLazy("redeemGiftCode");
 let startTime = 0;
 let claiming = false;
 const claimQueue: ClaimRequest[] = [];
+const seenCodes = new Set<string>();
 
 function resetState() {
     startTime = Date.now();
     claimQueue.length = 0;
+    seenCodes.clear();
     claiming = false;
 }
 
@@ -52,6 +52,13 @@ function extractGiftCode(content: string) {
     return content.match(GIFT_LINK_REGEX)?.[1] ?? null;
 }
 
+function shouldSkipCode(code: string) {
+    if (!settings.store.skipRepeatedCodes) return false;
+    if (seenCodes.has(code)) return true;
+    seenCodes.add(code);
+    return false;
+}
+
 function createClaimRequest(message: Message): ClaimRequest | null {
     const code = message.content ? extractGiftCode(message.content) : null;
     if (!code) return null;
@@ -68,7 +75,7 @@ function createClaimRequest(message: Message): ClaimRequest | null {
             ? `https://cdn.discordapp.com/avatars/${authorId}/${authorAvatar}.png?size=128`
             : undefined,
         channelId: message.channel_id,
-        guildId: (message as Message & { guild_id?: string; }).guild_id,
+        guildId: ChannelStore.getChannel(message.channel_id)?.guild_id,
         messageId: message.id
     };
 }
@@ -80,6 +87,16 @@ function notifyClaim(result: WebhookResult, request: ClaimRequest) {
         request
     ).catch(webhookError => {
         logger.error("Failed to send NitroSniper webhook notification", webhookError);
+    });
+}
+
+function notifyClaimAttempt(request: ClaimRequest) {
+    const sender = request.authorName ?? request.authorUsername;
+    showNotification({
+        title: "Nitro redemption attempt",
+        body: sender
+            ? `Trying to redeem a Nitro gift code sent by ${sender}.`
+            : "Trying to redeem a Nitro gift code."
     });
 }
 
@@ -106,7 +123,14 @@ function processQueue() {
     const request = claimQueue.shift();
     if (!request) return;
 
+    if (!GiftActions?.redeemGiftCode) {
+        logger.error("GiftActions module not found. Cannot redeem gift codes.");
+        claiming = false;
+        return;
+    }
+
     claiming = true;
+    notifyClaimAttempt(request);
     GiftActions.redeemGiftCode({
         code: request.code,
         onRedeemed: () => handleClaimSuccess(request),
@@ -117,7 +141,10 @@ function processQueue() {
 export default definePlugin({
     name: "NitroSniper",
     description: "Automatically redeems Nitro gift links sent in chat",
-    authors: [IllegalcordDevs.neoarz],
+    authors: [{
+        name: "neoarz",
+        id: 218675193592283137n
+    }],
     tags: ["Chat", "Utility"],
     searchTerms: ["nitro", "gift", "redeem", "snipe"],
     settings,
@@ -126,12 +153,16 @@ export default definePlugin({
         resetState();
     },
 
+    stop() {
+        resetState();
+    },
+
     flux: {
         MESSAGE_CREATE({ message }: { message: Message; }) {
             if (!message.content || shouldSkipMessage(message) || isMessageOlderThanStart(message)) return;
 
             const request = createClaimRequest(message);
-            if (!request) return;
+            if (!request || shouldSkipCode(request.code)) return;
 
             claimQueue.push(request);
             processQueue();

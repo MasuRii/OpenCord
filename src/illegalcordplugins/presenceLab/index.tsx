@@ -6,7 +6,7 @@
 
 import { ComponentsIcon } from "@components/Icons";
 import SettingsPlugin from "@plugins/_core/settings";
-import { IllegalcordDevs } from "@utils/constants";
+import { Devs } from "@utils/constants";
 import { removeFromArray } from "@utils/misc";
 import definePlugin from "@utils/types";
 
@@ -34,7 +34,8 @@ function registerPresenceLabSettingsTab() {
 export default definePlugin({
     name: "PresenceLab",
     description: "Local-only dashboard for operators, targets, and manually logged experimental presence sessions.",
-    authors: [IllegalcordDevs.clrxxo],
+    authors: [Devs.clrxxo],
+    enabledByDefault: true,
     tags: ["Developers", "Utility"],
     requiresRestart: false,
 

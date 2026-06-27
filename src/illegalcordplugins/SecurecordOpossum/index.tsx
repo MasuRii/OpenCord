@@ -11,7 +11,6 @@ import { definePluginSettings } from "@api/Settings";
 import { Logger } from "@utils/Logger";
 import definePlugin, { IconComponent, OptionType } from "@utils/types";
 import { CommandContext, Message } from "@vencord/discord-types";
-import { IllegalcordDevs } from "@utils/constants";
 
 interface IMessageCreate {
     type: "MESSAGE_CREATE";
@@ -724,7 +723,7 @@ export default definePlugin({
     name: "SecurecordOpossum",
     description: "High-Performance, Post-Quantum Resilient end-to-end encryption for Discord based on BlazingOpossum cipher. Share the same password with other users to communicate securely.",
     tags: ["Privacy", "Chat"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
     chatBarButton: {
         icon: EncryptionEnabledIcon,

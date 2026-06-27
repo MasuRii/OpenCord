@@ -15,12 +15,12 @@ import definePlugin, { OptionType, type PluginNative } from "@utils/types";
 import type { RenderModalProps } from "@vencord/discord-types";
 import { Modal, openModal, React, showToast, TextInput, Toasts, UserStore, useStateFromStores } from "@webpack/common";
 import type { SVGProps } from "react";
-import { IllegalcordDevs } from "@utils/constants";
 
 const Native = VencordNative?.pluginHelpers?.MultiInstance as PluginNative<typeof import("./native")> | undefined;
 
 const ICON_SETTING_KEYS: Array<"showIcon"> = ["showIcon"];
 const PROFILE_SETTING_KEYS: Array<"instances"> = ["instances"];
+const SESSION_SETTING_KEYS: Array<"blockExternalTokenAccess" | "performanceMode"> = ["blockExternalTokenAccess", "performanceMode"];
 const DOMAINS = ["discord.com", "ptb.discord.com", "canary.discord.com"] as const;
 const DOMAIN_LABELS: Record<DiscordDomain, string> = {
     "discord.com": "Discord",
@@ -91,6 +91,8 @@ function getProfiles(value: unknown) {
 }
 
 function shouldSaveSession(profile: InstanceProfile) {
+    if (settings.store.blockExternalTokenAccess) return false;
+
     return profile.saveSession ?? settings.store.saveSessionsByDefault;
 }
 
@@ -147,6 +149,16 @@ const settings = definePluginSettings({
         description: "Save sessions for new instances by default.",
         default: true
     },
+    blockExternalTokenAccess: {
+        type: OptionType.BOOLEAN,
+        description: "Use protected temporary sessions and clear saved login data before opening an instance.",
+        default: false
+    },
+    performanceMode: {
+        type: OptionType.BOOLEAN,
+        description: "Throttle background instances to reduce CPU usage.",
+        default: false
+    },
     openManager: {
         type: OptionType.COMPONENT,
         component: MultiInstanceSettingsButton,
@@ -157,6 +169,7 @@ const settings = definePluginSettings({
 function MultiInstanceModal({ rootProps }: { rootProps: RenderModalProps; }) {
     const currentUser = useStateFromStores([UserStore], () => UserStore.getCurrentUser());
     const profiles = getProfiles(settings.use(PROFILE_SETTING_KEYS).instances);
+    const { blockExternalTokenAccess, performanceMode } = settings.use(SESSION_SETTING_KEYS);
     const [openIds, setOpenIds] = React.useState<string[]>([]);
     const [busyId, setBusyId] = React.useState<string | null>(null);
     const [newName, setNewName] = React.useState("");
@@ -190,11 +203,11 @@ function MultiInstanceModal({ rootProps }: { rootProps: RenderModalProps; }) {
         setBusyId(profile.id);
 
         const saveSession = shouldSaveSession(profile);
-        const result = await Native.openInstance(profile.id, profile.name, saveSession, getDomain(profile))
+        const result = await Native.openInstance(profile.id, profile.name, saveSession, getDomain(profile), blockExternalTokenAccess, performanceMode)
             .catch(error => ({ ok: false, error: getErrorMessage(error) }));
 
         if (result.ok) {
-            showToast(`${profile.name} opened${saveSession ? "." : " as a temporary session."}`, Toasts.Type.SUCCESS);
+            showToast(`${profile.name} opened${blockExternalTokenAccess ? " with token protection." : saveSession ? "." : " as a temporary session."}`, Toasts.Type.SUCCESS);
         } else {
             showToast(result.error ?? `Could not open ${profile.name}.`, Toasts.Type.FAILURE);
         }
@@ -335,7 +348,21 @@ function MultiInstanceModal({ rootProps }: { rootProps: RenderModalProps; }) {
                         <strong>Temporary session</strong>
                         <span>Exists only while that instance window is open.</span>
                     </div>
+                    <div>
+                        <strong>Token protection</strong>
+                        <span>Forces temporary sessions and clears saved login data before opening.</span>
+                    </div>
+                    <div>
+                        <strong>Performance mode</strong>
+                        <span>Throttles background instances to reduce CPU usage after reopening.</span>
+                    </div>
                 </div>
+
+                {blockExternalTokenAccess && (
+                    <div className="vc-multi-instance-warning">
+                        Token protection is enabled. Instances will not use saved sessions while this setting is on.
+                    </div>
+                )}
 
                 <div className="vc-multi-instance-toolbar">
                     <p className="vc-multi-instance-text">
@@ -360,6 +387,7 @@ function MultiInstanceModal({ rootProps }: { rootProps: RenderModalProps; }) {
                         const saveSession = shouldSaveSession(profile);
                         const domain = getDomain(profile);
                         const isEditing = editingId === profile.id;
+                        const sessionLabel = blockExternalTokenAccess ? "Protected temporary session" : saveSession ? "Saved session" : "Temporary session";
 
                         return (
                             <div className="vc-multi-instance-row" key={profile.id}>
@@ -384,7 +412,7 @@ function MultiInstanceModal({ rootProps }: { rootProps: RenderModalProps; }) {
                                             <div className="vc-multi-instance-name">{profile.name}</div>
                                         )}
                                         <div className="vc-multi-instance-id">
-                                            {profile.id} · {DOMAIN_LABELS[domain]} · {saveSession ? "Saved session" : "Temporary session"}
+                                            {profile.id} · {DOMAIN_LABELS[domain]} · {sessionLabel}
                                         </div>
                                     </div>
                                 </div>
@@ -395,8 +423,8 @@ function MultiInstanceModal({ rootProps }: { rootProps: RenderModalProps; }) {
                                     <Button size="small" variant="secondary" disabled={isBusy || isOpen} onClick={() => cycleDomain(profile)}>
                                         {DOMAIN_LABELS[domain]}
                                     </Button>
-                                    <Button size="small" variant="secondary" disabled={isBusy || isOpen} onClick={() => toggleSessionSaving(profile)}>
-                                        {saveSession ? "Use once" : "Save"}
+                                    <Button size="small" variant="secondary" disabled={isBusy || isOpen || blockExternalTokenAccess} onClick={() => toggleSessionSaving(profile)}>
+                                        {blockExternalTokenAccess ? "Protected" : saveSession ? "Use once" : "Save"}
                                     </Button>
                                     <Button size="small" disabled={isBusy || isEditing} onClick={() => void openInstance(profile)}>
                                         {isOpen ? "Focus" : "Open"}
@@ -453,8 +481,9 @@ const MultiInstanceButtonWithBoundary = ErrorBoundary.wrap(MultiInstanceButton, 
 export default definePlugin({
     name: "MultiInstance",
     description: "Opens extra Illegalcord windows with separate Discord sessions.",
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     dependencies: ["HeaderBarAPI"],
+    enabledByDefault: true,
     settings,
     headerBarButton: {
         icon: MultiInstanceIcon,

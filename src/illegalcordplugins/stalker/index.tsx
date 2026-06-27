@@ -15,7 +15,6 @@ import { ChannelStore, GuildStore, Menu } from "@webpack/common";
 import * as activity from "./activity";
 import * as status from "./status";
 import * as voice from "./voice";
-import { IllegalcordDevs } from "@utils/constants";
 
 export const logger = new Logger("Stalker");
 
@@ -280,8 +279,8 @@ export default definePlugin({
     description: "Notifies you whenever a person does something.",
     tags: ["Friends", "Utility"],
     authors: [
-        IllegalcordDevs.Reycko,
-        IllegalcordDevs.irritably
+        { name: "Reycko", id: 1123725368004726794n },
+        { name: "irritably", id: 928787166916640838n }
     ],
 
     contextMenus: {

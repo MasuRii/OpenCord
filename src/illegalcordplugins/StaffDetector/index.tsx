@@ -7,11 +7,22 @@
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
 import { Logger } from "@utils/Logger";
-import { IllegalcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { chooseFile } from "@utils/web";
 import { findStoreLazy } from "@webpack";
-import { Button, ChannelStore, GuildMemberStore, GuildRoleStore, GuildStore, IconUtils, PermissionsBits, React, Toasts, UserStore, VoiceStateStore } from "@webpack/common";
+import {
+    Button,
+    ChannelStore,
+    GuildMemberStore,
+    GuildRoleStore,
+    GuildStore,
+    IconUtils,
+    PermissionsBits,
+    React,
+    Toasts,
+    UserStore,
+    VoiceStateStore,
+} from "@webpack/common";
 
 const SelectedChannelStore = findStoreLazy("SelectedChannelStore");
 const PermissionStore = findStoreLazy("PermissionStore");
@@ -653,8 +664,8 @@ export default definePlugin({
     description: "Alerts (toast/notification + sound) when staff join or leave your VC.",
     tags: ["Servers", "Utility"],
     authors: [
-        IllegalcordDevs.Irritably,
-        IllegalcordDevs.zFrxncesck1,
+        { name: "Irritably", id: 928787166916640838n },
+        { name: "zFrxncesck1", id: 456195985404592149n },
     ],
     settings,
 

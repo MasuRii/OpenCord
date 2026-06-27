@@ -5,42 +5,42 @@
  */
 
 import definePlugin from "@utils/types";
-import { IllegalcordDevs } from "@utils/constants";
 
+const URL_REGEX = /https:\/\/[^\s<>()]+/gi;
+const URL_TRAILING_PUNCTUATION_REGEX = /[),.!?]+$/;
 
-
-const urlMap = new Map<string, string>([
-    ["https://www.tiktok.com", "https://www.tnktok.com"],
-    ["https://vt.tiktok.com", "https://www.tnktok.com"],
-    ["https://x.com", "https://www.fxtwitter.com"],
-    ["https://www.twitter.com", "https://www.fxtwitter.com"],
-    ["https://www.instagram.com", "https://www.kkinstagram.com"]
-]);
+const urlMap: Record<string, string> = {
+    "https://www.tiktok.com": "https://www.tnktok.com",
+    "https://vt.tiktok.com": "https://www.tnktok.com",
+    "https://x.com": "https://www.fxtwitter.com",
+    "https://www.twitter.com": "https://www.fxtwitter.com",
+    "https://www.instagram.com": "https://www.kkinstagram.com"
+};
 
 export default definePlugin({
     name: "EmbeddedURLs",
-    description: "Turns plain social links into embeddable URLs so posts and videos are fully viewable in Discord instead of forcing users to open the external site.",
+    description: `Turns plain social links into embeddable URLs so posts
+    and videos are fully viewable in Discord instead of forcing users to open the external site.`,
     tags: ["Chat", "Media"],
-    authors: [IllegalcordDevs.Dadian1],
+    authors: [{ name: "Dadian1", id: 131825869302792192n }],
 
-    replaceUrl(originalUrl: string): string {
+    replaceUrl(match: string): string {
+        const trailingPunctuation = URL_TRAILING_PUNCTUATION_REGEX.exec(match)?.[0] ?? "";
+        const originalUrl = trailingPunctuation ? match.slice(0, -trailingPunctuation.length) : match;
+
         try {
             var newUrl = new URL(originalUrl);
         } catch (error) {
-            // Don't modify anything if we can't parse the URL
-            return originalUrl;
+            return match;
         }
-        if (urlMap.has(newUrl.origin)) {
-            return urlMap.get(newUrl.origin) + newUrl.pathname + newUrl.search;
-        }
-        // If we can't find the URL in the map, return the original
-        return originalUrl;
+
+        const replacementOrigin = urlMap[newUrl.origin];
+        if (!replacementOrigin) return match;
+
+        return `${replacementOrigin}${newUrl.pathname}${newUrl.search}${newUrl.hash}${trailingPunctuation}`;
     },
 
     onBeforeMessageSend(_, msg) {
-        // Only modify URL
-        if (/https:\/\//.test(msg.content)) {
-            msg.content = this.replaceUrl(msg.content); // needs fixing because this only works with raw url message
-        }
+        msg.content = msg.content.replace(URL_REGEX, match => this.replaceUrl(match));
     }
 });

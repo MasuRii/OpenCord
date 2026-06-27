@@ -10,7 +10,6 @@ import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { showToast, Toasts } from "@webpack/common";
 
 import type { DnsFamily, DnsResolveResult } from "./native";
-import { IllegalcordDevs } from "@utils/constants";
 
 const Native = VencordNative.pluginHelpers.CustomDNS as PluginNative<typeof import("./native")>;
 
@@ -399,7 +398,7 @@ export default definePlugin({
     name: "CustomDNS",
     description: "Resolve Discord hosts through DNS.SB, Quad9, or custom DNS servers.",
     tags: ["Privacy", "Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
 
     start() {

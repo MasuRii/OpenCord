@@ -19,6 +19,7 @@ const PROFILE_ID_RE = /^[a-z0-9_-]{1,32}$/i;
 const openWindows = new Map<string, {
     ses: Electron.Session;
     win: BrowserWindow;
+    saveSession: boolean;
 }>();
 const configuredSessions = new Set<string>();
 
@@ -162,26 +163,42 @@ export async function openInstance(
     rawProfileId: unknown,
     rawDisplayName: unknown,
     rawSaveSession: unknown = true,
-    rawDomain: unknown = "discord.com"
+    rawDomain: unknown = "discord.com",
+    rawBlockExternalTokenAccess: unknown = false,
+    rawPerformanceMode: unknown = false
 ): Promise<NativeResult> {
     const profileId = normalizeProfileId(rawProfileId);
     if (!profileId) return { ok: false, error: "Invalid instance profile." };
 
     const displayName = normalizeDisplayName(rawDisplayName, "Secondary Discord");
-    const saveSession = rawSaveSession !== false;
+    const blockExternalTokenAccess = rawBlockExternalTokenAccess === true;
+    const performanceMode = rawPerformanceMode === true;
+    const saveSession = !blockExternalTokenAccess && rawSaveSession !== false;
     const domain = normalizeDomain(rawDomain);
     const existing = openWindows.get(profileId);
 
     if (existing && !existing.win.isDestroyed()) {
+        if (blockExternalTokenAccess && existing.saveSession) {
+            return { ok: false, error: "Close this instance before opening it with token protection." };
+        }
+
         focusWindow(existing.win);
         return { ok: true };
     }
 
     try {
+        const savedPartition = `persist:illegalcord-mi-${profileId}`;
+        if (blockExternalTokenAccess) {
+            const savedSes = session.fromPartition(savedPartition, { cache: true });
+            await savedSes.clearStorageData();
+            await savedSes.clearCache();
+            configuredSessions.delete(savedPartition);
+        }
+
         const partition = saveSession
-            ? `persist:illegalcord-mi-${profileId}`
+            ? savedPartition
             : `illegalcord-mi-${profileId}-${Date.now()}`;
-        const ses = session.fromPartition(partition, { cache: true });
+        const ses = session.fromPartition(partition, { cache: !blockExternalTokenAccess });
         configureSession(partition, ses);
 
         const win = new BrowserWindow({
@@ -199,7 +216,7 @@ export async function openInstance(
                 contextIsolation: true,
                 nodeIntegration: false,
                 sandbox: false,
-                backgroundThrottling: false,
+                backgroundThrottling: performanceMode,
                 session: ses
             }
         });
@@ -207,7 +224,7 @@ export async function openInstance(
         const cleanupWindowControls = registerWindowControls(win);
         const { webContents } = win;
 
-        openWindows.set(profileId, { ses, win });
+        openWindows.set(profileId, { ses, win, saveSession });
 
         if (process.platform === "win32") {
             win.setAppDetails({
@@ -230,8 +247,7 @@ export async function openInstance(
         win.on("enter-html-full-screen", () => win.setFullScreen(true));
         win.on("leave-html-full-screen", () => win.setFullScreen(false));
 
-        webContents.on("will-navigate", event => {
-            const { url } = event;
+        webContents.on("will-navigate", (event, url) => {
             if (!isDiscordUrl(url)) event.preventDefault();
         });
 

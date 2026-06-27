@@ -7,7 +7,6 @@
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByProps } from "@webpack";
-import { IllegalcordDevs } from "@utils/constants";
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
@@ -143,7 +142,7 @@ export default definePlugin({
     name: "ClanSwitcher",
     description: "Automatically rotates Discord clan tags at a configurable interval.",
     tags: ["Appearance", "Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     settings,
 
     start() {

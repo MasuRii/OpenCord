@@ -18,7 +18,6 @@ import { ChannelStore, GuildStore, Menu, PresenceStore, RelationshipStore, Setti
 
 import { recordEvent, trimEvents } from "./store";
 import type { MessageSnapshot, SurveillanceEvent, SurveillanceEventType, SurveillanceScope, VoiceParticipant, VoiceState, VoiceStateFlag } from "./types";
-import { IllegalcordDevs } from "@utils/constants";
 
 const SETTINGS_ENTRY_KEY = "illegalcord_surveillance";
 const NOTIFICATION_COLOR = "#5865f2";
@@ -992,7 +991,7 @@ export default definePlugin({
     name: "Surveillance",
     description: "Adds a local live event dashboard for selected users and servers.",
     tags: ["Friends", "Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     enabledByDefault: false,
     settings,
     contextMenus: {

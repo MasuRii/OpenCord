@@ -5,13 +5,12 @@
  */
 
 import definePlugin from "@utils/types";
-import { IllegalcordDevs } from "@utils/constants";
 
 export default definePlugin({
     name: "1FA",
     description: "hide the 2fa moderation warning because annoying",
     tags: ["Appearance", "Utility"],
-    authors: [IllegalcordDevs.Death],
+    authors: [{ id: 1003477997728313405n, name: "Death" }],
     patches: [
         {
             find: "APPLICATION_SUBSCRIPTION_EXPIRATION:",

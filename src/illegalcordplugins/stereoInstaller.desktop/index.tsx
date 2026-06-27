@@ -10,15 +10,14 @@ import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Heading } from "@components/Heading";
-import { HeadphonesIcon } from "@components/Icons";
+import { DeleteIcon, HeadphonesIcon, NoEntrySignIcon, WarningIcon } from "@components/Icons";
 import { Paragraph } from "@components/Paragraph";
 import SettingsPlugin from "@plugins/_core/settings";
-import { removeFromArray } from "@utils/misc";
+import { classes, removeFromArray } from "@utils/misc";
 import definePlugin, { OptionType, PluginNative, ReporterTestable } from "@utils/types";
 import { Alerts, Button, React, Select, SettingsRouter, showToast, TextInput, Toasts } from "@webpack/common";
 
 import type { ActionInfo, InstallInfo, NativeResult, StereoMethod2Quality } from "./native";
-import { IllegalcordDevs } from "@utils/constants";
 
 const Native = VencordNative.pluginHelpers.StereoInstaller as PluginNative<typeof import("./native")>;
 const SETTINGS_ENTRY_KEY = "illegalcord_stereo_installer";
@@ -27,6 +26,12 @@ const VOICE_PLAYGROUND_SOURCE_URL = "https://codeberg.org/UnpackedX/Discord-Expe
 const VOICE_PLAYGROUND_TUTORIAL_URL = "https://www.youtube.com/watch?v=zSIIganbZxg";
 
 type InstallerMethod = "method1" | "method2";
+type LogLevel = "error" | "info" | "success" | "warning";
+
+interface LogEntry {
+    id: number;
+    line: string;
+}
 
 const METHOD_LABELS = {
     method1: "Discord Audio Collective Method",
@@ -50,9 +55,10 @@ const METHOD_2_QUALITY_OPTIONS = [
 ] satisfies Array<{ label: string; value: StereoMethod2Quality; }>;
 
 let lastRepatchNotificationKey = "";
+let nextLogId = 0;
 
-function appendLogs(existingLogs: string[], newLogs: string[] | undefined): string[] {
-    return [...existingLogs, ...(newLogs ?? [])];
+function appendLogs(existingLogs: LogEntry[], newLogs: string[] | undefined): LogEntry[] {
+    return [...existingLogs, ...(newLogs ?? []).map(line => ({ id: nextLogId++, line }))];
 }
 
 function notifyRepatchIfNeeded(info: InstallInfo): void {
@@ -93,11 +99,71 @@ function InfoLine({ label, value }: { label: string; value: string; }) {
     );
 }
 
+function InstallationStatus({ info }: { info: InstallInfo | ActionInfo; }) {
+    const method = info.installedMethod ? METHOD_LABELS[info.installedMethod === "discordAudioCollective" ? "method1" : "method2"] : "StereoInstaller";
+
+    if (info.installStatus === "installed") {
+        return (
+            <div className={classes("vc-stereo-installer-install-status", "vc-stereo-installer-install-status-installed")}>
+                <HeadphonesIcon width={28} height={28} />
+                <div>
+                    <Heading tag="h3">Stereo is installed</Heading>
+                    <Paragraph>{method} is active for {info.clientLabel}.</Paragraph>
+                </div>
+            </div>
+        );
+    }
+
+    if (info.installStatus === "needsReinstall") {
+        return (
+            <div className={classes("vc-stereo-installer-install-status", "vc-stereo-installer-install-status-needs-reinstall")}>
+                <WarningIcon width={28} height={28} />
+                <div>
+                    <Heading tag="h3">Stereo must be installed again</Heading>
+                    <Paragraph>Discord was updated after {method} was installed. Patch Discord voice again.</Paragraph>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={classes("vc-stereo-installer-install-status", "vc-stereo-installer-install-status-not-installed")}>
+            <NoEntrySignIcon width={28} height={28} />
+            <div>
+                <Heading tag="h3">Stereo is not installed</Heading>
+                <Paragraph>Choose a method and patch Discord voice to enable stereo audio.</Paragraph>
+            </div>
+        </div>
+    );
+}
+
+function LogLine({ entry }: { entry: LogEntry; }) {
+    const match = /^\[([^\]]+)]\s*(.*)$/.exec(entry.line);
+    const timestamp = match?.[1] || "";
+    const rawMessage = match?.[2] || entry.line;
+    const level: LogLevel = /^(?:FAIL|ERROR):/i.test(rawMessage)
+        ? "error"
+        : /^WARN:/i.test(rawMessage)
+            ? "warning"
+            : /^OK:/i.test(rawMessage)
+                ? "success"
+                : "info";
+    const message = rawMessage.replace(/^(?:FAIL|ERROR|WARN|OK):\s*/i, "");
+
+    return (
+        <div className={classes("vc-stereo-installer-log-line", `vc-stereo-installer-log-line-${level}`)}>
+            <span className="vc-stereo-installer-log-time">{timestamp || "--"}</span>
+            <span className="vc-stereo-installer-log-level">{level}</span>
+            <span className="vc-stereo-installer-log-message">{message}</span>
+        </div>
+    );
+}
+
 function StereoInstallerPanel() {
     const [root, setRoot] = React.useState("");
     const [info, setInfo] = React.useState<InstallInfo | ActionInfo | null>(null);
     const [status, setStatus] = React.useState("Ready.");
-    const [logs, setLogs] = React.useState<string[]>([]);
+    const [logs, setLogs] = React.useState<LogEntry[]>([]);
     const [busy, setBusy] = React.useState(false);
     const [installerMethod, setInstallerMethod] = React.useState<InstallerMethod>("method1");
     const [method2Quality, setMethod2Quality] = React.useState<StereoMethod2Quality>("128");
@@ -131,6 +197,20 @@ function StereoInstallerPanel() {
         setRoot(detected.discordRoot);
         setStatus(detected.repatchWarning || "Discord install detected.");
         notifyRepatchIfNeeded(detected);
+    }
+
+    async function loadLogs(): Promise<void> {
+        const result = await Native.readLogs();
+        if (result.success) setLogs(appendLogs([], result.data));
+    }
+
+    async function clearLogs(): Promise<void> {
+        const cleared = await runNative(() => Native.clearLogs());
+        if (!cleared) return;
+
+        setLogs([]);
+        setStatus("Logs cleared.");
+        showToast("StereoInstaller logs cleared.", Toasts.Type.SUCCESS);
     }
 
     async function browse(): Promise<void> {
@@ -242,7 +322,7 @@ function StereoInstallerPanel() {
     }
 
     React.useEffect(() => {
-        void autoDetect();
+        void loadLogs().then(autoDetect);
     }, []);
 
     React.useEffect(() => {
@@ -382,6 +462,8 @@ function StereoInstallerPanel() {
                 </div>
             </div>
 
+            {info && <InstallationStatus info={info} />}
+
             {info && (
                 <div className="vc-stereo-installer-info">
                     <InfoLine label="Client" value={info.clientLabel} />
@@ -394,11 +476,28 @@ function StereoInstallerPanel() {
 
             <Paragraph className="vc-stereo-installer-status">{busy ? "Working..." : status}</Paragraph>
 
-            {!!logs.length && (
-                <div className="vc-stereo-installer-log-panel">
-                    <pre className="vc-stereo-installer-log">{logs.slice(-80).join("\n")}</pre>
+            <div className="vc-stereo-installer-log-panel">
+                <div className="vc-stereo-installer-log-header">
+                    <div>
+                        <Heading tag="h3">Installer logs</Heading>
+                        <Paragraph>{logs.length ? `${logs.length} log entries.` : "No log entries yet."}</Paragraph>
+                    </div>
+                    <Button
+                        color={Button.Colors.RED}
+                        size={Button.Sizes.SMALL}
+                        disabled={busy || !logs.length}
+                        onClick={() => void clearLogs()}
+                    >
+                        <DeleteIcon width={16} height={16} />
+                        Clear logs
+                    </Button>
                 </div>
-            )}
+                <div className="vc-stereo-installer-log" role="log" aria-live="polite">
+                    {logs.length
+                        ? logs.slice(-200).map(entry => <LogLine key={entry.id} entry={entry} />)
+                        : <div className="vc-stereo-installer-log-empty">StereoInstaller activity will appear here.</div>}
+                </div>
+            </div>
         </div>
     );
 }
@@ -423,7 +522,7 @@ export default definePlugin({
     name: "StereoInstaller",
     description: "Installs and reverts the Discord stereo voice module from selected method sources.",
     tags: ["Utility"],
-    authors: [IllegalcordDevs.irritably],
+    authors: [{ name: "irritably", id: 928787166916640838n }],
     reporterTestable: ReporterTestable.None,
     settings,
     settingsAboutComponent: ErrorBoundary.wrap(StereoWarning, { noop: true }),
