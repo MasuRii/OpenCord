@@ -23,6 +23,15 @@ interface FetchTiming {
 let currentFetch: FetchTiming | null = null;
 let currentChannelId: string | null = null;
 const channelTimings: Map<string, { time: number; timestamp: Date; }> = new Map();
+const MAX_CHANNEL_TIMINGS = 100;
+
+function trimChannelTimings() {
+    while (channelTimings.size > MAX_CHANNEL_TIMINGS) {
+        const key = channelTimings.keys().next().value;
+        if (key === undefined) break;
+        channelTimings.delete(key);
+    }
+}
 
 const settings = definePluginSettings({
     location: {
@@ -99,9 +108,9 @@ function ChannelFetchTimeButton() {
 }
 
 const FetchTimeButton: ChatBarButtonFactory = ({ isMainChat }) => {
-    const { showMs, iconColor } = settings.use(["showMs", "iconColor"]);
+    const { showMs, iconColor, showIcon, location } = settings.use(["showMs", "iconColor", "showIcon", "location"]);
 
-    if (!isMainChat || !settings.store.showIcon || !currentChannelId || settings.store.location !== "chatbar") {
+    if (!isMainChat || !showIcon || !currentChannelId || location !== "chatbar") {
         return null;
     }
 
@@ -192,6 +201,7 @@ function handleMessageLoad(data: any) {
         time: duration,
         timestamp: new Date()
     });
+    trimChannelTimings();
 
     currentFetch = null;
     notifyTimingListeners();
