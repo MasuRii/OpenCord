@@ -648,6 +648,7 @@ async function fakeMessageRequestGuild(guildId: string) {
 let MessageRequestStore: any = null;
 
 let reapplyTimer: ReturnType<typeof setTimeout> | null = null;
+let running = false;
 let origGetRequests: Function | null = null;
 let origHasRequest: Function | null = null;
 
@@ -884,6 +885,7 @@ export default definePlugin({
     dependencies: ["ContextMenuAPI"],
 
     async start() {
+        running = true;
         patchStore();
         patchChannelStore();
         patchAcceptFriend();
@@ -893,6 +895,7 @@ export default definePlugin({
 
         // Load persistent state then reapply dispatches
         await loadState();
+        if (!running) return;
         if (fakeState.size > 0) {
             // Delay to let Discord fully load
             reapplyTimer = setTimeout(() => { reapplyTimer = null; reapplyFakeStates(); }, 3000);
@@ -900,6 +903,7 @@ export default definePlugin({
     },
 
     stop() {
+        running = false;
         if (reapplyTimer !== null) { clearTimeout(reapplyTimer); reapplyTimer = null; }
         removeContextMenuPatch("user-context", userContextPatch);
         removeContextMenuPatch("guild-context", guildContextPatch);
