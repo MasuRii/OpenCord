@@ -388,6 +388,8 @@ export default definePlugin({
                 <HeaderBarIcon
                     tooltip={`Following ${UserStore.getUser(followUserId).username} (click to trigger manually, right-click to unfollow)`}
                     icon={UnfollowIcon}
+                    className="vc-plugin-icon-button"
+                    iconClassName="vc-plugin-icon-button"
                     onClick={() => {
                         triggerFollow();
                     }}
