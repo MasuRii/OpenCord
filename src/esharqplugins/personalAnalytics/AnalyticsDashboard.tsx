@@ -6,7 +6,7 @@
 
 import * as DataStore from "@api/DataStore";
 import { classNameFactory } from "@utils/css";
-import { isArabicMode } from "@esharqplugins/_esharqI18n";
+import { isArabicMode } from "@utils/esharqI18n";
 import { formatDurationMs } from "@utils/text";
 import type { RenderModalProps } from "@vencord/discord-types";
 import { ChannelStore, Modal, Tooltip, useEffect, useState } from "@webpack/common";

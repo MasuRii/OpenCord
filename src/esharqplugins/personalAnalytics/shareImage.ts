@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { t } from "@esharqplugins/_esharqI18n";
+import { t } from "@utils/esharqI18n";
 import { formatDurationMs } from "@utils/text";
 import { saveFile } from "@utils/web";
 import { ChannelStore, UserStore } from "@webpack/common";

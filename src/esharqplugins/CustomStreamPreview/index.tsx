@@ -13,8 +13,8 @@ import { UserAreaButton, UserAreaRenderProps } from "@api/UserArea";
 import { Divider } from "@components/Divider";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Flex } from "@components/Flex";
-import { EsharqDevs } from "@utils/constants";
-import { t } from "@esharqplugins/_esharqI18n";
+import { EquicordDevs } from "@utils/constants";
+import { t } from "@utils/esharqI18n";
 import { closeModal, ModalCloseButton as ModalCloseButtonRaw, ModalContent as ModalContentRaw, ModalFooter as ModalFooterRaw, ModalHeader as ModalHeaderRaw, ModalRoot as ModalRootRaw, ModalSize, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { RenderModalProps } from "@vencord/discord-types";
@@ -171,9 +171,12 @@ function PreviewButton(props: UserAreaRenderProps) {
 
 export default definePlugin({
     name: "CustomStreamPreview",
-    description: "🖼️ Set a custom image as your Discord stream preview (Esharq).",
+    description: t(
+        "🖼️ عيّن صورة مخصصة كمعاينة لبثّك على Discord (اشراق).",
+        "🖼️ Set a custom image as your Discord stream preview (Esharq)."
+    ),
     tags: ["Voice", "Utility"],
-    authors: [EsharqDevs.LOSTSTR],
+    authors: [EquicordDevs.LOSTSTR],
     dependencies: ["UserAreaAPI"],
 
     userAreaButton: {

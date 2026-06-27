@@ -16,10 +16,10 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { MicrophoneSettingsModal } from "@esharqplugins/betterMicrophone.desktop/components";
-import { PluginInfo } from "@esharqplugins/betterMicrophone.desktop/constants";
-import Plugin from "@esharqplugins/betterMicrophone.desktop/index";
-import { microphoneStore } from "@esharqplugins/betterMicrophone.desktop/stores";
+import { MicrophoneSettingsModal } from "@plugins/betterMicrophone.desktop/components";
+import { PluginInfo } from "@plugins/betterMicrophone.desktop/constants";
+import Plugin from "@plugins/betterMicrophone.desktop/index";
+import { microphoneStore } from "@plugins/betterMicrophone.desktop/stores";
 import { openModalLazy } from "@utils/modal";
 
 const onMicrophoneModalDone = () => {

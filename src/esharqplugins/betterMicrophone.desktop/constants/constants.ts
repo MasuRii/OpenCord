@@ -16,21 +16,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { types } from "@esharqplugins/philsPluginLibrary";
+import { types } from "@plugins/philsPluginLibrary";
 
 export const PluginInfo = {
     PLUGIN_NAME: "BetterMicrophone",
     DESCRIPTION: "This plugin allows you to further customize your microphone.",
     AUTHOR: {
-        name: "viciouscal",
-        id: 0n,
-        github: "https://github.com/viciouscal"
+        name: "philhk",
+        id: 305288513941667851n,
+        github: "https://github.com/philhk"
     },
     CONTRIBUTORS: {
-        philhk: {
-            github: "https://github.com/philhk",
-            id: 305288513941667851n,
-            name: "philhk"
+        LOSTSTR: {
+            github: "https://github.com/LOSTSTR",
+            id: 681465758127226900n,
+            name: "LOSTSTR"
         }
     },
 } as const satisfies types.PluginInfo;

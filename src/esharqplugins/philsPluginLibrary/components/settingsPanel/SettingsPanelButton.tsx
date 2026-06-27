@@ -17,7 +17,7 @@
 */
 
 import { Button } from "@components/Button";
-import { panelClasses } from "@esharqplugins/philsPluginLibrary";
+import { panelClasses } from "@plugins/philsPluginLibrary";
 import { classes } from "@utils/misc";
 import React, { JSX } from "react";
 

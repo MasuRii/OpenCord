@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import * as types from "@esharqplugins/philsPluginLibrary/types";
+import * as types from "@plugins/philsPluginLibrary/types";
 import { findCssClassesLazy } from "@webpack";
 
 export const panelClasses = findCssClassesLazy("button", "buttonContents", "buttonColor", "container", "actionButtons", "buttonIcon") as types.PanelClasses;

@@ -20,8 +20,8 @@ import { useSettings } from "@api/Settings";
 import { Card } from "@components/Card";
 import { Flex } from "@components/Flex";
 import { Switch } from "@components/Switch";
-import { t } from "@esharqplugins/_esharqI18n";
-import { MicrophoneProfile, MicrophoneStore } from "@esharqplugins/betterMicrophone.desktop/stores";
+import { t } from "@utils/esharqI18n";
+import { MicrophoneProfile, MicrophoneStore } from "@plugins/betterMicrophone.desktop/stores";
 import {
     ProfilableStore,
     SettingsModal,
@@ -31,8 +31,8 @@ import {
     SettingsModalProfilesCard,
     validateNumberInput,
     validateTextInputNumber
-} from "@esharqplugins/philsPluginLibrary";
-import { Styles } from "@esharqplugins/philsPluginLibrary/styles";
+} from "@plugins/philsPluginLibrary";
+import { Styles } from "@plugins/philsPluginLibrary/styles";
 import { ModalSize } from "@utils/modal";
 import { SelectOption } from "@vencord/discord-types";
 import { Forms, Select, Slider, TextInput, useEffect, useState } from "@webpack/common";
@@ -48,8 +48,6 @@ function getSimpleVoiceBitrates(): readonly SelectOption[] {
 
 export interface MicrophoneSettingsModalProps extends React.ComponentProps<typeof SettingsModal> {
     microphoneStore: ProfilableStore<MicrophoneStore, MicrophoneProfile>;
-    onClose: () => void;
-    onDone?: () => void;
     showInfo?: boolean;
 }
 

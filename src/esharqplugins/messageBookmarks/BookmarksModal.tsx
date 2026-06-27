@@ -5,7 +5,7 @@
  */
 
 import { copyWithToast } from "@utils/discord";
-import { t } from "@esharqplugins/_esharqI18n";
+import { t } from "@utils/esharqI18n";
 import { RenderModalProps } from "@vencord/discord-types";
 import { ChannelStore, GuildStore, Modal, NavigationRouter, React, showToast, Toasts, useEffect, useState } from "@webpack/common";
 

@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { t } from "@esharqplugins/_esharqI18n";
+import { t } from "@utils/esharqI18n";
 import { Card } from "@components/Card";
 import { Switch } from "@components/Switch";
 import { Forms } from "@webpack/common";
