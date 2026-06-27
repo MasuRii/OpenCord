@@ -79,6 +79,36 @@
             ],
             "@mallcordplugins/*": [
                 "./src/mallcordplugins/*"
+            ],
+            // Cross-collection aliases: upstream plugins use these paths which
+            // differ from OpenCord's collection-scoped layout. Map them so
+            // synced upstream code compiles without manual import rewrites.
+            "@utils/esharqI18n": [
+                "./src/esharqplugins/_esharqI18n"
+            ],
+            "@utils/apiKeyWarning": [
+                "./src/testcordplugins/_shared/apiKeyWarning"
+            ],
+            "@utils/cacheLimits": [
+                "./src/testcordplugins/_shared/cacheLimits"
+            ],
+            "@plugins/philsPluginLibrary": [
+                "./src/esharqplugins/philsPluginLibrary"
+            ],
+            "@plugins/philsPluginLibrary/*": [
+                "./src/esharqplugins/philsPluginLibrary/*"
+            ],
+            "@plugins/fakeDeafen": [
+                "./src/esharqplugins/fakeDeafen"
+            ],
+            "@plugins/betterMicrophone.desktop": [
+                "./src/esharqplugins/betterMicrophone.desktop"
+            ],
+            "@plugins/betterMicrophone.desktop/*": [
+                "./src/esharqplugins/betterMicrophone.desktop/*"
+            ],
+            "discord-types/general": [
+                "./packages/discord-types/src/index"
             ]
         },
         "plugins": [
