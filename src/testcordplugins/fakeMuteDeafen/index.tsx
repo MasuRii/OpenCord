@@ -247,6 +247,7 @@ function FakeMuteDeafenButton() {
 }
 
 let lastVoiceChannelId: string | null = null;
+let refreshVoiceStateTimer: ReturnType<typeof setTimeout> | null = null;
 function handleVoiceChannelChange() {
     try {
         const currentChannelId = SelectedChannelStore?.getVoiceChannelId?.();
@@ -255,7 +256,9 @@ function handleVoiceChannelChange() {
         lastVoiceChannelId = currentChannelId ?? null;
 
         if (currentChannelId && currentChannelId !== previousChannelId && (fakeVoiceState.selfMute || fakeVoiceState.selfDeaf)) {
-            setTimeout(() => {
+            if (refreshVoiceStateTimer) clearTimeout(refreshVoiceStateTimer);
+            refreshVoiceStateTimer = setTimeout(() => {
+                refreshVoiceStateTimer = null;
                 refreshVoiceState();
             }, 500);
         }
@@ -315,6 +318,10 @@ start() {
         } catch (e) { }
 
         document.removeEventListener("keydown", handleKeydown);
+        if (refreshVoiceStateTimer) {
+            clearTimeout(refreshVoiceStateTimer);
+            refreshVoiceStateTimer = null;
+        }
         if (SelectedChannelStore?.removeChangeListener) {
             SelectedChannelStore.removeChangeListener(handleVoiceChannelChange);
         }
