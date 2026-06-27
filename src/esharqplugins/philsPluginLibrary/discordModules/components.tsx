@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { types } from "@esharqplugins/philsPluginLibrary";
+import { types } from "@plugins/philsPluginLibrary";
 import { LazyComponent } from "@utils/react";
 import { findByCode } from "@webpack";
 

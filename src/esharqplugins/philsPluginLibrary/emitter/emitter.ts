@@ -18,7 +18,7 @@
 
 import EventEmitter from "events";
 
-import type { TypedEmitter } from "@esharqplugins/philsPluginLibrary/emitter/typedEmitter";
+import type { TypedEmitter } from "@plugins/philsPluginLibrary/emitter/typedEmitter";
 
 export type TypedEmitterEvents<J extends TypedEmitter<any>> = J extends TypedEmitter<
     infer N

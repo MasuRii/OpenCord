@@ -8,7 +8,7 @@ import {
 } from "@webpack/common";
 import { RestAPI, Constants } from "@webpack/common";
 import { SelectedGuildStore } from "@webpack/common";
-import { EquicordPlusDevs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 
 // Retrieval of necessary stores and actions
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
@@ -82,7 +82,13 @@ export default definePlugin({
     name: "AutoUnmute",
     description:
         "Automatically unmutes and undeafens when server mute/deafen occurs if you have permissions (no notifications)",
-    authors: [EquicordPlusDevs.Bash, TestcordDevs.x2b],
+    authors: [
+        {
+            name: "Bash",
+            id: 1327483363518582784n,
+        },
+        TestcordDevs.x2b
+    ],
 
     // Using the flux system to listen to voice events
     flux: {

@@ -16,13 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { PluginInfo } from "@esharqplugins/betterMicrophone.desktop/constants";
-import { openMicrophoneSettingsModal } from "@esharqplugins/betterMicrophone.desktop/modals";
-import { MicrophonePatcher } from "@esharqplugins/betterMicrophone.desktop/patchers";
-import { initMicrophoneStore } from "@esharqplugins/betterMicrophone.desktop/stores";
-import { addSettingsPanelButton, Emitter, MicrophoneSettingsIcon, removeSettingsPanelButton } from "@esharqplugins/philsPluginLibrary";
-import { t } from "@esharqplugins/_esharqI18n";
-import { EsharqDevs } from "@utils/constants";
+import { PluginInfo } from "@plugins/betterMicrophone.desktop/constants";
+import { openMicrophoneSettingsModal } from "@plugins/betterMicrophone.desktop/modals";
+import { MicrophonePatcher } from "@plugins/betterMicrophone.desktop/patchers";
+import { initMicrophoneStore } from "@plugins/betterMicrophone.desktop/stores";
+import { addSettingsPanelButton, Emitter, MicrophoneSettingsIcon, removeSettingsPanelButton } from "@plugins/philsPluginLibrary";
+import { t } from "@utils/esharqI18n";
 import definePlugin, { PluginNative } from "@utils/types";
 
 export const Native = VencordNative.pluginHelpers.BetterMicrophone as PluginNative<typeof import("./native")>;
@@ -30,7 +29,7 @@ export const Native = VencordNative.pluginHelpers.BetterMicrophone as PluginNati
 export default definePlugin({
     name: "BetterMicrophone",
     description: "Allows you to customize microphone settings more deeply.",
-    authors: [EsharqDevs.viciouscal],
+    authors: [{ name: "philhk", id: 305288513941667851n }, { name: "LOSTSTR", id: 681465758127226900n }],
     dependencies: ["PhilsPluginLibrary"],
     requiresRestart: true,
 

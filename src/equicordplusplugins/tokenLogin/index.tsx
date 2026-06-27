@@ -7,14 +7,11 @@
 import "./styles.css";
 
 import { DataStore } from "@api/index";
-import { EquicordPlusDevs } from "@utils/constants";
-import * as ModalRaw from "@utils/modal";
+import { EquicordDevs } from "@utils/constants";
+import * as Modal from "@utils/modal";
 import definePlugin from "@utils/types";
 // REMOVED "Flex" from the import below
 import { Button, React, Text, TextInput } from "@webpack/common";
-
-const Modal = ModalRaw as Record<string, any>;
-type ModalProps = { onClose(): void; [key: string]: any; };
 
 const loginWithToken = (token: string) => {
     const iframe = document.createElement("iframe");
@@ -62,7 +59,7 @@ class TokenLoginManager {
     }
 }
 
-const AddAccountModal = ({ manager, onClose, ...props }: ModalProps & {
+const AddAccountModal = ({ manager, onClose, ...props }: Modal.ModalProps & {
     manager: TokenLoginManager;
     onClose: () => void;
 }) => {
@@ -210,7 +207,7 @@ class TokenLoginManagerUI {
 export default definePlugin({
     name: "TokenLoginManager",
     description: "Manage and login with user tokens",
-    authors: [EquicordPlusDevs.ExoDev],
+    authors: [EquicordDevs.ExoDev],
 
     tokenLoginManager: null as TokenLoginManager | null,
     ui: null as TokenLoginManagerUI | null,

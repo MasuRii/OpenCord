@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { types } from "@esharqplugins/philsPluginLibrary";
+import { types } from "@plugins/philsPluginLibrary";
 
 export type MediaEngineStore = MediaEngineStore__ &
     MediaEngineStore_ & {

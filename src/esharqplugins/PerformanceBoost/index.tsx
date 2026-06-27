@@ -11,8 +11,8 @@ import { HeaderBarButton } from "@api/HeaderBar";
 import { showNotification } from "@api/Notifications";
 import { popNotice, showNotice } from "@api/Notices";
 import { getUserSettingLazy } from "@api/UserSettings";
-import { EsharqDevs } from "@utils/constants";
-import { t } from "@esharqplugins/_esharqI18n";
+import { EquicordDevs } from "@utils/constants";
+import { t } from "@utils/esharqI18n";
 import { Logger } from "@utils/Logger";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { PluginNative } from "@utils/types";
@@ -218,7 +218,7 @@ function PerfHeaderButton() {
 export default definePlugin({
     name: "PerformanceBoost",
     description: "Game/performance mode: automatically reduces animations, compacts messages, stops GIFs, lowers process priority, and cleans cache — all revertible. (Hardware acceleration requires one-time manual toggle + restart.)",
-    authors: [EsharqDevs.LOSTSTR],
+    authors: [EquicordDevs.LOSTSTR],
     tags: ["Utility"],
     dependencies: ["HeaderBarAPI"],
     settings,

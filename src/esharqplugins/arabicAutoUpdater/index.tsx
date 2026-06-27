@@ -6,7 +6,7 @@
 
 import * as DataStore from "@api/DataStore";
 import { Devs } from "@utils/constants";
-import { t } from "@esharqplugins/_esharqI18n";
+import { t } from "@utils/esharqI18n";
 import { Logger } from "@utils/Logger";
 import definePlugin from "@utils/types";
 import { Alerts } from "@webpack/common";
