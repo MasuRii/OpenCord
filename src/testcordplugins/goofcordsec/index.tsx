@@ -192,6 +192,7 @@ function unpatchWebRtc() {
 // ────────────────────────────────────────────────────────────── stegcloak
 
 let steggo: any = null;
+let startToken = 0;
 
 // matches strings produced by StegCloak (zero-width chars)
 const INV_REGEX = /( \u200c|\u200d |[\u2060-\u2064])[^\u200b]/;
@@ -290,6 +291,7 @@ export default definePlugin({
     INV_REGEX,
 
     async start() {
+        const token = ++startToken;
         if (settings.store.webRtcLeakPrevent) {
             try { patchWebRtc(); } catch (e) { logger.error("WebRTC patch failed:", e); }
         }
@@ -297,6 +299,7 @@ export default definePlugin({
         if (settings.store.messageEncryption) {
             try {
                 await ensureStegCloak();
+                if (token !== startToken) return;
                 addChatBarButton("GoofcordSecurityEncrypt", ChatBarIcon, LockIcon);
                 addMessagePreSendListener(onSend);
                 FluxDispatcher.subscribe("MESSAGE_CREATE", onMessageCreate);
@@ -327,6 +330,7 @@ export default definePlugin({
     },
 
     stop() {
+        startToken++;
         unpatchWebRtc();
         removeChatBarButton("GoofcordSecurityEncrypt");
         removeHeaderBarButton("GoofcordSecurity");
