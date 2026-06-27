@@ -85,8 +85,12 @@ import { getEntryPoint, isPluginFile, parseDevs, parseEquicordDevs, parseEquicor
             readdirSync(dir, { withFileTypes: true })
                 .filter(isPluginFile)
                 .map(async dirent => {
-                    const [data] = await parseFile(await getEntryPoint(dir, dirent));
-                    plugins.sort().push(data);
+                    try {
+                        const [data] = await parseFile(await getEntryPoint(dir, dirent));
+                        plugins.sort().push(data);
+                    } catch (e) {
+                        console.warn(`[plugin-list] Skipping ${dirent.name}: ${(e as Error).message}`);
+                    }
                 })
         )
     );
