@@ -6,9 +6,8 @@
 
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
-import { t } from "@esharqplugins/_esharqI18n";
+import { t } from "@utils/esharqI18n";
 import { Logger } from "@utils/Logger";
-import { EsharqDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
 import { NavigationRouter, React, UserStore } from "@webpack/common";
@@ -92,7 +91,10 @@ export default definePlugin({
     name: "NitroSniper",
     description: "Automatically redeems Nitro gift links sent in chat.\n\n⚠️ WARNING: This plugin automatically redeems Nitro gift codes found in chat. This may violate Discord's Terms of Service and could result in account suspension. Use at your own risk.",
     tags: ["Utility", "Fun"],
-    authors: [EsharqDevs.neoarz, EsharqDevs.irritably],
+    authors: [
+        { name: "neoarz", id: 1015372540937502851n },
+        { name: "irritably", id: 928787166916640838n }
+    ],
 
     settingsAboutComponent: () => (
         <div style={{

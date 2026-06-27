@@ -16,11 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { PluginInfo } from "@esharqplugins/betterMicrophone.desktop/constants";
-import { logger } from "@esharqplugins/betterMicrophone.desktop/logger";
-import { microphoneStore } from "@esharqplugins/betterMicrophone.desktop/stores";
-import { Emitter, MediaEngineStore, Patcher, types } from "@esharqplugins/philsPluginLibrary";
-import { patchConnectionAudioTransportOptions } from "@esharqplugins/philsPluginLibrary/patches/audio";
+import { PluginInfo } from "@plugins/betterMicrophone.desktop/constants";
+import { logger } from "@plugins/betterMicrophone.desktop/logger";
+import { microphoneStore } from "@plugins/betterMicrophone.desktop/stores";
+import { Emitter, MediaEngineStore, Patcher, types } from "@plugins/philsPluginLibrary";
+import { patchConnectionAudioTransportOptions } from "@plugins/philsPluginLibrary/patches/audio";
 
 export class MicrophonePatcher extends Patcher {
     private mediaEngineStore: types.MediaEngineStore;

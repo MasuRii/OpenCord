@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import type { TypedEmitter } from "@esharqplugins/philsPluginLibrary/emitter/typedEmitter";
+import type { TypedEmitter } from "@plugins/philsPluginLibrary/emitter/typedEmitter";
 
 import { Connection } from "./";
 

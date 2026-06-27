@@ -16,8 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { PluginInfo } from "@esharqplugins/betterMicrophone.desktop/constants";
-import { createPluginStore, ProfilableInitializer, ProfilableStore, profileable, ProfileableProfile } from "@esharqplugins/philsPluginLibrary";
+import { PluginInfo } from "@plugins/betterMicrophone.desktop/constants";
+import { createPluginStore, ProfilableInitializer, ProfilableStore, profileable, ProfileableProfile } from "@plugins/philsPluginLibrary";
 
 
 export interface MicrophoneProfile {

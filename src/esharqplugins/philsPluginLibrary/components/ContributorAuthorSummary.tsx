@@ -17,8 +17,8 @@
 */
 
 import { Flex } from "@components/Flex";
-import { Author, Contributor } from "@esharqplugins/philsPluginLibrary/types";
-import { openURL } from "@esharqplugins/philsPluginLibrary/utils";
+import { Author, Contributor } from "@plugins/philsPluginLibrary/types";
+import { openURL } from "@plugins/philsPluginLibrary/utils";
 import { findByProps } from "@webpack";
 import { Text } from "@webpack/common";
 import React from "react";

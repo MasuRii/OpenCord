@@ -11,8 +11,8 @@ import { HeaderBarButton } from "@api/HeaderBar";
 import { addMessagePopoverButton, removeMessagePopoverButton } from "@api/MessagePopover";
 import { useSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { EsharqDevs } from "@utils/constants";
-import { t } from "@esharqplugins/_esharqI18n";
+import { EquicordDevs } from "@utils/constants";
+import { t } from "@utils/esharqI18n";
 import definePlugin from "@utils/types";
 import { ChannelStore, Menu, openModal, React, showToast, Toasts } from "@webpack/common";
 
@@ -136,7 +136,7 @@ export default definePlugin({
     name: "MessageBookmarks",
     description: "Save messages as private bookmarks and organize them in a beautiful panel with search",
     tags: ["Chat", "Utility"],
-    authors: [EsharqDevs.LOSTSTR, EsharqDevs.NRaymond],
+    authors: [EquicordDevs.LOSTSTR, EquicordDevs.NRaymond],
     dependencies: ["MessagePopoverAPI", "HeaderBarAPI"],
     headerBarButton: {
         icon: BookmarkIcon,

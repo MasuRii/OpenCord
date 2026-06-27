@@ -16,14 +16,21 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import * as types from "@esharqplugins/philsPluginLibrary/types/constants";
+import * as types from "@plugins/philsPluginLibrary/types/constants";
 
 export const PluginInfo: types.PluginInfo = {
     PLUGIN_NAME: "PhilsPluginLibrary",
     DESCRIPTION: "A library for phil's plugins",
     AUTHOR: {
-        name: "viciouscal",
-        id: 0n,
-        github: "https://github.com/viciouscal"
+        name: "philhk",
+        id: 305288513941667851n,
+        github: "https://github.com/philhk"
+    },
+    CONTRIBUTORS: {
+        LOSTSTR: {
+            github: "https://github.com/LOSTSTR",
+            id: 681465758127226900n,
+            name: "LOSTSTR"
+        }
     },
 } as const;

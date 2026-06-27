@@ -16,16 +16,15 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { fakeD } from "@esharqplugins/fakeDeafen";
-import { replacedUserPanelComponent } from "@esharqplugins/philsPluginLibrary/patches";
-import { t } from "@esharqplugins/_esharqI18n";
-import { EsharqDevs } from "@utils/constants";
+import { fakeD } from "@plugins/fakeDeafen";
+import { replacedUserPanelComponent } from "@plugins/philsPluginLibrary/patches";
+import { t } from "@utils/esharqI18n";
 import definePlugin from "@utils/types";
 
 export default definePlugin({
     name: "PhilsPluginLibrary",
     description: "A library for phil's plugins.",
-    authors: [EsharqDevs.viciouscal],
+    authors: [{ name: "philhk", id: 305288513941667851n }, { name: "LOSTSTR", id: 681465758127226900n }],
     patches: [
         {
             find: '"--custom-app-panels-height",',
