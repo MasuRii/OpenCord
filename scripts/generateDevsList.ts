@@ -71,6 +71,7 @@ function parseDevGroup(groupName: keyof typeof devGroups) {
         if (!isSatisfiesExpression(value) || !isObjectLiteralExpression(value.expression)) throw new Error(`Failed to parse ${groupName}: not an object literal`);
 
         for (const prop of value.expression.properties) {
+            if (!prop.name) continue;
             const name = (prop.name as Identifier).text;
             const value = isPropertyAssignment(prop) ? prop.initializer : prop;
 
