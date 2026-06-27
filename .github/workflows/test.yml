@@ -56,6 +56,5 @@ jobs:
             - name: Lint patches
               run: pnpm lint:patches
 
-            - name: Generate plugin lists (advisory)
-              continue-on-error: true
+            - name: Generate plugin lists (must pass)
               run: pnpm generatePluginJson
