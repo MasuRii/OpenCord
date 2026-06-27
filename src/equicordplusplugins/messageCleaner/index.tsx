@@ -10,7 +10,7 @@ import {
 } from "@api/ContextMenu";
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
-import { EquicordPlusDevs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import type { Channel, Message } from "@vencord/discord-types";
 import { ChannelStore, Menu, RestAPI, UserStore } from "@webpack/common";
@@ -632,7 +632,13 @@ export default definePlugin({
     name: "MessageCleaner",
     description:
         "Cleans all messages in a channel with intelligent rate limiting management, real-time statistics and secure confirmation",
-    authors: [EquicordPlusDevs.Bash, TestcordDevs.x2b],
+    authors: [
+        {
+            name: "Bash",
+            id: 1327483363518582784n,
+        },
+        TestcordDevs.x2b
+    ],
     dependencies: ["ContextMenuAPI"],
     settings,
 

@@ -114,16 +114,18 @@ function FakeActionsButton() {
         (buttonControlsVideo && activeState.video);
 
     const handleToggle = () => {
-        const targets: Array<keyof typeof activeState> = [];
+        const targets = [];
         if (buttonControlsMute) targets.push("mute");
         if (buttonControlsDeaf) targets.push("deaf");
         if (buttonControlsVideo) targets.push("video");
 
         if (targets.length === 0) return;
 
+        // @ts-ignore
         const allTargetsOn = targets.every(t => activeState[t] === true);
         const newState = !allTargetsOn;
 
+        // @ts-ignore
         targets.forEach(t => activeState[t] = newState);
         
         emitChange();
@@ -131,7 +133,7 @@ function FakeActionsButton() {
 
     return (
         <UserAreaButton
-            aria-label="Fake Actions"
+            label="Fake Actions"
             tooltipText={isAnyActive ? "Disable Active Fake Actions" : "Enable Configured Fake Actions"}
             icon={<FakeDeafenIcon enabled={isAnyActive} />}
             onClick={handleToggle}
