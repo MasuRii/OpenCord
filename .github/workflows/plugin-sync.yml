@@ -140,9 +140,13 @@ jobs:
             - name: Clone upstream
               if: steps.detect.outputs.has_changes == 'true'
               run: |
+                  # Clone OUTSIDE the repo working tree ($RUNNER_TEMP) so the
+                  # upstream checkout can never be staged/committed into the
+                  # sync PR. A nested git repo inside the worktree previously
+                  # leaked as a gitlink (mode 160000) into main's history.
                   git clone --depth 1 \
                       "https://github.com/${{ steps.config.outputs.repo }}.git" \
-                      upstream-temp
+                      "$RUNNER_TEMP/upstream-temp"
 
             - name: Stage plugins and check file types
               id: stage
@@ -175,7 +179,7 @@ jobs:
                   }
 
                   while IFS= read -r upstream_dir; do
-                      UPSTREAM="upstream-temp/$upstream_dir"
+                      UPSTREAM="$RUNNER_TEMP/upstream-temp/$upstream_dir"
                       if [ ! -d "$UPSTREAM" ]; then
                           echo "Warning: upstream directory $upstream_dir not found" >&2
                           continue
@@ -248,7 +252,7 @@ jobs:
               env:
                   LOCAL_DIR: ${{ steps.config.outputs.local_dir }}
               run: |
-                  QUARANTINE_DIR=".github/sync-quarantine/${{ matrix.source }}"
+                  QUARANTINE_DIR="$RUNNER_TEMP/sync-quarantine/${{ matrix.source }}"
                   rm -rf "$QUARANTINE_DIR"
                   mkdir -p "$QUARANTINE_DIR"
                   QUARANTINE_LIST="$QUARANTINE_DIR/quarantined.txt"
@@ -399,7 +403,7 @@ jobs:
                       ### Quarantined Plugins (skipped, need manual review)
                       ${{ steps.quarantine.outputs.quarantined }}
 
-                      Quarantined plugins failed the build and were excluded from this PR. They are saved in `.github/sync-quarantine/${{ matrix.source }}/` for manual review. Fix the upstream type/import errors and re-sync individually.
+                      Quarantined plugins failed the build and were excluded from this PR. They are not committed; review the list below and re-sync individually once fixed.
 
                       ### Plugins Affected
                       ${{ steps.stage.outputs.plugins }}
