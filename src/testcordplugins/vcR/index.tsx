@@ -129,6 +129,7 @@ export default definePlugin({
         "channel-context": createContextMenuPatch(),
     },
     settings,
+    stop: closeWebSockets,
 });
 
 async function executeVoiceChannelAction(guildId: string, channelId: string, duration: number, rejoin: number, delay: number, randomDelay: number, amount: number) {
@@ -279,6 +280,14 @@ function initializeWebSockets() {
     });
 }
 
+function closeWebSockets() {
+    shouldStop = true;
+    for (const socket of webSockets) {
+        socket.close();
+    }
+    webSockets = [];
+}
+
 let selectedGuildId = "";
 let selectedChannelId = "";
 
@@ -302,12 +311,15 @@ function VCRaperModal(props) {
     const [randomDelay, setRandomDelay] = React.useState(100);
     const [amount, setAmount] = React.useState(0);
 
-    const connectWebSockets = () => { true ? initializeWebSockets() : webSockets.forEach(socket => socket.close()); };
+    const connectWebSockets = () => { initializeWebSockets(); };
     const forceStop = () => { stopExecution(); };
 
-    connectWebSockets();
-    loadTokensFromStorage();
-    shouldStop = false;
+    React.useEffect(() => {
+        connectWebSockets();
+        loadTokensFromStorage();
+        shouldStop = false;
+        return closeWebSockets;
+    }, []);
 
     return (
         <ModalRoot {...props} size={ModalSize.DYNAMIC}>
@@ -597,7 +609,10 @@ function VCRaperModal(props) {
             <ModalFooter>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
                     <Button
-                        onClick={props.onClose}
+                        onClick={() => {
+                            closeWebSockets();
+                            props.onClose();
+                        }}
                         style={{
                             backgroundColor: "#dc2626",
                             color: "#ffffff",
