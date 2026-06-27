@@ -77,6 +77,10 @@ export function WordBombOverlay() {
     const [pos, setPos] = useState({ x: 100, y: 100 });
     const dragOffset = useRef({ x: 0, y: 0 });
     const inputRef = useRef<HTMLInputElement>(null);
+    const mountedRef = useRef(true);
+    const calibrationKeyRef = useRef<((e: KeyboardEvent) => void) | null>(null);
+    const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const remountTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Calibration removed — click is always at the dynamic center of the Discord window
     const [lps, setLps] = useState(() => parseFloat(getSetting("wb_lps", "50")));
@@ -88,6 +92,14 @@ export function WordBombOverlay() {
     const [noSpace, setNoSpace] = useState(() => getSetting("wb_noSpace", "false") === "true");
     const [isCalibrating, setIsCalibrating] = useState(false);
     const [calibratedPos, setCalibratedPos] = useState<{ x: number; y: number; } | null>(null);
+
+    useEffect(() => () => {
+        mountedRef.current = false;
+        if (calibrationKeyRef.current) window.removeEventListener("keydown", calibrationKeyRef.current, true);
+        if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+        if (remountTimerRef.current) clearTimeout(remountTimerRef.current);
+    }, []);
+
     // Load dictionary
     useEffect(() => {
         setStatus("Loading dictionaries...");
@@ -208,6 +220,7 @@ export function WordBombOverlay() {
     }, [isDragging]);
 
     const startCalibrate = async () => {
+        if (calibrationKeyRef.current) window.removeEventListener("keydown", calibrationKeyRef.current, true);
         setIsCalibrating(true);
         setStatus("Place your mouse on the game's text area, then press Space...");
 
@@ -216,12 +229,14 @@ export function WordBombOverlay() {
             e.preventDefault();
             e.stopPropagation();
             window.removeEventListener("keydown", onKeyDown, true);
+            calibrationKeyRef.current = null;
 
             try {
                 // VencordNative is exposed via contextBridge under the name "VencordNative"
                 // In the packaged Electron renderer, you need to go through window
                 const nc = (window as any).VencordNative ?? (globalThis as any).VencordNative;
                 const cursorPos = await nc?.wordBomb?.getCursorPos?.() || await nc?.worldBomb?.getCursorPos?.();
+                if (!mountedRef.current) return;
                 if (cursorPos && typeof cursorPos.x === "number" && typeof cursorPos.y === "number") {
                     setCalibratedPos(cursorPos);
                     setSetting("wb_calibPos", JSON.stringify(cursorPos));
@@ -231,6 +246,7 @@ export function WordBombOverlay() {
                     const { ipcRenderer } = (window as any).require?.("electron") ?? {};
                     if (ipcRenderer) {
                         const pos = await ipcRenderer.invoke("WorldBombGetCursorPos");
+                        if (!mountedRef.current) return;
                         if (pos && typeof pos.x === "number") {
                             setCalibratedPos(pos);
                             setSetting("wb_calibPos", JSON.stringify(pos));
@@ -243,13 +259,19 @@ export function WordBombOverlay() {
                     }
                 }
             } catch (err) {
+                if (!mountedRef.current) return;
                 setStatus("❌ Calibration error: " + String(err));
             } finally {
+                if (!mountedRef.current) return;
                 setIsCalibrating(false);
-                setTimeout(() => inputRef.current?.focus(), 100);
+                focusTimerRef.current = setTimeout(() => {
+                    focusTimerRef.current = null;
+                    inputRef.current?.focus();
+                }, 100);
             }
         };
 
+        calibrationKeyRef.current = onKeyDown;
         window.addEventListener("keydown", onKeyDown, true);
     };
 
@@ -412,13 +434,16 @@ export function WordBombOverlay() {
             }
             setStatus("Ready!");
         } catch (e) {
+            if (!mountedRef.current) return;
             console.error("[WordBomb] Typing error:", e);
             setStatus("Typing error");
         } finally {
+            if (!mountedRef.current) return;
             isTypingRef.current = false;
             setIsTyping(false);
             // Refocus the input field automatically so the user never has to use the mouse
-            setTimeout(() => {
+            focusTimerRef.current = setTimeout(() => {
+                focusTimerRef.current = null;
                 inputRef.current?.focus();
             }, 50);
         }
@@ -582,7 +607,8 @@ export function WordBombOverlay() {
                                     setSafeMode(checked);
                                     setSetting("wb_safeMode", String(checked));
                                     if (checked) {
-                                        setTimeout(() => {
+                                        remountTimerRef.current = setTimeout(() => {
+                                            remountTimerRef.current = null;
                                             unmountOverlay();
                                             toggleWordBombOverlay();
                                         }, 300);
