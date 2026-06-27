@@ -7,15 +7,11 @@
 import "./styles.css";
 
 import { DataStore } from "@api/index";
-import { EquicordPlusDevs } from "@utils/constants";
-import * as ModalRaw from "@utils/modal";
+import { EquicordDevs } from "@utils/constants";
+import * as Modal from "@utils/modal";
 import definePlugin from "@utils/types";
 // REMOVED "Flex" from the import below
 import { Button, React, Text, TextInput } from "@webpack/common";
-
-const Modal = ModalRaw as Record<string, any>;
-type ModalProps = { onClose(): void; [key: string]: any; };
-const selectableTextProps = { selectable: true } as any;
 
 interface PasswordEntry {
     id: string;
@@ -203,7 +199,7 @@ class PasswordManager {
     }
 }
 
-const AddPasswordModal = ({ manager, onClose, ...props }: ModalProps & {
+const AddPasswordModal = ({ manager, onClose, ...props }: Modal.ModalProps & {
     manager: PasswordManager;
     onClose: () => void;
 }) => {
@@ -285,7 +281,7 @@ const AddPasswordModal = ({ manager, onClose, ...props }: ModalProps & {
     );
 };
 
-const SetMasterPasswordModal = ({ manager, onSuccess, ...props }: ModalProps & {
+const SetMasterPasswordModal = ({ manager, onSuccess, ...props }: Modal.ModalProps & {
     manager: PasswordManager;
     onSuccess?: () => void;
 }) => {
@@ -354,7 +350,7 @@ const DeletePasswordModal = ({
     passwordTitle,
     onSuccess,
     ...props
-}: ModalProps & {
+}: Modal.ModalProps & {
     manager: PasswordManager;
     passwordId: string;
     passwordTitle: string;
@@ -415,7 +411,7 @@ const ViewPasswordModal = ({
     manager,
     entry,
     ...props
-}: ModalProps & {
+}: Modal.ModalProps & {
     manager: PasswordManager;
     entry: PasswordEntry;
 }) => {
@@ -455,16 +451,16 @@ const ViewPasswordModal = ({
                         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                             <div className="password-view-section">
                                 <Text variant="heading-sm/medium">Username</Text>
-                                <Text {...selectableTextProps}>{entry.username}</Text>
+                                <Text selectable>{entry.username}</Text>
                             </div>
                             <div className="password-view-section">
                                 <Text variant="heading-sm/medium">Password</Text>
-                                <Text {...selectableTextProps}>{entry.password}</Text>
+                                <Text selectable>{entry.password}</Text>
                             </div>
                             {entry.twoFactorSecret && (
                                 <div className="password-view-section">
                                     <Text variant="heading-sm/medium">2FA Secret</Text>
-                                    <Text {...selectableTextProps}>{entry.twoFactorSecret}</Text>
+                                    <Text selectable>{entry.twoFactorSecret}</Text>
                                 </div>
                             )}
                         </div>
@@ -673,7 +669,7 @@ class PasswordManagerUI {
 export default definePlugin({
     name: "PasswordManager",
     description: "Securely store and manage your passwords",
-    authors: [EquicordPlusDevs.ExoDev],
+    authors: [EquicordDevs.ExoDev],
 
     passwordManager: null as PasswordManager | null,
     ui: null as PasswordManagerUI | null,
