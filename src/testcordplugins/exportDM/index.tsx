@@ -11,8 +11,7 @@ import { TestcordRequestCoordinator } from "@api/index";
 import { ModalCloseButton,ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { findStoreLazy } from "@webpack";
-import { React, useEffect,useState } from "@webpack/common";
-import { Forms } from "@webpack/common";
+import { Forms, React, useEffect, useRef, useState } from "@webpack/common";
 
 import { t } from "../autoTranslateNightcord";
 
@@ -86,24 +85,32 @@ async function getDeletedMessagesFromIDB(channelId: string): Promise<any[]> {
     }
 }
 
-async function fetchAllMessages(channelId: string, token: string, onProgress: (n: number) => void): Promise<RichMessage[]> {
+async function fetchAllMessages(channelId: string, token: string, onProgress: (n: number) => void, signal?: AbortSignal): Promise<RichMessage[]> {
     const messageMap = new Map<string, RichMessage>();
     let beforeId: string | null = null;
     let count = 0;
 
     while (true) {
-        const batch = await TestcordRequestCoordinator.request<unknown[]>({
-            key: `discord:messages:${channelId}:before:${beforeId ?? ""}:limit:100`,
-            ttlMs: 30_000,
-            run: async () => {
-                const url = `https://discord.com/api/v9/channels/${channelId}/messages?limit=100${beforeId ? `&before=${beforeId}` : ""}`;
-                const res = await fetch(url, { headers: { Authorization: token } });
-                if (!res.ok) return [];
-                const body = await res.json() as unknown;
-                return Array.isArray(body) ? body : [];
-            },
-            cacheable: Array.isArray,
-        });
+        if (signal?.aborted) break;
+        let batch: any[];
+        try {
+            batch = await TestcordRequestCoordinator.request<any[]>({
+                key: `discord:messages:${channelId}:before:${beforeId ?? ""}:limit:100`,
+                ttlMs: 30_000,
+                run: async () => {
+                    const url = `https://discord.com/api/v9/channels/${channelId}/messages?limit=100${beforeId ? `&before=${beforeId}` : ""}`;
+                    const res = await fetch(url, { headers: { Authorization: token }, signal });
+                    if (!res.ok) return [];
+                    const body = await res.json() as unknown;
+                    return Array.isArray(body) ? body : [];
+                },
+                cacheable: Array.isArray,
+            });
+        } catch (e) {
+            if (signal?.aborted) break;
+            throw e;
+        }
+        if (signal?.aborted) break;
         if (!batch.length) break;
 
         for (const m of batch) {
@@ -355,6 +362,7 @@ function ExportDMModal({ rootProps }: { rootProps: any; }) {
     const [includeEmbeds, setIncludeEmbeds] = useState(true);
     const [includeReactions, setIncludeReactions] = useState(true);
     const [search, setSearch] = useState("");
+    const abortRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
         try {
@@ -377,19 +385,31 @@ function ExportDMModal({ rootProps }: { rootProps: any; }) {
         } catch (e) { console.error("[ExportDM]", e); }
     }, []);
 
+    useEffect(() => () => abortRef.current?.abort(), []);
+
+    function closeModal() {
+        abortRef.current?.abort();
+        rootProps.onClose();
+    }
+
     async function doExport() {
         if (selected.size === 0) return;
         const token = getToken();
         if (!token) { setStatus("error"); setProgress(t("Token not found")); return; }
 
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         setStatus("fetching");
         const selectedChannels = channels.filter(c => selected.has(c.id));
 
         for (let i = 0; i < selectedChannels.length; i++) {
+            if (controller.signal.aborted) return;
             const ch = selectedChannels[i];
             const channelPrefix = `[${i + 1}/${selected.size}] ${ch.name}: `;
 
-            let msgs = await fetchAllMessages(ch.id, token, n => setProgress(`${channelPrefix}${t("Fetching:")} ${n} ${t("messages")}...`));
+            let msgs = await fetchAllMessages(ch.id, token, n => setProgress(`${channelPrefix}${t("Fetching:")} ${n} ${t("messages")}...`), controller.signal);
+            if (controller.signal.aborted) return;
             if (!includeMedia) msgs = msgs.map(m => ({ ...m, attachments: [] }));
             if (!includeEmbeds) msgs = msgs.map(m => ({ ...m, embeds: [] }));
             if (!includeReactions) msgs = msgs.map(m => ({ ...m, reactions: [] }));
@@ -410,8 +430,10 @@ function ExportDMModal({ rootProps }: { rootProps: any; }) {
             downloadFile(content, `DM_${safeName}_${date}.${ext}`, mime);
         }
 
-        setStatus("done");
-        setProgress(`${selected.size} ${t("conversations exported")}`);
+        if (!controller.signal.aborted) {
+            setStatus("done");
+            setProgress(`${selected.size} ${t("conversations exported")}`);
+        }
     }
 
     const toggleSelected = (id: string) => {
@@ -446,7 +468,7 @@ function ExportDMModal({ rootProps }: { rootProps: any; }) {
                 <Forms.FormTitle tag="h4" style={{ margin: 0, display: "flex", alignItems: "center", gap: 8, color: "#fff" }}>
                     <ExportIcon width={16} height={16} /> {t("Export DMs")}
                 </Forms.FormTitle>
-                <ModalCloseButton onClick={rootProps.onClose} />
+                <ModalCloseButton onClick={closeModal} />
             </ModalHeader>
             <ModalContent className="edm-content">
 
