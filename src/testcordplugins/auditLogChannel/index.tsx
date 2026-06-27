@@ -10,7 +10,6 @@ import definePlugin from "@utils/types";
 import AuditLogChannelRow from "./components/AuditLogChannelRow";
 import AuditLogPage from "./components/AuditLogPage";
 import AuditLogPageWrapper from "./components/AuditLogPageWrapper";
-import { useAuditLogPermission } from "./hooks";
 
 export default definePlugin({
     name: "AuditLogChannel",

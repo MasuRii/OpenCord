@@ -155,6 +155,43 @@ const ChannelData = () => {
         </>
     );
 };
+const settings = definePluginSettings({
+    emojiToTrack: {
+        type: OptionType.STRING,
+        description: "The emoji to track (type its name, any emoji containing that name will be tracked)",
+        default: "husk",
+        placeholder: "emojiname (no :)"
+    },
+    buttons: {
+        type: OptionType.COMPONENT,
+        description: "stats",
+        component: () => (
+            <>
+                <UserData />
+                <ChannelData />
+            </>
+        )
+    },
+    clearAll: {
+        type: OptionType.COMPONENT,
+        description: "clear",
+        component: () => (
+            <Button color={Button.Colors.RED} onClick={() => {
+                DataStore.set(DATA_STORE_KEY, []); Toasts.show({
+                    id: Toasts.genId(),
+                    message: "Cleared all data, reopen settings to see changes",
+                    type: Toasts.Type.SUCCESS,
+                    options: {
+                        position: Toasts.Position.BOTTOM, // NOBODY LIKES TOASTS AT THE TOP
+                    },
+                });
+            }}>
+                Clear all data
+            </Button>
+        )
+    }
+});
+
 export default definePlugin({
     name: "ReactionTracker",
     description: "See how much you've been reacted with a specific emoji, and by who",
@@ -166,7 +203,7 @@ export default definePlugin({
                 const msg = getMessage(event.channelId, event.messageId);
                 if (!msg) return;
                 if (msg.author.id !== UserStore.getCurrentUser().id) return;
-                if (!event.emoji.name.includes("husk")) return;
+                if (!event.emoji.name.includes(settings.store.emojiToTrack)) return;
                 const husks: Husk[] = await DataStore.get(DATA_STORE_KEY) || [];
                 husks.push({
                     userId: event.userId,
@@ -180,40 +217,5 @@ export default definePlugin({
             }
         }
     },
-    settings: definePluginSettings({
-        emojiToTrack: {
-            type: OptionType.STRING,
-            description: "The emoji to track (type its name, any emoji containing that name will be tracked)",
-            default: "husk",
-            placeholder: "emojiname (no :)"
-        },
-        buttons: {
-            type: OptionType.COMPONENT,
-            description: "stats",
-            component: () => (
-                <>
-                    <UserData />
-                    <ChannelData />
-                </>
-            )
-        },
-        clearAll: {
-            type: OptionType.COMPONENT,
-            description: "clear",
-            component: () => (
-                <Button color={Button.Colors.RED} onClick={() => {
-                    DataStore.set(DATA_STORE_KEY, []); Toasts.show({
-                        id: Toasts.genId(),
-                        message: "Cleared all data, reopen settings to see changes",
-                        type: Toasts.Type.SUCCESS,
-                        options: {
-                            position: Toasts.Position.BOTTOM, // NOBODY LIKES TOASTS AT THE TOP
-                        },
-                    });
-                }}>
-                    Clear all data
-                </Button>
-            )
-        }
-    })
+    settings,
 });

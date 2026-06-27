@@ -6,6 +6,7 @@
 
 import { ApplicationCommandInputType, ApplicationCommandOptionType, findOption, sendBotMessage } from "@api/Commands";
 import { addContextMenuPatch, findGroupChildrenByChildId, type NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
+import { TestcordRequestCoordinator } from "@api/index";
 import { addServerListElement, removeServerListElement, ServerListRenderPosition } from "@api/ServerList";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
@@ -461,7 +462,7 @@ function makeEngineLabel(label: string, template: string) {
 }
 
 function openExternalSearch(url: string) {
-    open(url, "_blank");
+    window.open(url, "_blank");
 }
 
 function openSearchModal() {
@@ -581,10 +582,15 @@ async function searchGuildMessages(guildId: string, query: QueryOptions) {
     const collected = new Map<string, Message>();
 
     for (let offset = 0; offset < maxResults; offset += 25) {
-        const response = await RestAPI.get({
-            url: Constants.Endpoints.SEARCH_GUILD(guildId),
-            query: buildSearchQueryRequest(query, offset)
-        }) as { body?: SearchApiResponseBody; };
+        const requestQuery = buildSearchQueryRequest(query, offset);
+        const response = await TestcordRequestCoordinator.request<{ body?: SearchApiResponseBody; }>({
+            key: `discord:guild-search:${guildId}:${JSON.stringify(requestQuery)}`,
+            ttlMs: 30_000,
+            run: () => RestAPI.get({
+                url: Constants.Endpoints.SEARCH_GUILD(guildId),
+                query: requestQuery
+            }) as Promise<{ body?: SearchApiResponseBody; }>,
+        });
 
         const messageGroups = response.body?.messages ?? [];
         if (!messageGroups.length) break;
@@ -616,16 +622,23 @@ async function searchChannelMessages(channelId: string, query: QueryOptions) {
     let before: string | undefined;
 
     while (collected.size < maxResults) {
-        const response = await RestAPI.get({
-            url: `/channels/${targetChannelId}/messages`,
-            query: {
-                before,
-                limit: 100
-            },
-            retries: 1
-        }) as { body?: Message[]; };
+        const messages = await TestcordRequestCoordinator.request<Message[]>({
+            key: `discord:messages:${targetChannelId}:before:${before ?? ""}:limit:100`,
+            ttlMs: 30_000,
+            run: async () => {
+                const response = await RestAPI.get({
+                    url: `/channels/${targetChannelId}/messages`,
+                    query: {
+                        before,
+                        limit: 100
+                    },
+                    retries: 1
+                }) as { body?: Message[]; };
 
-        const messages = Array.isArray(response.body) ? response.body : [];
+                return Array.isArray(response.body) ? response.body : [];
+            },
+            cacheable: Array.isArray,
+        });
         if (!messages.length) break;
 
         for (const message of messages) {
@@ -1506,8 +1519,14 @@ export default definePlugin({
 
                 try {
                     const query = encodeURIComponent(word);
-                    const response = await fetch(`https://api.urbandictionary.com/v0/define?term=${query}&per_page=${settings.store.urbanResultsAmount}`);
-                    const { list } = await response.json() as { list: UrbanDictionaryDefinition[]; };
+                    const { list } = await TestcordRequestCoordinator.request<{ list: UrbanDictionaryDefinition[]; }>({
+                        key: `external:urban:${word.toLowerCase()}:${settings.store.urbanResultsAmount}`,
+                        ttlMs: 30 * 60_000,
+                        run: async () => {
+                            const response = await fetch(`https://api.urbandictionary.com/v0/define?term=${query}&per_page=${settings.store.urbanResultsAmount}`);
+                            return await response.json() as { list: UrbanDictionaryDefinition[]; };
+                        },
+                    });
 
                     if (!list.length) {
                         sendBotMessage(ctx.channel.id, { content: "No results found." });

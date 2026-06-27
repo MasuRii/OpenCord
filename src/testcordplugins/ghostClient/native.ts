@@ -1,14 +1,14 @@
 /*
- * GhostClient native.ts — main process Electron
- * Launches ghost-server via node.exe bundled in nightcord-dist
- * Communication via HTTP localhost:47821
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { app, shell, ipcMain } from "electron";
 import * as childProcess from "child_process";
+import { app, ipcMain,shell } from "electron";
 import * as fs from "fs";
-import * as path from "path";
 import * as http from "http";
+import * as path from "path";
 
 // IPC handler to open external URLs (used by NightcordUpdater)
 ipcMain.handle("NIGHTCORD_OPEN_URL", (_event, url: string) => {
@@ -107,16 +107,16 @@ async function killZombieServer(): Promise<void> {
                 // Not our process — it's a zombie from a previous crash
                 // Try to stop it via the HTTP API
                 try {
-                    await new Promise<void>((resolve) => {
-                        const req = http.request({ hostname: '127.0.0.1', port: PORT, path: '/shutdown', method: 'POST' }, () => resolve());
+                    await new Promise<void>(resolve => {
+                        const req = http.request({ hostname: "127.0.0.1", port: PORT, path: "/shutdown", method: "POST" }, () => resolve());
                         req.setTimeout(1000, () => { req.destroy(); resolve(); });
-                        req.on('error', () => resolve());
+                        req.on("error", () => resolve());
                         req.end();
                     });
                 } catch { }
                 // Fallback : taskkill
                 try {
-                    childProcess.execSync('taskkill /F /IM node.exe /FI "WINDOWTITLE eq ghost-server"', { stdio: 'ignore' });
+                    childProcess.execSync('taskkill /F /IM node.exe /FI "WINDOWTITLE eq ghost-server"', { stdio: "ignore" });
                 } catch { }
                 await new Promise(r => setTimeout(r, 500));
             }

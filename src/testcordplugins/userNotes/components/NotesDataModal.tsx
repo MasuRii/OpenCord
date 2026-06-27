@@ -11,7 +11,7 @@ import {
     closeModal, ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot, openModal
 } from "@utils/modal";
 import { LazyComponent, useAwaiter } from "@utils/react";
-import {Alerts, Avatar, Button, ContextMenuApi, Menu, Popout, React, RelationshipStore, Select, Text, TextArea, TextInput, Tooltip, useCallback, useMemo, useReducer, useRef, UserStore, UserUtils, useState} from "@webpack/common";
+import { Alerts, Avatar, Button, ContextMenuApi, Menu, Popout, React, RelationshipStore, Select, Text, TextArea, TextInput, Tooltip, useCallback, useMemo, useReducer, useRef, UserStore, UserUtils, useState } from "@webpack/common";
 
 import { cacheUsers, deleteUserNotes, getRunning, saveUserNotes, setupStates, stopCacheProcess, usersCache, usersNotes as usersNotesMap } from "../data";
 import settings from "../settings";
@@ -498,5 +498,3 @@ export const openNotesDataModal = async () => {
         />
     ));
 };
-
-

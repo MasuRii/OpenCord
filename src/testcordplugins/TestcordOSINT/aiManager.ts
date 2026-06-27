@@ -228,7 +228,7 @@ async function callOpenAICompatible(
     const headers: Record<string, string> = {
         "Content-Type": "application/json",
     };
-    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+    if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
     const res = await osintFetch(url, "POST", headers, JSON.stringify({
         model,

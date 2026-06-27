@@ -1,3 +1,9 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { User } from "@vencord/discord-types";
 
 import { AnalysisValue, pruneMap } from "../../utils";
@@ -33,7 +39,7 @@ export function analyzeBotProfile(user: User): AnalysisValue | null {
 
     const details: AnalysisValue["details"] = [];
     const isVerifiedBot = typeof user.isVerifiedBot === "function" && user.isVerifiedBot();
-    const createdAt = user.createdAt;
+    const { createdAt } = user;
     const accountAgeMs = createdAt instanceof Date ? Date.now() - createdAt.getTime() : Number.POSITIVE_INFINITY;
 
     if (isVerifiedBot) {

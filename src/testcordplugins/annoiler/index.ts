@@ -5,7 +5,7 @@
  */
 
 import { findOption, RequiredMessageOption } from "@api/Commands";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 
 function annoil(input) {
@@ -32,8 +32,3 @@ export default definePlugin({
         },
     ],
 });
-
-
-
-
-

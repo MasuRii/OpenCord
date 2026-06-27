@@ -16,9 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Devs } from "@utils/constants";
 import definePlugin from "@utils/types";
-
 
 const plugin = definePlugin({
     name: "PhilsPluginLibrary",
@@ -41,7 +39,6 @@ const plugin = definePlugin({
         }
     ]
 });
-
 
 export default plugin;
 

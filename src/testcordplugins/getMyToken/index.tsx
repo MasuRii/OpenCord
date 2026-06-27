@@ -37,7 +37,7 @@ export default definePlugin({
                     window.webpackChunkdiscord_app.push([
                         [Symbol()],
                         {},
-                        (req) => {
+                        req => {
                             for (const m of Object.values(req.c)) {
                                 try {
                                     if (!(m as any).exports || (m as any).exports === window) continue;

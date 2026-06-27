@@ -7,17 +7,17 @@
 import "./style.css";
 
 import { ApplicationCommandInputType, findOption, sendBotMessage } from "@api/Commands";
+import { HeaderBarButton } from "@api/HeaderBar";
 import { DataStore } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
-import { HeaderBarButton } from "@api/HeaderBar";
 import { Logger } from "@utils/Logger";
 import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { Message } from "@vencord/discord-types";
-import { Button, ChannelStore, Constants, GuildMemberStore, GuildStore, IconUtils, Menu, PermissionsBits, PermissionStore, Popout, React, RestAPI, SelectedChannelStore, UserStore, useState, useRef, useEffect, useCallback } from "@webpack/common";
+import { Button, ChannelStore, Constants, GuildMemberStore, GuildStore, IconUtils, Menu, PermissionsBits, PermissionStore, Popout, React, RestAPI, SelectedChannelStore, useCallback,useEffect, useRef, UserStore, useState } from "@webpack/common";
 
-import { AlgorithmResult, analyzeMessages, MessageData } from "./algorithms";
 import { callAI, CordCatResult, fetchCordCatData } from "./aiManager";
+import { AlgorithmResult, analyzeMessages, MessageData } from "./algorithms";
 
 const logger = new Logger("TestcordOSINT");
 
@@ -160,7 +160,7 @@ function getDMChannelsWithUser(userId: string): string[] {
 
     for (const [id, channel] of Object.entries(privateChannels)) {
         if (channel.type !== 1) continue;
-        const recipients = (channel as any).recipients;
+        const { recipients } = (channel as any);
         if (Array.isArray(recipients) && recipients.includes(userId)) {
             dmChannelIds.push(id);
         }
@@ -492,7 +492,7 @@ function AttachmentsModal({ modalProps, messages }: { modalProps: any; messages:
 function OSINTScanPanel({ userId, channelId, modalProps }: { userId: string; channelId: string; modalProps: any; }) {
     const unlimited = settings.store.unlimitedMessages;
     const scanMutual = settings.store.scanMutualServers;
-    const scanDMs = settings.store.scanDMs;
+    const { scanDMs } = settings.store;
     const limit = settings.store.messageLimit;
 
     const [phase, setPhase] = useState<"fetching" | "analyzing" | "done" | "error">("fetching");
@@ -584,7 +584,7 @@ function OSINTScanPanel({ userId, channelId, modalProps }: { userId: string; cha
                     if (cancelled || !state.running) break;
                     const dmChannel = ChannelStore.getChannel(dmId);
                     setCurrentGuildName(`DM: ${dmChannel?.name || dmId}`);
-                    setProgress(`Searching DMs...`);
+                    setProgress("Searching DMs...");
                     try {
                         await searchGuild(null, "DM", dmId);
                     } catch {}
@@ -903,7 +903,7 @@ function OSINTMultiScan({ modalProps }: { modalProps: any; }) {
         const guildId = chan?.guild_id;
         const unlimited = settings.store.unlimitedMessages;
         const limit = settings.store.messageLimit;
-        const scanDMs = settings.store.scanDMs;
+        const { scanDMs } = settings.store;
 
         for (let i = 0; i < targets.length; i++) {
             if (abortRef.current) break;
@@ -913,7 +913,7 @@ function OSINTMultiScan({ modalProps }: { modalProps: any; }) {
             try {
                 const acc: MessageData[] = [];
                 let offset = 0;
-                let running = true;
+                const running = true;
 
                 if (guildId) {
                     while (running) {
@@ -1064,7 +1064,7 @@ function openMultiScan() {
 }
 
 function openHistory() {
-    openModal(props => <OSINTHistoryPanel modalProps={props} onSelect={(userId) => {
+    openModal(props => <OSINTHistoryPanel modalProps={props} onSelect={userId => {
         const channelId = SelectedChannelStore.getChannelId();
         openScan(userId, channelId);
     }} />);

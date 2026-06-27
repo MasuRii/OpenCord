@@ -17,7 +17,6 @@
 */
 
 import * as types from "../../philsPluginLibrary/types/constants";
-import { Devs } from "@utils/constants";
 
 export const PluginInfo: types.PluginInfo = {
     PLUGIN_NAME: "PhilsPluginLibrary",

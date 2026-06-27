@@ -7,7 +7,7 @@
 import "./styles.css";
 
 import { copyToClipboard } from "@utils/clipboard";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { Guild, GuildMember } from "@vencord/discord-types";
 import { findComponentByCodeLazy } from "@webpack";
@@ -224,8 +224,3 @@ export default definePlugin({
     ],
 
 });
-
-
-
-
-

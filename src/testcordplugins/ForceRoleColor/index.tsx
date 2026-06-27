@@ -17,7 +17,7 @@
 */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { Text, UserStore } from "@webpack/common";
 
@@ -177,8 +177,3 @@ export default definePlugin({
         return this.getColorsForMessages({ author: user }, old);
     }
 });
-
-
-
-
-

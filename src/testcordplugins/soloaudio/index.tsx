@@ -4,15 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { NavContextMenuPatchCallback, addContextMenuPatch, removeContextMenuPatch } from "@api/ContextMenu";
+import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
 import { UserAreaButton, UserAreaRenderProps } from "@api/UserArea";
-import { ModalContent, ModalFooter, ModalHeader, RenderModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import { debounce } from "@shared/debounce";
+import { ModalContent, ModalFooter, ModalHeader, ModalRoot, ModalSize, openModal,RenderModalProps } from "@utils/modal";
 import definePlugin, { makeRange, OptionType } from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-
-import { ContextMenuApi, Menu, React, RelationshipStore, UserStore, VoiceActions, VoiceStateStore, FluxDispatcher, Slider, Button } from "@webpack/common";
+import { Button,ContextMenuApi, FluxDispatcher, Menu, React, RelationshipStore, Slider, UserStore, VoiceActions, VoiceStateStore } from "@webpack/common";
 
 const MediaEngineStore = findStoreLazy("MediaEngineStore");
 const { setLocalVolume } = findByPropsLazy("setLocalVolume");
@@ -361,7 +360,7 @@ function SoloAudioModal({ modalProps }: { modalProps: RenderModalProps; }) {
                         <SectionLabel>Active Status</SectionLabel>
                         <Card>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                <div style={{ color: C.text, fontSize: '15px' }}>
+                                <div style={{ color: C.text, fontSize: "15px" }}>
                                     Targeting: <strong style={{ color: (soloedUserId || soloedGroupId) ? C.green : C.text }}>{currentSoloText}</strong>
                                 </div>
                                 {(soloedUserId || soloedGroupId) && (
@@ -378,7 +377,7 @@ function SoloAudioModal({ modalProps }: { modalProps: RenderModalProps; }) {
                                 const pfp = u?.getAvatarURL?.(null, 24) ?? "https://cdn.discordapp.com/embed/avatars/0.png";
                                 const isSolo = soloedUserId === uid;
                                 return (
-                                    <div key={uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div key={uid} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                                             <img src={pfp} width={24} height={24} style={{ borderRadius: "50%" }} />
                                             <span style={{ color: C.text, fontSize: 15, fontWeight: 500 }}>{u?.globalName ?? u?.username ?? uid}</span>
@@ -387,7 +386,7 @@ function SoloAudioModal({ modalProps }: { modalProps: RenderModalProps; }) {
                                             {isSolo ? "✓ Active" : "Solo"}
                                         </Button>
                                     </div>
-                                )
+                                );
                             })}
                         </Card>
 
@@ -397,7 +396,7 @@ function SoloAudioModal({ modalProps }: { modalProps: RenderModalProps; }) {
                             {groups.map(g => {
                                 const isSolo = soloedGroupId === g.id;
                                 return (
-                                    <div key={g.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div key={g.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                         <div style={{ display: "flex", flexDirection: "column" }}>
                                             <span style={{ color: C.text, fontSize: 15, fontWeight: 500 }}>{g.name}</span>
                                             <span style={{ color: C.textMuted, fontSize: 12 }}>{g.userIds.length} members ({g.volume ?? 100}%)</span>
@@ -406,7 +405,7 @@ function SoloAudioModal({ modalProps }: { modalProps: RenderModalProps; }) {
                                             {isSolo ? "✓ Active" : "Solo"}
                                         </Button>
                                     </div>
-                                )
+                                );
                             })}
                         </Card>
                     </>}
@@ -431,7 +430,7 @@ function SoloAudioModal({ modalProps }: { modalProps: RenderModalProps; }) {
                                     label="Group Volume"
                                     value={group.volume ?? 100}
                                     min={0} max={200} step={5} unit="%"
-                                    onChange={(v) => {
+                                    onChange={v => {
                                         group.volume = v;
                                         saveGroups();
                                         if (soloedGroupId === group.id) reapplyCurrentSolo();
@@ -457,7 +456,7 @@ function SoloAudioModal({ modalProps }: { modalProps: RenderModalProps; }) {
                                                     </div>
                                                 }
                                                 value={inGroup}
-                                                onChange={(v) => {
+                                                onChange={v => {
                                                     if (v) addUserToGroup(group.id, uid);
                                                     else removeUserFromGroup(group.id, uid);
                                                     forceUpdate();

@@ -6,8 +6,8 @@
 
 import { addMessagePopoverButton, removeMessagePopoverButton } from "@api/MessagePopover";
 import { definePluginSettings } from "@api/Settings";
-import definePlugin, { OptionType } from "@utils/types";
 import { TestcordDevs } from "@utils/constants";
+import definePlugin, { OptionType } from "@utils/types";
 import { Toasts } from "@webpack/common";
 
 const googleExtensions = ["pdf"];
@@ -109,7 +109,3 @@ export default definePlugin({
         removeMessagePopoverButton("FileViewer");
     },
 });
-
-
-
-

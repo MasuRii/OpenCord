@@ -12,7 +12,6 @@ import { CustomStreamPreviewState } from "./state";
 import { StreamCreateEvent, StreamDeleteEvent } from "./types";
 import { parseStreamKey, stopSendingScreenSharePreview } from "./utilities";
 
-
 export default definePlugin({
     name: "CustomScreenSharePreview",
     description: "Adds ability to select your own image as screen share preview.",

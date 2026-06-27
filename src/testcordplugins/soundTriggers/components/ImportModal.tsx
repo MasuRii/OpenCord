@@ -11,7 +11,6 @@ import { Button, Forms, TextArea, useState } from "@webpack/common";
 import { classFactory, settings, SoundTrigger } from "../index";
 import { failToast, getUniqueTriggers, successToast, triggersAreUnique, validateAndFormatTrigger } from "../util";
 
-
 export function ImportModal(props: ModalProps) {
     const [textArea, setTextArea] = useState("");
 
@@ -78,5 +77,3 @@ export function ImportModal(props: ModalProps) {
         </ModalRoot>
     );
 }
-
-

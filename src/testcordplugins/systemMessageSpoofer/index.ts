@@ -6,7 +6,7 @@
 
 import { ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
 import { ApplicationCommandInputType } from "@api/Commands/types";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { FluxDispatcher, UserStore } from "@webpack/common";
 
@@ -446,7 +446,7 @@ export default definePlugin({
 
                     const content = action === "start"
                         ? `${username} started a call. Join here!`
-                        : `${username} ended the call${callDuration ? ` (Duration: ${callDuration} minutes)` : ''}.`;
+                        : `${username} ended the call${callDuration ? ` (Duration: ${callDuration} minutes)` : ""}.`;
 
                     dispatchFakeMessage(channelId, {
                         type: MessageType.CALL,
@@ -846,8 +846,3 @@ export default definePlugin({
         }
     ]
 });
-
-
-
-
-

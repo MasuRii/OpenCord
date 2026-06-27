@@ -1,7 +1,13 @@
-import definePlugin from "@utils/types";
-import { FluxDispatcher, React, UserStore } from "@webpack/common";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { UserAreaButton } from "@api/UserArea";
-import { findByProps, findByPropsLazy } from "@webpack";
+import definePlugin from "@utils/types";
+import { findByPropsLazy } from "@webpack";
+import { FluxDispatcher, React, UserStore } from "@webpack/common";
 
 // Webpack Modules
 const ChannelActions = findByPropsLazy("selectVoiceChannel", "disconnect");
@@ -83,7 +89,7 @@ function AntiMoveDecoButton() {
 export default definePlugin({
     name: "AntiMoveDeco",
     description: "Adds a button to prevent being moved or disconnected from a voice channel.",
-    tags: ["Voice", "Utility"],
+    tags: ["Voice", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
 
     userAreaButton: {

@@ -15,7 +15,6 @@ export const NotesDataIcon = LazyComponent(() => React.memo(() => {
     );
 }));
 
-
 export const SaveIcon = LazyComponent(() => React.memo(() => {
     return (
         <svg width="32" height="32" viewBox="-4 -4 32 32">
@@ -75,5 +74,3 @@ export const SuccessIcon = LazyComponent(() => React.memo(() => {
         </svg>
     );
 }));
-
-

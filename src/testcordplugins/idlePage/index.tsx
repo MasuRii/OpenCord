@@ -6,10 +6,8 @@
 
 import "./style.css";
 
-import { TestcordDevs } from "@utils/constants";
-
 import { definePluginSettings } from "@api/Settings";
-import {Devs} from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import { LazyComponent } from "@utils/lazyReact";
 import { closeModal, Modals, openModalLazy } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
@@ -107,8 +105,3 @@ export default definePlugin({
         }
     ]
 });
-
-
-
-
-

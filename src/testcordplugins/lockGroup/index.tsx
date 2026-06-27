@@ -8,11 +8,11 @@ import {
     findGroupChildrenByChildId,
     NavContextMenuPatchCallback,
 } from "@api/ContextMenu";
-import { definePluginSettings } from "@api/Settings";
 import { showNotification } from "@api/Notifications";
+import { definePluginSettings } from "@api/Settings";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { ChannelStore, Menu, RestAPI, UserStore } from "@webpack/common";
-import { TestcordDevs } from "@utils/constants";
 
 // State of locked groups
 const lockedGroups = new Set<string>();
@@ -301,76 +301,51 @@ export default definePlugin({
         // Monitor messages to detect member additions
         MESSAGE_CREATE(event: { message: any; }) {
             const { message } = event;
+            if (!message || message.type !== 1) return;
             const currentUserId = UserStore.getCurrentUser()?.id;
 
-            // Check if it's a member addition message (type 1)
-            if (message && message.type === 1) {
-                // RECIPIENT_ADD
-                const channelId = message.channel_id;
+            const channelId = message.channel_id;
+            if (!lockedGroups.has(channelId)) return;
 
-                if (lockedGroups.has(channelId)) {
-                    const channel = ChannelStore.getChannel(channelId);
+            const channel = ChannelStore.getChannel(channelId);
+            if (!channel || channel.type !== 3 || channel.ownerId !== currentUserId) return;
 
-                    if (
-                        channel &&
-                        channel.type === 3 &&
-                        channel.ownerId === currentUserId
-                    ) {
-                        const channelName = channel.name || "Unnamed group";
-                        const addedUserId = message.mentions?.[0]?.id;
-                        const addedByUserId = message.author?.id;
+            const channelName = channel.name || "Unnamed group";
+            const addedUserId = message.mentions?.[0]?.id;
+            const addedByUserId = message.author?.id;
 
-                        log(`📨 Addition message detected in "${channelName}"`);
-                        debugLog(
-                            `Added by: ${addedByUserId}, User added: ${addedUserId}, Owner: ${currentUserId}`
-                        );
+            log(`📨 Addition message detected in "${channelName}"`);
+            debugLog(`Added by: ${addedByUserId}, User added: ${addedUserId}, Owner: ${currentUserId}`);
 
-                        // If addition was done by owner, don't kick
-                        if (addedByUserId === currentUserId) {
-                            debugLog(`✅ Addition made by owner - Authorized`);
+            // If addition was done by owner, don't kick
+            if (addedByUserId === currentUserId) {
+                debugLog("✅ Addition made by owner - Authorized");
+                if (settings.store.showNotifications && settings.store.debugMode) {
+                    showNotification({
+                        title: "🔒 LockGroup - Owner addition",
+                        body: `Member added by owner in "${channelName}" - Authorized`,
+                    });
+                }
+                return;
+            }
 
-                            if (
-                                settings.store.showNotifications &&
-                                settings.store.debugMode
-                            ) {
-                                showNotification({
-                                    title: "🔒 LockGroup - Owner addition",
-                                    body: `Member added by owner in "${channelName}" - Authorized`,
-                                    icon: undefined,
-                                });
-                            }
-                            return;
-                        }
-
-                        // If someone else added, kick
-                        if (addedUserId && addedByUserId !== currentUserId) {
-                            debugLog(
-                                `🚫 Unauthorized addition by ${addedByUserId} - Kick scheduled`
-                            );
-
-                            // Security kick for unauthorized additions
-                            setTimeout(async () => {
-                                try {
-                                    await RestAPI.del({
-                                        url: `/channels/${channelId}/recipients/${addedUserId}`,
-                                    });
-                                    log(
-                                        `🔒 Security kick performed for ${addedUserId} (added by ${addedByUserId})`
-                                    );
-                                } catch (error) {
-                                    debugLog(`Security kick error: ${error}`);
-                                }
-                            }, 150);
-
-                            if (settings.store.showNotifications) {
-                                showNotification({
-                                    title: "🔒 LockGroup - Unauthorized addition",
-                                    body: `Member added without authorization in "${channelName}" then removed`,
-                                    icon: undefined,
-                                });
-                            }
-                        }
+            // If someone else added, kick
+            if (addedUserId && addedByUserId !== currentUserId) {
+                debugLog(`🚫 Unauthorized addition by ${addedByUserId} - Kick scheduled`);
+                setTimeout(async () => {
+                    try {
+                        await RestAPI.del({ url: `/channels/${channelId}/recipients/${addedUserId}` });
+                        log(`🔒 Security kick performed for ${addedUserId} (added by ${addedByUserId})`);
+                    } catch (error) {
+                        debugLog(`Security kick error: ${error}`);
                     }
+                }, 150);
+
+                if (settings.store.showNotifications) {
+                    showNotification({
+                        title: "🔒 LockGroup - Unauthorized addition",
+                        body: `Member added without authorization in "${channelName}" then removed`,
+                    });
                 }
             }
         },
@@ -420,7 +395,3 @@ export default definePlugin({
         }
     },
 });
-
-
-
-

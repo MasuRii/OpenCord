@@ -40,7 +40,7 @@ function keybind2(e) {
         if (cChannelId) {
             const cChannel = ChannelStore.getChannel(cChannelId);
             if (cChannel) {
-                const mftokick = trackedmfs.pop() ?? "";
+                const mftokick = trackedmfs[trackedmfs.length - 1] ?? "";
                 if (mftokick && friendststore.getFriendIDs().includes(mftokick)) {
                     trackedmfs.splice(trackedmfs.indexOf(mftokick), 1);
                     Toasts.show({
@@ -126,6 +126,8 @@ function keybind(e) {
     }
 }
 
+const MAX_TRACKED = 200;
+
 const cb = async e => {
     const state = e.voiceStates[0];
     if (!state?.channelId) return;
@@ -134,6 +136,8 @@ const cb = async e => {
     const Cvcstates = VoiceStateStore.getVoiceStatesForChannel(state?.channelId) ?? {};
     if (!Object.keys(Cvcstates).includes(UserStore.getCurrentUser().id)) return;
     trackedmfs.push(state.userId);
+    // Cap growth: drop oldest entries (front of the stack) once over the limit
+    while (trackedmfs.length > MAX_TRACKED) trackedmfs.shift();
 };
 
 const good = async e => {
@@ -205,5 +209,6 @@ export default definePlugin({
         document.removeEventListener("keydown", keybind2);
         FluxDispatcher.unsubscribe("STREAMER_MODE_UPDATE", good);
         FluxDispatcher.unsubscribe("VOICE_STATE_UPDATES", cb);
+        trackedmfs.length = 0;
     },
 });

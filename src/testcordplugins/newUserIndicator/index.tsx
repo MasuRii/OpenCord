@@ -4,17 +4,15 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { addProfileBadge, BadgePosition, ProfileBadge, removeProfileBadge } from "@api/Badges";
+import { addProfileBadge, BadgePosition, removeProfileBadge } from "@api/Badges";
 import { addMemberListDecorator, removeMemberListDecorator } from "@api/MemberListDecorators";
 import { addMessageDecoration, removeMessageDecoration } from "@api/MessageDecorations";
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { User } from "@vencord/discord-types";
 import { SnowflakeUtils, Tooltip, UserStore } from "@webpack/common";
-
-
 
 const getTimeDiff = (now: Date, user: Date) => {
     // Get days since creation
@@ -45,7 +43,6 @@ const badge = {
     shouldShow: (_: any) => true,
     key: "newuser-indicator"
 } as any;
-
 
 const settings = definePluginSettings({
     badges: {
@@ -98,8 +95,3 @@ export default definePlugin({
     },
 
 });
-
-
-
-
-

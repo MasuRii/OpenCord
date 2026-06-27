@@ -1,6 +1,12 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { definePluginSettings } from "@api/Settings";
-import definePlugin, { OptionType } from "@utils/types";
 import { TestcordDevs } from "@utils/constants";
+import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import { RestAPI, Toasts, UserStore } from "@webpack/common";
 // @ts-ignore
@@ -8,10 +14,8 @@ import { VoiceState as WebpackVoiceState } from "@webpack/types";
 // @ts-ignore
 import type { User } from "discord-types/general";
 
-
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
 const VoiceChannelUtils = findByPropsLazy("getVoiceChannelId");
-
 
 const userJoinCounts = new Map<string, number>();
 const userTimeouts = new Map<string, NodeJS.Timeout>();
@@ -65,14 +69,12 @@ async function executeBan(channelId: string, userId: string): Promise<void> {
     const banOperation = banQueue.then(async () => {
         if (bannedUsers.has(userId)) return;
 
-
         if (!Vencord.Plugins.plugins.vcOwnerDetector?.settings?.store?.amivcowner) {
             console.warn("Cannot ban user: VC owner permissions not detected");
             return;
         }
 
         bannedUsers.add(userId);
-
 
         Toasts.show({
             message: `Auto-banning user ${userId} for voice channel spam`,
@@ -101,9 +103,7 @@ async function executeBan(channelId: string, userId: string): Promise<void> {
                 }, 1500);
             }
 
-
             await new Promise(resolve => setTimeout(resolve, 1000));
-
 
             const banResponse = await RestAPI.post({
                 url: `/channels/${channelId}/messages`,
@@ -153,13 +153,11 @@ function resetUserCount(userId: string): void {
 function handleUserVoiceActivity(userId: string, oldChannelId: string): void {
     if (bannedUsers.has(userId)) return;
 
-
     const currentCount = userJoinCounts.get(userId) || 0;
     const newCount = currentCount + 1;
     userJoinCounts.set(userId, newCount);
 
     console.log(`User ${userId} voice activity count: ${newCount}`);
-
 
     if (!userTimeouts.has(userId)) {
         const timeout = setTimeout(() => {
@@ -168,7 +166,6 @@ function handleUserVoiceActivity(userId: string, oldChannelId: string): void {
 
         userTimeouts.set(userId, timeout);
     }
-
 
     if (newCount >= settings.store.joinThreshold) {
         executeBan(oldChannelId, userId);
@@ -193,7 +190,6 @@ export default definePlugin({
                 const { userId, channelId } = state;
                 let { oldChannelId } = state;
 
-
                 if (userId === currentUserId) {
                     if (channelId !== lastUserChannelId) {
                         oldChannelId = lastUserChannelId;
@@ -202,13 +198,11 @@ export default definePlugin({
                     return;
                 }
 
-
                 const targetChannelId = settings.store.targetChannelId ||
                     VoiceChannelUtils.getVoiceChannelId();
 
                 if (!targetChannelId || oldChannelId !== targetChannelId) return;
                 if (oldChannelId === channelId) return;
-
 
                 if (oldChannelId && !channelId) {
                     handleUserVoiceActivity(userId, oldChannelId);
@@ -220,7 +214,6 @@ export default definePlugin({
             });
         }
     },
-
 
     stop() {
 

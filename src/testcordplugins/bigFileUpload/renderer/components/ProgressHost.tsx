@@ -33,12 +33,17 @@ export function initProgressBar() {
         injectProgressBar();
     }
 
-    // Also watch for navigation changes (channel switching)
-    // Store reference for cleanup to prevent memory leak
+    // Also watch for navigation changes (channel switching) with debounce
+    // Only observe the chat area parent rather than the entire document body
+    let mutationTimer: ReturnType<typeof setTimeout> | null = null;
     mutationObserver = new MutationObserver(() => {
-        if (!progressBarContainer || !document.contains(progressBarContainer)) {
-            injectProgressBar();
-        }
+        if (mutationTimer) return;
+        mutationTimer = setTimeout(() => {
+            mutationTimer = null;
+            if (!progressBarContainer || !document.contains(progressBarContainer)) {
+                injectProgressBar();
+            }
+        }, 500);
     });
 
     mutationObserver.observe(document.body, {

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 
 import { Connection } from "./connection-types";
@@ -34,8 +34,3 @@ export default definePlugin({
         return connections;
     }
 });
-
-
-
-
-

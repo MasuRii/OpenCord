@@ -16,12 +16,13 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { UserStore } from "@webpack/common";
+
 import { PluginInfo } from "../../betterScreenshare.desktop/constants";
 import { logger } from "../../betterScreenshare.desktop/logger";
 import { screenshareStore } from "../../betterScreenshare.desktop/stores";
 import { Emitter, MediaEngineStore, Patcher, types } from "../../philsPluginLibrary";
 import { patchConnectionVideoSetDesktopSourceWithOptions, patchConnectionVideoTransportOptions } from "../../philsPluginLibrary/patches/video";
-import { UserStore } from "@webpack/common";
 
 export class ScreensharePatcher extends Patcher {
     private mediaEngineStore: types.MediaEngineStore;

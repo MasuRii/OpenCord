@@ -6,7 +6,7 @@
 
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { makeRange, OptionType } from "@utils/types";
 import type { Channel } from "@vencord/discord-types";
 import { findStoreLazy } from "@webpack";
@@ -167,10 +167,3 @@ export default definePlugin({
         "channel-context": VoiceChannelContext
     },
 });
-
-
-
-
-
-
-

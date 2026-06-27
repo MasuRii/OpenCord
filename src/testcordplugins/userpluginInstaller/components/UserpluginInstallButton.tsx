@@ -20,7 +20,7 @@ export default function UserpluginInstallButton({ props }: any) {
         setPlugins(plugins.value());
         const cid = plugins.registerCallback(value => setPlugins(plugins.value()));
         return () => plugins.deregisterCallback(cid);
-    });
+    }, []);
     const { message } = props;
     const channel = ChannelStore.getChannel(message.channel_id);
     if (![...WHITELISTED_SHARE_CHANNELS, ...(settings.store.allowlistedChannels || "").split(",")].includes(channel?.parent_id) && !WHITELISTED_SHARE_CHANNELS.includes(message.channel_id))

@@ -10,7 +10,38 @@ import { ActivityType } from "@vencord/discord-types/enums";
 import { findComponentByCodeLazy } from "@webpack";
 import { Popout, PresenceStore, useRef, UserStore, useStateFromStores } from "@webpack/common";
 
+import type { MessageDecorationProps } from "../../api/MessageDecorations";
+
 const ActivityCard = findComponentByCodeLazy(".USER_PROFILE_LIVE_ACTIVITY_CARD),{themeType:");
+
+function ListeningCover({ message }: MessageDecorationProps) {
+    const activities = useStateFromStores([PresenceStore], () =>
+        PresenceStore.getActivities(message.author.id)
+            .filter(a => a.type === ActivityType.LISTENING && a.assets?.large_image)
+    );
+
+    const activity = activities[0];
+    if (!activity) return null;
+
+    const largeImage = activity.assets!.large_image!;
+    const url = largeImage.startsWith("spotify:")
+        ? largeImage.replace("spotify:", "https://i.scdn.co/image/")
+        : largeImage.replace("mp:", "https://media.discordapp.net/");
+
+    const ref = useRef<HTMLDivElement>(null);
+
+    return <Popout
+        position="top"
+        renderPopout={() => <div style={{ width: 267, height: 110 }}>
+            <ActivityCard activity={activity} currentUser={UserStore.getCurrentUser()} user={message.author} />
+        </div>}
+        targetElementRef={ref}
+    >
+        {popoutProps => <div ref={ref} style={{ width: 20, height: 20 }} {...popoutProps}>
+            <img src={url} style={{ width: 20, height: 20, borderRadius: 3 }} />
+        </div>}
+    </Popout>;
+}
 
 export default definePlugin({
     name: "MessageListeningCover",
@@ -18,42 +49,9 @@ export default definePlugin({
     tags: ["Chat", "Privacy"],
     authors: [Devs.nin0dev],
     renderMessageDecoration: props => {
-        const ract = useStateFromStores([PresenceStore], () => PresenceStore.getActivities(props.message.author.id));
-        const activities = ract.filter(a => [ActivityType.LISTENING].includes(a.type));
-
-        const ref = useRef(null);
-        return <Popout
-            position="top"
-            renderPopout={() => <div style={{
-                width: 267,
-                height: 110
-            }}>
-                <ActivityCard activity={activities[0]} currentUser={UserStore.getCurrentUser()} user={props.message.author} />
-            </div>}
-            targetElementRef={ref}
-        >
-            {popoutProps => activities.length > 0 && <div ref={ref} style={{
-                width: 20,
-                height: 20
-            }} {...popoutProps}>
-                {
-                    (() => {
-                        const activity = activities[0];
-                        if (!activity.assets?.large_image) return null;
-                        const largeImage = activity.assets.large_image;
-
-                        const url = largeImage.startsWith("spotify:")
-                            ? largeImage.replace("spotify:", "https://i.scdn.co/image/")
-                            : largeImage.replace("mp:", "https://media.discordapp.net/");
-                        return <img src={url} style={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: 3
-                        }} />;
-                    })()
-                }
-            </div>
-            }
-        </Popout>;
+        const me = UserStore.getCurrentUser()?.id;
+        // Only show for other users' messages (not our own)
+        if (!me || props.message.author.id === me) return null;
+        return <ListeningCover {...props} />;
     }
 });

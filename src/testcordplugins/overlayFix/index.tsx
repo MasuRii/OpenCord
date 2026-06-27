@@ -1,18 +1,27 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import definePlugin from "@utils/types";
 
 export default definePlugin({
     name: "OverlayFix",
     description: "Attempts to fix the overlay by tricking Discord about the process name (pretends to be discord.exe).",
-    tags: ["Utility", "Voice", "Utility"],
+    tags: ["Performance", "Voice", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     cannotBeDisabled: false,
     enabledByDefault: false,
     requiresRestart: true,
 
+    _originalNative: undefined as any,
+
     start() {
         try {
             if (typeof window.DiscordNative !== "undefined") {
                 const originalNative = window.DiscordNative;
+                this._originalNative = originalNative;
 
                 // Try to redefine the property on window safely
                 try {
@@ -57,6 +66,22 @@ export default definePlugin({
             }
         } catch (e) {
             console.error("[OverlayFix] Failed to setup spoofing:", e);
+        }
+    },
+
+    stop() {
+        try {
+            if (this._originalNative !== undefined) {
+                Object.defineProperty(window, "DiscordNative", {
+                    value: this._originalNative,
+                    configurable: true,
+                    enumerable: true,
+                    writable: true
+                });
+                this._originalNative = undefined;
+            }
+        } catch (e) {
+            console.error("[OverlayFix] Failed to restore DiscordNative:", e);
         }
     },
 

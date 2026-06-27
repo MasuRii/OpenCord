@@ -6,7 +6,7 @@
 
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings, Settings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { ChannelStore, MessageStore, NavigationRouter, UserStore } from "@webpack/common";
 
@@ -84,10 +84,13 @@ export default definePlugin({
                 timeoutId = null;
             }, Settings.plugins.ReactionLogger.delay * 1000);
         },
+    },
+
+    stop() {
+        if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+        reactions = {};
     }
 });
-
-
-
-
-

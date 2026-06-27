@@ -79,13 +79,15 @@ function PruneModal(props: ModalProps) {
     }, [index]);
 
     useAwaiter(async () => {
+        const srv = joinedServers[index];
+        if (!srv) return;
         const response = await RestAPI.get(
             {
-                url: `/guilds/${joinedServers[index].id}/messages/search?author_id=${UserStore.getCurrentUser().id}`
+                url: `/guilds/${srv.id}/messages/search?author_id=${UserStore.getCurrentUser().id}`
             });
         const recentResponse = await RestAPI.get(
             {
-                url: `/guilds/${joinedServers[index].id}/messages/search?author_id=${UserStore.getCurrentUser().id}&min_id=${SnowflakeUtils.fromTimestamp(Date.now() - (7 * 24 * 60 * 60 * 1000))}`
+                url: `/guilds/${srv.id}/messages/search?author_id=${UserStore.getCurrentUser().id}&min_id=${SnowflakeUtils.fromTimestamp(Date.now() - (7 * 24 * 60 * 60 * 1000))}`
             });
         setMessages(response.body.total_results.toString());
         setRecentMessages(recentResponse.body.total_results.toString());

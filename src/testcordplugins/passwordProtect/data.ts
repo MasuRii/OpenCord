@@ -50,7 +50,6 @@ export async function checkPassword(input: string, channelId: string) {
     return await sha256(input) === getPasswordHash(channelId);
 }
 
-
 export function accessChannel(channel: Channel) {
     accessedChannels.push(channel.id);
     if (isChannelCurrent(channel.id)) reloadChannel();
@@ -58,5 +57,3 @@ export function accessChannel(channel: Channel) {
         accessedChannels.splice(accessedChannels.indexOf(channel.id), 1);
     }, 1000);
 }
-
-

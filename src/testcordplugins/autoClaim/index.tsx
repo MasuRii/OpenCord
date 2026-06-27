@@ -1,19 +1,25 @@
-import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
 import { classNameFactory } from "@api/Styles";
-import { Devs, EquicordDevs, TestcordDevs } from "@utils/constants";
-import definePlugin, { OptionType } from "@utils/types";
-import { findByCodeLazy, findStoreLazy, findByPropsLazy } from "@webpack";
-import { FluxDispatcher, Menu, MessageActions, MessageStore, ChannelStore, Button, Tooltip, RestAPI, useStateFromStores, SelectedGuildStore, RelationshipStore, SelectedChannelStore, Toasts, GuildStore, PermissionStore, React, UserStore } from "@webpack/common";
-import { Message, User } from "@vencord/discord-types";
+import { TestcordDevs } from "@utils/constants";
 import { classes } from "@utils/misc";
+import definePlugin, { OptionType } from "@utils/types";
+import { User } from "@vencord/discord-types";
+import { findByCodeLazy, findByPropsLazy,findStoreLazy } from "@webpack";
+import { Button, ChannelStore, Menu, React, RestAPI, Toasts, Tooltip, UserStore } from "@webpack/common";
 
 export const cl = classNameFactory("vc-voice-channel-log-");
 const createBotMessage = findByCodeLazy('username:"Clyde"');
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
 const sessionStore = findByPropsLazy("getSessionId");
 
-let currentVcOwners: Map<string, string> = new Map();
+const currentVcOwners: Map<string, string> = new Map();
 
 const settings = definePluginSettings({
     allowedguilds: {
@@ -60,7 +66,7 @@ function isCustomVoiceChannel(channelId: string): boolean {
     const channelName = channel.name.trim();
 
     // Remove all infinity symbols, pipe symbols, and spaces from the start
-    const cleanedName = channelName.replace(/^[\u221E\|\s]+/, '');
+    const cleanedName = channelName.replace(/^[\u221E\|\s]+/, "");
 
     // Check if what remains matches "VC [number]"
     const vcPattern = /^VC\s+\d+$/;
@@ -112,7 +118,7 @@ function updateVcOwnerTracking(channelId: string) {
 
     if (newOwner) {
         if (previousOwner !== newOwner) {
-            console.log(`VC ownership changed in channel ${channelId}: ${previousOwner || 'none'} -> ${newOwner}`);
+            console.log(`VC ownership changed in channel ${channelId}: ${previousOwner || "none"} -> ${newOwner}`);
             if (previousOwner) {
                 console.log(`Detected VC transfer from ${previousOwner} to ${newOwner}`);
             }
@@ -128,7 +134,7 @@ function updateVcOwnerTracking(channelId: string) {
 }
 
 function isGuildAllowed(guildId: string): boolean {
-    const allowedGuilds = settings.store.allowedguilds.split('/').filter(item => item !== '');
+    const allowedGuilds = settings.store.allowedguilds.split("/").filter(item => item !== "");
     return allowedGuilds.includes(guildId);
 }
 
@@ -174,23 +180,23 @@ function attemptClaim(channelId: string, reason: string, isManual: boolean = fal
     RestAPI.post({
         url: `/channels/${channelId}/messages`,
         body: {
-            content: `!voice-claim`,
+            content: "!voice-claim",
             nonce: Math.floor(Math.random() * 10000000000000).toString()
         }
     }).then(() => {
-        console.log(`Successfully ${isManual ? 'manually' : 'auto-'}claimed channel ${channelId}`);
+        console.log(`Successfully ${isManual ? "manually" : "auto-"}claimed channel ${channelId}`);
 
         currentVcOwners.set(channelId, clientUserId);
 
         Toasts.show({
-            message: `Successfully ${isManual ? 'claimed' : 'auto-claimed'} voice channel!`,
+            message: `Successfully ${isManual ? "claimed" : "auto-claimed"} voice channel!`,
             id: isManual ? "manual-claim-success" : "auto-claim-success",
             type: Toasts.Type.SUCCESS,
             options: {
                 position: Toasts.Position.BOTTOM
             }
         });
-    }).catch((error) => {
+    }).catch(error => {
         console.error("Failed to claim channel:", error);
         Toasts.show({
             message: `Failed to claim channel: ${error.message}`,
@@ -450,7 +456,7 @@ export default definePlugin({
                                     currentVcOwners.set(oldChannelId, clientUserId);
                                     return;
                                 }
-                                attemptClaim(oldChannelId, `Original VC owner left`);
+                                attemptClaim(oldChannelId, "Original VC owner left");
                             }, 1000);
 
                             // Fallback attempt
@@ -464,7 +470,7 @@ export default definePlugin({
                                 // Only attempt if we still don't have an owner tracked
                                 if (!currentVcOwners.has(oldChannelId)) {
                                     console.log("Fallback attempt - no owner detected after delay");
-                                    attemptClaim(oldChannelId, `Fallback claim after owner left`);
+                                    attemptClaim(oldChannelId, "Fallback claim after owner left");
                                 }
                             }, 3000);
                         } else {
@@ -482,12 +488,12 @@ export default definePlugin({
                             // If there's no owner now and someone just left, attempt to claim
                             if (!newOwner && settings.store.autoClaimOnTransfer && settings.store.autoClaimEnabled) {
                                 console.log(`No owner after user ${userId} left channel ${oldChannelId}, attempting auto-claim`);
-                                attemptClaim(oldChannelId, `Auto-claim after user left - no owner detected`);
+                                attemptClaim(oldChannelId, "Auto-claim after user left - no owner detected");
                             }
                             // If ownership transferred to someone else who just left
                             else if (newOwner && newOwner !== previousOwner && !isOwnerInChannel(oldChannelId, newOwner) && settings.store.autoClaimOnTransfer) {
                                 console.log(`New owner ${newOwner} not in channel ${oldChannelId}, attempting auto-claim`);
-                                attemptClaim(oldChannelId, `Auto-claim - transferred owner not present`);
+                                attemptClaim(oldChannelId, "Auto-claim - transferred owner not present");
                             }
                         }, 1500);
                     }

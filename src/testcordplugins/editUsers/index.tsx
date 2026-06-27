@@ -6,7 +6,7 @@
 
 import "./styles.css";
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { User } from "@vencord/discord-types";
 import { Menu } from "@webpack/common";
@@ -124,8 +124,3 @@ export default definePlugin({
         return hasFlag(flags, OverrideFlags.DisableNicks);
     }
 });
-
-
-
-
-

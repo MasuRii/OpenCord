@@ -5,7 +5,7 @@
  */
 
 import { disableStyle, enableStyle } from "@api/Styles";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 
 import style from "./style.css?managed";
@@ -33,8 +33,3 @@ export default definePlugin({
         disableStyle(style);
     }
 });
-
-
-
-
-

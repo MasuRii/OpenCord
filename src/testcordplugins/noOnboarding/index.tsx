@@ -16,8 +16,8 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import definePlugin from "@utils/types";
 import { Devs, EquicordDevs } from "@utils/constants";
+import definePlugin from "@utils/types";
 import { RestAPI } from "@webpack/common";
 
 export default definePlugin({

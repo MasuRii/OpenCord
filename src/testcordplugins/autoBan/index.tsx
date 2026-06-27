@@ -1,11 +1,17 @@
-import definePlugin, { OptionType } from "@utils/types";
-import { TestcordDevs } from "@utils/constants";
-import { Toasts, FluxDispatcher, UserStore, GuildStore, GuildMemberStore } from "@webpack/common";
-import { definePluginSettings } from "@api/Settings";
-import { findStoreLazy } from "@webpack";
-import { Menu, RestAPI, React, Button, TextInput, ChannelStore, PermissionStore, Forms, GuildChannelStore } from "@webpack/common";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
-import { ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal, ModalSize } from "@utils/modal";
+import { definePluginSettings } from "@api/Settings";
+import { TestcordDevs } from "@utils/constants";
+import { ModalContent, ModalFooter, ModalHeader, ModalRoot, ModalSize,openModal } from "@utils/modal";
+import definePlugin, { OptionType } from "@utils/types";
+import { findStoreLazy } from "@webpack";
+import { FluxDispatcher, GuildMemberStore,GuildStore, Toasts, UserStore } from "@webpack/common";
+import { Button, ChannelStore, Forms,Menu, React, RestAPI, TextInput } from "@webpack/common";
 
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
 let isCurrentlyVcOwner = false;
@@ -218,7 +224,7 @@ function banAllUsersInCurrentVc(): void {
         return;
     }
 
-    const currentBannedUsers = settings.store.users.split('/').filter(item => item !== '');
+    const currentBannedUsers = settings.store.users.split("/").filter(item => item !== "");
     const newUsers = usersInVc.filter(userId => !currentBannedUsers.includes(userId));
 
     if (newUsers.length === 0) {
@@ -231,7 +237,7 @@ function banAllUsersInCurrentVc(): void {
     }
 
     const allBannedUsers = [...currentBannedUsers, ...newUsers];
-    settings.store.users = allBannedUsers.join('/');
+    settings.store.users = allBannedUsers.join("/");
 
     Toasts.show({
         message: `Added ${newUsers.length} users to auto-ban list`,
@@ -310,7 +316,7 @@ function BulkAutoBanSubmenu() {
 
 function MenuItem(id: string) {
     if (UserStore.getCurrentUser().id === id) return;
-    const [isChecked, setIsChecked] = React.useState(settings.store.users.split('/').filter(item => item !== '').includes(id));
+    const [isChecked, setIsChecked] = React.useState(settings.store.users.split("/").filter(item => item !== "").includes(id));
     return (
         <Menu.MenuCheckboxItem
             id="auto-ban"
@@ -318,7 +324,7 @@ function MenuItem(id: string) {
             checked={isChecked}
             action={async () => {
                 openModal(props => <EncModals {...props} userId={id} />);
-                const updatedList = [...settings.store.users.split('/').filter(item => item !== '')];
+                const updatedList = [...settings.store.users.split("/").filter(item => item !== "")];
                 const index = updatedList.indexOf(id);
                 const wasAdded = index === -1;
 
@@ -409,7 +415,7 @@ function banninguser(id) {
 
 function checkExistingUsersInVC(channelId: string) {
     const voiceStates = VoiceStateStore.getVoiceStatesForChannel(channelId) ?? {};
-    const bannedUsers = settings.store.users.split('/').filter(item => item !== '');
+    const bannedUsers = settings.store.users.split("/").filter(item => item !== "");
     const currentUserId = UserStore.getCurrentUser().id;
 
     if (!Object.keys(voiceStates).includes(currentUserId)) return;
@@ -437,9 +443,9 @@ function checkExistingUsersInVC(channelId: string) {
 
 function EncModals(props) {
     const { userId } = props;
-    const currentReasons = settings.store.store.split('.').filter(Boolean);
+    const currentReasons = settings.store.store.split(".").filter(Boolean);
     const existingReasonEntry = currentReasons.find(entry => entry.startsWith(`${userId}/`));
-    const existingReason = existingReasonEntry ? existingReasonEntry.split('/')[1] : "";
+    const existingReason = existingReasonEntry ? existingReasonEntry.split("/")[1] : "";
     const [reason, setReason] = React.useState(existingReason);
 
     return (
@@ -507,7 +513,7 @@ export default definePlugin({
     }
 });
 
-const cb = async (e) => {
+const cb = async e => {
     const state = e.voiceStates[0];
     if (!state?.channelId) return;
 
@@ -538,7 +544,7 @@ const cb = async (e) => {
     if (state?.channelId == state?.oldChannelId) return;
     if (!Object.keys(Cvcstates).includes(currentUserId)) return;
 
-    if (state?.channelId && settings.store.users.split('/').filter(item => item !== '').includes(state.userId)) {
+    if (state?.channelId && settings.store.users.split("/").filter(item => item !== "").includes(state.userId)) {
         const channel = ChannelStore.getChannel(state.channelId);
         if (!channel?.guild_id) return;
 

@@ -1,5 +1,5 @@
 /*
- * Nightcord, a Discord client mod
+ * Vencord, a Discord client mod
  * Copyright (c) 2025 Nightcord contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
@@ -32,39 +32,94 @@ const settings = definePluginSettings({
     },
 });
 
-// ─── Tick hook — forces a re-render every second ─────────────────────────────
+// ─── Shared global tick — one interval for all timestamps ────────────────────
 
-function useSecondTick() {
-    const [, tick] = useReducer((n: number) => n + 1, 0);
-    useEffect(() => {
-        const id = setInterval(tick, 1000);
-        return () => clearInterval(id);
-    }, []);
+let tickInterval: ReturnType<typeof setInterval> | null = null;
+let tickVersion = 0;
+const tickListeners = new Set<() => void>();
+
+function notifyTickListeners() {
+    tickVersion++;
+    for (const listener of tickListeners) listener();
+}
+
+function startTick() {
+    if (tickInterval !== null) return;
+    tickVersion = 0;
+    tickInterval = setInterval(notifyTickListeners, 1000);
+}
+
+function stopTick() {
+    if (tickInterval !== null) {
+        clearInterval(tickInterval);
+        tickInterval = null;
+    }
+    tickVersion = 0;
+    tickListeners.clear();
+}
+
+function subscribeTick(callback: () => void): () => void {
+    tickListeners.add(callback);
+    return () => { tickListeners.delete(callback); };
+}
+
+function getTickVersion() {
+    return tickVersion;
+}
+
+// ─── Hook that re-renders on the global tick ─────────────────────────────────
+
+function useGlobalTick() {
+    const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
+    useEffect(() => subscribeTick(forceUpdate), []);
 }
 
 // ─── Renderers called by the patches ─────────────────────────────────────────
 
-function renderTimestamp(date: Date, type: "cozy" | "compact" | "tooltip"): string {
-    // Hook must be called unconditionally — React requires this
-    useSecondTick();
+// Formatted output is identical for every timestamp that lands in the same
+// second with the same settings, so cache by second + the settings that affect
+// the string. On a busy guild this turns N moment().format() calls per tick
+// into one per unique second, while keeping the same string return type the
+// patch sites depend on. Bounded so it can't grow without limit.
+const formatCache = new Map<string, string>();
+const FORMAT_CACHE_MAX = 512;
 
-    const fmt = settings.store.format ?? "HH:mm:ss";
+function formatCached(date: Date, type: "cozy" | "compact" | "tooltip", fmt: string): string {
+    const { showInCompact, showInTooltip } = settings.store;
+    const second = Math.floor(date.getTime() / 1000);
+    const key = `${type}|${second}|${fmt}|${showInCompact ? 1 : 0}|${showInTooltip ? 1 : 0}`;
 
+    const cached = formatCache.get(key);
+    if (cached !== undefined) return cached;
+
+    let out: string;
     switch (type) {
         case "cozy":
-            // Cozy mode: replace the default "Today at HH:mm" with seconds
-            return moment(date).format(fmt);
+            out = moment(date).format(fmt);
+            break;
         case "compact":
-            // Compact mode (grouped message line): show seconds if enabled
-            return settings.store.showInCompact
-                ? moment(date).format(fmt)
-                : moment(date).format("LT");
+            out = showInCompact ? moment(date).format(fmt) : moment(date).format("LT");
+            break;
         case "tooltip":
-            // Tooltip on hover: full date + seconds
-            return settings.store.showInTooltip
+            out = showInTooltip
                 ? moment(date).format(`dddd, MMMM D, YYYY [at] ${fmt}`)
                 : moment(date).format("LLLL");
+            break;
     }
+
+    if (formatCache.size >= FORMAT_CACHE_MAX) {
+        const oldest = formatCache.keys().next().value;
+        if (oldest !== undefined) formatCache.delete(oldest);
+    }
+    formatCache.set(key, out);
+    return out;
+}
+
+function renderTimestamp(date: Date, type: "cozy" | "compact" | "tooltip"): string {
+    if (type !== "tooltip") useGlobalTick();
+
+    const fmt = settings.store.format ?? "HH:mm:ss";
+    return formatCached(date, type, fmt);
 }
 
 // ─── Plugin ──────────────────────────────────────────────────────────────────
@@ -72,7 +127,7 @@ function renderTimestamp(date: Date, type: "cozy" | "compact" | "tooltip"): stri
 export default definePlugin({
     name: "RealtimeTimestamps",
     description: "Replaces Discord timestamps (e.g. 15:31) with live seconds (e.g. 15:34:21), updated every second.",
-    tags: ["Appearance", "Chat", "Utility", "Utility"],
+    tags: ["Appearance", "Chat", "Utility", "Nightcord"],
     authors: [{ name: "Nightcord", id: 253979869n }],
     settings,
 
@@ -110,4 +165,12 @@ export default definePlugin({
             },
         },
     ],
+
+    start() {
+        startTick();
+    },
+
+    stop() {
+        stopTick();
+    },
 });

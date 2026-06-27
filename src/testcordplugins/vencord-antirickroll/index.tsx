@@ -8,7 +8,7 @@ import { addMessageAccessory, removeMessageAccessory } from "@api/MessageAccesso
 import { definePluginSettings } from "@api/Settings";
 import { getUserSettingLazy } from "@api/UserSettings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import type { Message } from "@vencord/discord-types";
 import { React, Text } from "@webpack/common";
@@ -174,8 +174,3 @@ export default definePlugin({
         removeMessageAccessory("rickrollWarning");
     },
 });
-
-
-
-
-

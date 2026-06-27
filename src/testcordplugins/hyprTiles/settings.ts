@@ -41,8 +41,8 @@ function RulesFileControl({ setValue }: { setValue(value: boolean): void; }) {
     return React.createElement(
         SettingsSection,
         {
-            name: "rulesFile",
             id: "rulesFile",
+            name: "rulesFile",
             description: "Enable JSON5 rules and auto-layout overrides. When off, HyprTiles uses the plugin layout settings only.",
             inlineSetting: true
         },
@@ -157,6 +157,59 @@ export const settings = definePluginSettings({
         default: 8,
         markers: [0, 4, 8, 12, 16, 20, 24],
         stickToMarkers: true
+    },
+    enableBorders: {
+        type: OptionType.BOOLEAN,
+        description: "Enable custom border styling for tiles.",
+        default: false
+    },
+    borderColor: {
+        type: OptionType.STRING,
+        description: "Primary border color (HEX).",
+        default: "#7289da"
+    },
+    borderColorEnd: {
+        type: OptionType.STRING,
+        description: "Gradient end color (HEX).",
+        default: "#5b6eae"
+    },
+    enableGradients: {
+        type: OptionType.BOOLEAN,
+        description: "Enable gradient borders.",
+        default: true
+    },
+    gradientType: {
+        type: OptionType.SELECT,
+        description: "Gradient direction.",
+        options: [
+            { label: "Horizontal", value: "horizontal", default: true },
+            { label: "Vertical", value: "vertical" },
+            { label: "Diagonal", value: "diagonal" }
+        ]
+    },
+    animatedBorder: {
+        type: OptionType.BOOLEAN,
+        description: "Animate gradient borders (flowing effect).",
+        default: true
+    },
+    animationSpeed: {
+        type: OptionType.SLIDER,
+        description: "Animation speed (higher = faster).",
+        default: 5,
+        markers: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        stickToMarkers: true
+    },
+    borderWidth: {
+        type: OptionType.SLIDER,
+        description: "Border width in pixels.",
+        default: 3,
+        markers: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        stickToMarkers: true
+    },
+    showChannelName: {
+        type: OptionType.BOOLEAN,
+        description: "Show channel name in tile header.",
+        default: true
     },
     ...keybindSettings
 });

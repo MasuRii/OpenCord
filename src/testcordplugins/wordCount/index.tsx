@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { addMessageAccessory } from "@api/MessageAccessories";
+import { addMessageAccessory, removeMessageAccessory } from "@api/MessageAccessories";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { Text } from "@webpack/common";
@@ -36,5 +36,8 @@ export default definePlugin({
         addMessageAccessory("word-count", (props: Record<string, any>) => (
             <WordCount messageContent={props.message.content} />
         ), 2);
+    },
+    stop() {
+        removeMessageAccessory("word-count");
     }
 });

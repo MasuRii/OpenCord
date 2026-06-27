@@ -1,12 +1,13 @@
 /*
- * Vencord / Testcord Plugin: ThemeStore
- * File: src/userplugins/ThemeStore/index.tsx
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { Settings } from "@api/Settings";
 import definePlugin from "@utils/types";
 import { React } from "@webpack/common";
 import { Toasts } from "@webpack/common";
-import { Settings } from "@api/Settings";
 import { Forms } from "@webpack/common";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -395,9 +396,9 @@ function removeStyles() { document.getElementById("ts-plugin-styles")?.remove();
 type SortKey = "downloads" | "likes" | "name" | "newest";
 const SORTS: { key: SortKey; label: string }[] = [
     { key: "downloads", label: "↓ Popular" },
-    { key: "likes",     label: "❤ Liked"   },
-    { key: "newest",    label: "✨ New"     },
-    { key: "name",      label: "A–Z"        },
+    { key: "likes", label: "❤ Liked" },
+    { key: "newest", label: "✨ New" },
+    { key: "name", label: "A–Z" },
 ];
 
 // ─── ThemePreview (right panel) ───────────────────────────────────────────────
@@ -505,15 +506,15 @@ function ThemePreview({ theme, installed, onInstall }: {
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
 function ThemeStoreModal({ onClose }: { onClose(): void }) {
-    const [themes, setThemes]        = React.useState<EquiTheme[]>([]);
-    const [loading, setLoading]      = React.useState(true);
-    const [error, setError]          = React.useState<string | null>(null);
-    const [search, setSearch]        = React.useState("");
-    const [sort, setSort]            = React.useState<SortKey>("downloads");
-    const [selected, setSelected]    = React.useState<EquiTheme | null>(null);
-    const [installed, setInstalled]  = React.useState<Set<number>>(new Set());
+    const [themes, setThemes] = React.useState<EquiTheme[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
+    const [search, setSearch] = React.useState("");
+    const [sort, setSort] = React.useState<SortKey>("downloads");
+    const [selected, setSelected] = React.useState<EquiTheme | null>(null);
+    const [installed, setInstalled] = React.useState<Set<number>>(new Set());
     const [refreshing, setRefreshing] = React.useState(false);
-    const [activeTag, setActiveTag]   = React.useState<string | null>(null);
+    const [activeTag, setActiveTag] = React.useState<string | null>(null);
 
     async function load(isRefresh = false) {
         if (isRefresh) setRefreshing(true);
@@ -583,7 +584,7 @@ function ThemeStoreModal({ onClose }: { onClose(): void }) {
             list = list.filter(t =>
                 t.name.toLowerCase().includes(q) ||
                 (t.author?.discord_name ?? "").toLowerCase().includes(q) ||
-                (t.author?.github_name  ?? "").toLowerCase().includes(q) ||
+                (t.author?.github_name ?? "").toLowerCase().includes(q) ||
                 t.description?.toLowerCase().includes(q) ||
                 t.tags?.some(tag => tag.toLowerCase().includes(q))
             );
@@ -593,9 +594,9 @@ function ThemeStoreModal({ onClose }: { onClose(): void }) {
         }
         const sorted = [...list];
         if (sort === "downloads") sorted.sort((a, b) => (b.downloads ?? 0) - (a.downloads ?? 0));
-        if (sort === "likes")     sorted.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
-        if (sort === "name")      sorted.sort((a, b) => a.name.localeCompare(b.name));
-        if (sort === "newest")    sorted.sort((a, b) => new Date(b.release_date ?? 0).getTime() - new Date(a.release_date ?? 0).getTime());
+        if (sort === "likes") sorted.sort((a, b) => (b.likes ?? 0) - (a.likes ?? 0));
+        if (sort === "name") sorted.sort((a, b) => a.name.localeCompare(b.name));
+        if (sort === "newest") sorted.sort((a, b) => new Date(b.release_date ?? 0).getTime() - new Date(a.release_date ?? 0).getTime());
         return sorted;
     }, [themes, search, sort, activeTag]);
 
@@ -800,7 +801,7 @@ export default definePlugin({
     version: "7.0.0",
 
     start() { injectStyles(); },
-    stop()  { removeStyles(); },
+    stop() { removeStyles(); },
 
     settingsAboutComponent: () => (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

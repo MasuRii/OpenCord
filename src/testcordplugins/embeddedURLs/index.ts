@@ -6,8 +6,6 @@
 
 import definePlugin from "@utils/types";
 
-
-
 const urlMap = new Map<string, string>([
     ["https://www.tiktok.com", "https://www.tnktok.com"],
     ["https://vt.tiktok.com", "https://www.tnktok.com"],

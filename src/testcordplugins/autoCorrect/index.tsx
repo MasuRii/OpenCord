@@ -7,7 +7,7 @@
 import { ChatBarButton, ChatBarButtonFactory } from "@api/ChatButtons";
 import { addChannelToolbarButton, addHeaderBarButton, ChannelToolbarButton, HeaderBarButton, removeChannelToolbarButton, removeHeaderBarButton } from "@api/HeaderBar";
 import { definePluginSettings } from "@api/Settings";
-import { showApiKeyWarning } from "@testcordplugins/_shared/apiKeyWarning";
+import { showApiKeyWarning } from "@utils/apiKeyWarning";
 import definePlugin, { OptionType } from "@utils/types";
 import { React } from "@webpack/common";
 
@@ -162,8 +162,9 @@ const AutoCorrectChatBarButton: ChatBarButtonFactory = ({ type }) => {
 export default definePlugin({
     name: "AutoCorrectNC",
     description: "Automatically corrects spelling and grammar before sending. Requires a free Groq API key configured in TestcordAI.",
-    tags: ["Chat", "Utility", "Utility"],
+    tags: ["Chat", "Utility", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
+    dependencies: ["HeaderBarAPI"],
     settings,
 
     start() {

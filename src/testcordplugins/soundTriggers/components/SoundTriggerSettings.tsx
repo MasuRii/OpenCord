@@ -18,7 +18,6 @@ import { ImportModal } from "./ImportModal";
 import { SoundTriggerEntry } from "./SoundTriggerEntry";
 import { openTriggerModal } from "./SoundTriggerModal";
 
-
 export function SoundTriggerSettings() {
     const settingsExist = Array.isArray(settings.store.soundTriggers);
     return (
@@ -80,5 +79,3 @@ export function SoundTriggerSettings() {
 
     );
 }
-
-

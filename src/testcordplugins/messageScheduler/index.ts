@@ -6,12 +6,11 @@
 
 import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
 import { definePluginSettings } from "@api/Settings";
+import { TestcordDevs } from "@utils/constants";
 import { sendMessage } from "@utils/discord";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { moment } from "@webpack/common";
-
-import { TestcordDevs } from "@utils/constants";
 
 interface ScheduledMessage {
     channelId: string;
@@ -288,8 +287,3 @@ export default definePlugin({
         logger.info("Plugin stopped, all scheduled messages cleared");
     }
 });
-
-
-
-
-

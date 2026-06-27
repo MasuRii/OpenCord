@@ -15,6 +15,7 @@ import { findByPropsLazy, findComponentByCodeLazy } from "@webpack";
 
 import SettingsTab from "./components/SettingsTab";
 import UserpluginInstallButton from "./components/UserpluginInstallButton";
+import { CLONE_LINK_REGEX } from "./misc/constants";
 import { VariableWithCallbacks } from "./VariableWithCallbacks";
 
 // @ts-ignore
@@ -106,6 +107,8 @@ export default definePlugin({
     settings,
     authors: [Devs.nin0dev],
     renderMessageAccessory: props => {
+        if (!props?.message?.content) return null;
+        if (!CLONE_LINK_REGEX.test(props.message.content)) return null;
         return <UserpluginInstallButton props={props} />;
     }
 });

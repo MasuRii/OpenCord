@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { DataStore } from "@api/index";
+import { DataStore, TestcordRequestCoordinator } from "@api/index";
 import { classNameFactory } from "@utils/css";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot, ModalSize } from "@utils/modal";
 import type { Channel, Message, User } from "@vencord/discord-types";
@@ -13,11 +13,30 @@ import { Avatar, ChannelStore, MessageStore, NavigationRouter, React, RestAPI, T
 
 import { settings } from "./index";
 import { MediaGrid, MediaItemsCache, searchMediaMessages } from "./MediaGrid";
-import styles from "./styles.css?managed";
 
 const PrivateChannelSortStore = findStoreLazy("PrivateChannelSortStore") as { getPrivateChannelIds: () => string[]; };
 
 const cl = classNameFactory("vc-search-utility-");
+
+// Bound the per-query results cache: track written keys and evict oldest when over the cap
+const SEARCH_CACHE_INDEX_KEY = "ultra-search-results-index";
+const MAX_SEARCH_RESULT_KEYS = 100;
+
+async function recordSearchCacheKey(key: string) {
+    try {
+        const index = (await DataStore.get(SEARCH_CACHE_INDEX_KEY) as string[] | null | undefined) ?? [];
+        const existing = index.indexOf(key);
+        if (existing !== -1) index.splice(existing, 1);
+        index.push(key);
+        while (index.length > MAX_SEARCH_RESULT_KEYS) {
+            const oldest = index.shift();
+            if (oldest) await DataStore.del(oldest);
+        }
+        await DataStore.set(SEARCH_CACHE_INDEX_KEY, index);
+    } catch (error) {
+        console.error("[Ultra Advanced Search] Error updating search cache index:", error);
+    }
+}
 
 enum SearchFilter {
     RECENT = "recent",
@@ -562,6 +581,7 @@ export function SearchModal({ modalProps }: { modalProps: ModalProps; }) {
                             results: finalResults,
                             lastUpdated: Date.now()
                         } as SearchResultsCache);
+                        await recordSearchCacheKey(cacheKey);
                         console.log(`[Ultra Advanced Search] Search cache saved for "${searchQuery}" (${finalResults.length} results)`);
                     } catch (error) {
                         console.error("[Ultra Advanced Search] Error saving search cache:", error);
@@ -602,12 +622,16 @@ export function SearchModal({ modalProps }: { modalProps: ModalProps; }) {
                 // Load messages from the API (limit of 100 messages per request)
                 let response: any = null;
                 try {
-                    response = await RestAPI.get({
-                        url: `/channels/${channelId}/messages`,
-                        query: {
-                            limit: 100
-                        },
-                        retries: 1
+                    response = await TestcordRequestCoordinator.request({
+                        key: `discord:messages:${channelId}:before::limit:100`,
+                        ttlMs: 30_000,
+                        run: () => RestAPI.get({
+                            url: `/channels/${channelId}/messages`,
+                            query: {
+                                limit: 100
+                            },
+                            retries: 1
+                        }),
                     });
                 } catch (error: any) {
                     // Handle rate limit (429)
@@ -618,12 +642,16 @@ export function SearchModal({ modalProps }: { modalProps: ModalProps; }) {
                         await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
                         // Retry once after waiting
                         try {
-                            response = await RestAPI.get({
-                                url: `/channels/${channelId}/messages`,
-                                query: {
-                                    limit: 100
-                                },
-                                retries: 0
+                            response = await TestcordRequestCoordinator.request({
+                                key: `discord:messages:${channelId}:before::limit:100`,
+                                ttlMs: 30_000,
+                                run: () => RestAPI.get({
+                                    url: `/channels/${channelId}/messages`,
+                                    query: {
+                                        limit: 100
+                                    },
+                                    retries: 0
+                                }),
                             });
                         } catch (retryError) {
                             // If still rate limited, skip to next channel

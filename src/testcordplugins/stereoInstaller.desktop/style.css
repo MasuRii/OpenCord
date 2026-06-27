@@ -1,0 +1,222 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-stereo-installer-warning {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 16px;
+    border: 1px solid var(--status-warning);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.vc-stereo-installer-warning-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.vc-stereo-installer-root {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.vc-stereo-installer-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.vc-stereo-installer-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.vc-stereo-installer-select-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.vc-stereo-installer-select-row {
+    display: grid;
+    grid-template-columns: minmax(170px, 0.4fr) minmax(220px, 1fr);
+    gap: 12px;
+    align-items: center;
+}
+
+.vc-stereo-installer-select-row span {
+    color: var(--header-primary);
+    font-weight: 600;
+}
+
+.vc-stereo-installer-method2-note {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--status-warning);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.vc-stereo-installer-info {
+    display: grid;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.vc-stereo-installer-install-status {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px;
+    border: 1px solid currentColor;
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.vc-stereo-installer-install-status svg {
+    flex: 0 0 auto;
+}
+
+.vc-stereo-installer-install-status h3 {
+    color: currentColor;
+}
+
+.vc-stereo-installer-install-status-installed {
+    color: var(--status-positive);
+}
+
+.vc-stereo-installer-install-status-needs-reinstall {
+    color: var(--status-warning);
+}
+
+.vc-stereo-installer-install-status-not-installed {
+    color: var(--text-muted);
+}
+
+.vc-stereo-installer-install-status p {
+    color: var(--text-normal);
+}
+
+.vc-stereo-installer-info-line {
+    display: grid;
+    grid-template-columns: minmax(90px, 0.22fr) minmax(0, 1fr);
+    gap: 10px;
+    align-items: start;
+}
+
+.vc-stereo-installer-info-line span {
+    color: var(--header-secondary);
+    font-weight: 600;
+}
+
+.vc-stereo-installer-info-line code {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--text-normal);
+}
+
+.vc-stereo-installer-status {
+    color: var(--header-secondary);
+}
+
+.vc-stereo-installer-log-panel {
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-accent);
+    border-radius: 8px;
+    background: var(--background-secondary-alt);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 3%);
+}
+
+.vc-stereo-installer-log-header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    border-bottom: 1px solid var(--background-modifier-accent);
+}
+
+.vc-stereo-installer-log-header button {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.vc-stereo-installer-log {
+    max-height: 320px;
+    overflow: auto;
+    background: var(--background-tertiary);
+    font-family: var(--font-code);
+    font-size: 12px;
+}
+
+.vc-stereo-installer-log-line {
+    display: grid;
+    grid-template-columns: minmax(125px, auto) 64px minmax(0, 1fr);
+    gap: 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--background-modifier-accent);
+    color: var(--text-normal);
+    line-height: 1.4;
+}
+
+.vc-stereo-installer-log-line:last-child {
+    border-bottom: 0;
+}
+
+.vc-stereo-installer-log-line:hover {
+    background: var(--background-modifier-hover);
+}
+
+.vc-stereo-installer-log-time {
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.vc-stereo-installer-log-level {
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.vc-stereo-installer-log-message {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+
+.vc-stereo-installer-log-line-success .vc-stereo-installer-log-level,
+.vc-stereo-installer-log-line-success .vc-stereo-installer-log-message {
+    color: var(--status-positive);
+}
+
+.vc-stereo-installer-log-line-warning .vc-stereo-installer-log-level,
+.vc-stereo-installer-log-line-warning .vc-stereo-installer-log-message {
+    color: var(--status-warning);
+}
+
+.vc-stereo-installer-log-line-error .vc-stereo-installer-log-level,
+.vc-stereo-installer-log-line-error .vc-stereo-installer-log-message {
+    color: var(--status-danger);
+}
+
+.vc-stereo-installer-log-line-info .vc-stereo-installer-log-level {
+    color: var(--text-muted);
+}
+
+.vc-stereo-installer-log-empty {
+    padding: 28px 12px;
+    color: var(--text-muted);
+    text-align: center;
+}

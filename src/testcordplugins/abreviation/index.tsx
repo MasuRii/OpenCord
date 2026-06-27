@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings } from "@api/Settings";
-import { showNotification } from "@api/Notifications";
 import {
     addMessagePreSendListener,
     MessageSendListener,
     removeMessagePreSendListener,
 } from "@api/MessageEvents";
+import { showNotification } from "@api/Notifications";
+import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
@@ -267,7 +267,7 @@ const messagePreSendListener: MessageSendListener = (
 
         if (settings.store.showNotifications) {
             const expansionText = expansions
-                .map((e) => `"${e.abbrev}" → "${e.expansion}"`)
+                .map(e => `"${e.abbrev}" → "${e.expansion}"`)
                 .join(", ");
             showNotification({
                 title: "📝 Abbreviation",
@@ -332,8 +332,3 @@ export default definePlugin({
         }
     },
 });
-
-
-
-
-

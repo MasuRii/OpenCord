@@ -113,5 +113,3 @@ export function SoundTriggerEntry(props: SoundTriggerEntryProps) {
         </Flex>
     );
 }
-
-

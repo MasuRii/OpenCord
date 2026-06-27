@@ -1,6 +1,6 @@
 /*
- * TestCord, a Discord client mod
- * Copyright (c) 2026 Mixiruri
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -10,7 +10,6 @@ import { sendMessage } from "@utils/discord";
 import { Logger } from "@utils/Logger";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { UserStore } from "@webpack/common";
 
 const logger = new Logger("GifSpammer");
 const FavoritesStore = findByPropsLazy("getGIFFavorites", "getFavorites");

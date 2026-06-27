@@ -160,6 +160,17 @@ const sillyKittenTransform = (text: string) => {
 };
 
 const settings = definePluginSettings({
+    location: {
+        type: OptionType.SELECT,
+        description: "Where to show the button",
+        options: [
+            { label: "Chat bar", value: "chatbar", default: true },
+            { label: "Header bar", value: "headerbar" },
+            { label: "Channel toolbar", value: "channeltoolbar" },
+            { label: "Disabled", value: "disabled" },
+        ],
+        restartNeeded: true,
+    },
     sillyMode: {
         type: OptionType.BOOLEAN,
         description: "Enable Silly Kitten mode!~~",

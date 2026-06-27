@@ -5,5 +5,3 @@
  */
 
 export type RelationshipStore = any;
-
-

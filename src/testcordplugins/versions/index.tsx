@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 
 import gitRemote from "~git-remote";
@@ -40,8 +40,3 @@ export default definePlugin({
         );
     }
 });
-
-
-
-
-

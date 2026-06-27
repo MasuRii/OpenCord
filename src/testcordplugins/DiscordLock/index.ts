@@ -67,6 +67,9 @@ let domObserver: MutationObserver | null = null;
 let keyGuard: ((e: KeyboardEvent) => void) | null = null;
 let focusGuard: ((e: FocusEvent) => void) | null = null;
 let inactiveTimer: ReturnType<typeof setTimeout> | null = null;
+let inputKeyHandler: ((e: KeyboardEvent) => void) | null = null;
+let overlayCtxHandler: ((e: Event) => void) | null = null;
+let overlayMouseHandler: ((e: Event) => void) | null = null;
 
 // tracks what's already been unlocked this session
 const unlockedGuilds = new Set<string>();
@@ -424,10 +427,11 @@ function createOverlay() {
     }
 
     submitBtn.addEventListener("click", tryUnlock);
-    input.addEventListener("keydown", e => {
+    inputKeyHandler = (e: KeyboardEvent) => {
         if (e.key === "Enter") { e.preventDefault(); tryUnlock(); }
         e.stopPropagation();
-    });
+    };
+    input.addEventListener("keydown", inputKeyHandler);
 
     keyGuard = (e: KeyboardEvent) => {
         if (e.target === input) return;
@@ -446,8 +450,10 @@ function createOverlay() {
     };
     document.addEventListener("focusin", focusGuard, true);
 
-    overlay.addEventListener("contextmenu", e => { if (e.target !== input) e.preventDefault(); });
-    overlay.addEventListener("mousedown", e => { if (e.target === overlay) { e.preventDefault(); input.focus(); } });
+    overlayCtxHandler = (e: Event) => { if (e.target !== input) e.preventDefault(); };
+    overlayMouseHandler = (e: Event) => { if (e.target === overlay) { e.preventDefault(); (input as HTMLInputElement).focus(); } };
+    overlay.addEventListener("contextmenu", overlayCtxHandler);
+    overlay.addEventListener("mousedown", overlayMouseHandler);
 
     setTimeout(() => input.focus(), 140);
 
@@ -477,6 +483,7 @@ export default definePlugin({
 
     stop() {
         FluxDispatcher.unsubscribe("CHANNEL_SELECT", onChannelSelect);
+        window.removeEventListener("load", lockFull);
         unbindActivity();
 
         domObserver?.disconnect();
@@ -485,8 +492,19 @@ export default definePlugin({
         if (keyGuard) { document.removeEventListener("keydown", keyGuard, true); keyGuard = null; }
         if (focusGuard) { document.removeEventListener("focusin", focusGuard, true); focusGuard = null; }
 
-        overlay?.remove();
+        if (overlay) {
+            const input = document.getElementById("vcl-input");
+            if (input && inputKeyHandler) {
+                input.removeEventListener("keydown", inputKeyHandler);
+            }
+            overlay.removeEventListener("contextmenu", overlayCtxHandler!);
+            overlay.removeEventListener("mousedown", overlayMouseHandler!);
+            overlay.remove();
+        }
         overlay = null;
+        inputKeyHandler = null;
+        overlayCtxHandler = null;
+        overlayMouseHandler = null;
 
         document.getElementById("vcl-styles")?.remove();
         document.getElementById("vcl-fa")?.remove();

@@ -8,7 +8,7 @@ import "../styles.css";
 
 import { copyToClipboard } from "@utils/clipboard";
 import type { RenderModalProps } from "@vencord/discord-types";
-import { Button, Modal, React, showToast, TextInput, Toasts, useEffect, useRef, useState } from "@webpack/common";
+import { Modal, React, showToast, TextInput, Toasts, useEffect, useRef, useState } from "@webpack/common";
 
 import {
     createAccount, deleteAccount, deleteMessage,
@@ -16,9 +16,9 @@ import {
     randomString, TmMessage, TmMessageFull,
 } from "../api";
 import {
+deleteMessageFromStore,
     getActiveId, getDataStorePath, getSavedAccounts, getSavedMessages,
-    mergeAndSaveMessages, deleteMessageFromStore,
-    removeAccount, SavedAccount, saveAccount, setActiveId,
+    mergeAndSaveMessages, removeAccount, saveAccount, SavedAccount, setActiveId,
 } from "../store";
 
 type View = "inbox" | "message" | "new" | "accounts";

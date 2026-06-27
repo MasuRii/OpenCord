@@ -8,7 +8,7 @@
  * Copyright (c) 2024 HAHALOSAH. All rights reserved.
  */
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 
 export default definePlugin({
@@ -28,8 +28,3 @@ export default definePlugin({
         },
     ],
 });
-
-
-
-
-

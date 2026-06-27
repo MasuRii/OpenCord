@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { definePluginSettings } from "@api/Settings";
 import { BaseText } from "@components/BaseText";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { definePluginSettings } from "@api/Settings";
 import { EquicordDevs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { classes } from "@utils/misc";
@@ -18,17 +18,36 @@ import { Clickable, useState } from "@webpack/common";
 
 import { fetchActiveWarnings, getActionTags, getActiveRestrictionLabels, invalidateWarnings } from "./api";
 import managedStyle from "./style.css?managed";
-import type { BreachRecord, DsaAction } from "./types";
+import type { BreachRecord, CordCatUserInfo, DsaAction } from "./types";
+
+function ApiKeyNotice() {
+    const hasKey = settings.store.cordCatApiKey.trim().length > 0;
+
+    return (
+        <div className={cl("settings-notice")}>
+            <BaseText size="sm" weight="medium" defaultColor={false}>
+                {hasKey
+                    ? "API key is set. Lookups should work."
+                    : "A CordCat API key is required for DSA lookups. Create a free account at https://api.cord.cat to get one, then paste it below."}
+            </BaseText>
+        </div>
+    );
+}
 
 const settings = definePluginSettings({
+    cordCatApiKey: {
+        type: OptionType.STRING,
+        description: "CordCat API key (required). Get one at https://api.cord.cat",
+        default: "",
+    },
     cordCatApiBaseUrl: {
         type: OptionType.STRING,
-        description: "Base URL for the CordCat intelligence query API",
+        description: "Base URL for the CordCat intelligence query API.",
         default: "https://api.cord.cat",
     },
     dsaBrowseBaseUrl: {
         type: OptionType.STRING,
-        description: "Base URL for the DSA lookup browse UI",
+        description: "Base URL for the DSA lookup browse UI.",
         default: "https://dsa.discord.food",
     },
 });
@@ -112,7 +131,14 @@ function getBreachSummary(breach: BreachRecord) {
         breach.id || breach.no ? `Record ${breach.id || breach.no}` : null
     ].filter(Boolean);
 
-    return parts.length > 0 ? parts.join(" • ") : "Listed in a known breach dataset";
+    return parts.length > 0 ? parts.join(" \u2022 ") : "Listed in a known breach dataset";
+}
+
+function formatIllegality(value: string | boolean | null) {
+    if (value === true || value === "Yes") return "Yes";
+    if (value === false || value === "No") return "No";
+    if (typeof value === "string" && value.length > 0) return value;
+    return null;
 }
 
 function StatusCard({
@@ -142,6 +168,60 @@ function StatusCard({
     );
 }
 
+function UserInfoSection({ userInfo }: { userInfo: CordCatUserInfo; }) {
+    const handle = userInfo.discriminator && userInfo.discriminator !== "0"
+        ? `${userInfo.username}#${userInfo.discriminator}`
+        : userInfo.username ? `@${userInfo.username}` : null;
+
+    const guild = userInfo.clan ?? userInfo.primary_guild;
+
+    return (
+        <div className={cl("user-info")}>
+            {userInfo.avatar && (
+                <img
+                    className={cl("user-avatar")}
+                    src={`https://cdn.discordapp.com/avatars/${userInfo.id}/${userInfo.avatar}.${userInfo.avatar.startsWith("a_") ? "gif" : "png"}?size=64`}
+                    alt=""
+                />
+            )}
+            <div className={cl("user-details")}>
+                {userInfo.global_name && (
+                    <BaseText className={cl("user-display")} size="lg" weight="bold" defaultColor={false}>
+                        {userInfo.global_name}
+                    </BaseText>
+                )}
+                {handle && (
+                    <BaseText className={cl("user-handle")} size="sm" weight="medium" defaultColor={false}>
+                        {handle}
+                    </BaseText>
+                )}
+                <BaseText className={cl("user-id")} size="xs" weight="medium" defaultColor={false}>
+                    {userInfo.id}
+                </BaseText>
+                {userInfo.public_flags != null && userInfo.public_flags !== 0 && (
+                    <BaseText className={cl("user-flags")} size="xs" weight="medium" defaultColor={false}>
+                        Flags: {userInfo.public_flags}
+                    </BaseText>
+                )}
+                {guild && (
+                    <BaseText className={cl("user-clan")} size="xs" weight="medium" defaultColor={false}>
+                        Clan: [{guild.tag}]
+                    </BaseText>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function ActionDetailRow({ label, value }: { label: string; value: string; }) {
+    return (
+        <div className={cl("detail-row")}>
+            <BaseText className={cl("detail-label")} size="xs" weight="bold" defaultColor={false}>{label}</BaseText>
+            <BaseText className={cl("detail-value")} size="xs" weight="medium" defaultColor={false}>{value}</BaseText>
+        </div>
+    );
+}
+
 const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection({
     user,
     displayProfile,
@@ -153,7 +233,16 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
 }) {
     const [refreshKey, setRefreshKey] = useState(0);
     const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
-    const [result] = useAwaiter(() => fetchActiveWarnings(user.id), {
+    const [result] = useAwaiter(() => {
+        console.warn("[DsaWarnings/component] useAwaiter calling fetchActiveWarnings for", user.id);
+        return fetchActiveWarnings(user.id).then(r => {
+            console.warn("[DsaWarnings/component] fetchActiveWarnings resolved:", r?.kind, JSON.stringify(r).slice(0, 200));
+            return r;
+        }).catch(e => {
+            console.warn("[DsaWarnings/component] fetchActiveWarnings rejected:", e);
+            return null;
+        });
+    }, {
         deps: [user.id, refreshKey],
         fallbackValue: null
     });
@@ -161,18 +250,26 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
     const isExpanded = expandedUserId === user.id;
     const isLightTheme = hasLightProfileTheme(displayProfile);
     const isReady = result?.kind === "ready";
-    const isCaptcha = result?.kind === "captcha";
     const isUnavailable = result?.kind === "unavailable";
     const isError = result?.kind === "error";
     const actions = isReady ? result.actions : [];
-    const breaches = isReady ? (result.breaches ?? []) : [];
+    const breaches = isReady ? result.breaches : [];
     const breachStatus = isReady ? result.breachStatus : "unavailable";
+    const breachError = isReady ? result.breachError : null;
+    const breachCount = isReady ? result.breachCount : 0;
+    const userInfo = isReady ? result.userInfo : null;
     const subtitle = result == null
         ? "Loading DSA lookup..."
         : isReady
         ? breachStatus === "ready"
-            ? `${actions.length} warnings • ${breaches.length} breaches`
-            : `${actions.length} warnings • breach lookup unavailable`
+            ? `${actions.length} warnings \u2022 ${breachCount} breaches`
+            : breachStatus === "error"
+            ? `${actions.length} warnings \u2022 breach lookup failed`
+            : `${actions.length} warnings \u2022 breach lookup unavailable`
+        : isError
+        ? result.error ?? "Lookup failed"
+        : isUnavailable
+        ? result.error ?? "Service unavailable"
         : "Direct API lookup is currently unavailable";
     const retryFetch = () => {
         invalidateWarnings(user.id);
@@ -202,6 +299,11 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                     <BaseText tag="span" size="xs" weight="bold" defaultColor={false}>Open DSA Lookup</BaseText>
                 </Clickable>
             </div>
+
+            {isReady && userInfo && (
+                <UserInfoSection userInfo={userInfo} />
+            )}
+
             <div className={cl("list")}>
                 {result == null && (
                     <StatusCard
@@ -212,6 +314,7 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                 {isReady && visibleActions.length > 0 && visibleActions.map(action => {
                     const restrictionLabels = getActiveRestrictionLabels(action).slice(0, 2);
                     const tags = getCardTags(action);
+                    const illegality = formatIllegality(action.incompatibleContentIllegal);
 
                     return (
                         <Clickable
@@ -230,6 +333,9 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                                                     {formatLabel(label)}
                                                 </span>
                                             ))}
+                                            {illegality === "Yes" && (
+                                                <span className={cl("chip", "chip-illegal")}>Illegal</span>
+                                            )}
                                         </div>
                                         <BaseText className={cl("category")} size="xl" weight="extrabold" defaultColor={false}>
                                             {formatLabel(action.category)}
@@ -237,6 +343,29 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                                         <BaseText className={cl("facts")} size="sm" weight="medium" defaultColor={false}>
                                             {action.decisionFacts}
                                         </BaseText>
+                                        <div className={cl("details")}>
+                                            {action.incompatibleContentExplanation && (
+                                                <ActionDetailRow label="Explanation" value={action.incompatibleContentExplanation} />
+                                            )}
+                                            {action.incompatibleContentGround && (
+                                                <ActionDetailRow label="Ground" value={formatLabel(action.incompatibleContentGround)} />
+                                            )}
+                                            {action.decisionGround && action.decisionGround !== action.incompatibleContentGround && (
+                                                <ActionDetailRow label="Decision ground" value={formatLabel(action.decisionGround)} />
+                                            )}
+                                            {action.categorySpecificationOther && (
+                                                <ActionDetailRow label="Sub-category" value={action.categorySpecificationOther} />
+                                            )}
+                                            {action.sourceType && (
+                                                <ActionDetailRow label="Source" value={formatLabel(action.sourceType)} />
+                                            )}
+                                            {action.automatedDetection && action.automatedDetection !== "" && (
+                                                <ActionDetailRow label="Automated" value={String(action.automatedDetection)} />
+                                            )}
+                                            {illegality != null && (
+                                                <ActionDetailRow label="Illegal content" value={illegality} />
+                                            )}
+                                        </div>
                                         {!!tags.length && (
                                             <div className={cl("chip-row")}>
                                                 {tags.map(tag => (
@@ -252,6 +381,11 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                                     <BaseText className={cl("date")} size="xs" weight="bold" defaultColor={false}>
                                         {formatDate(action.applicationDate)}
                                     </BaseText>
+                                    {action.createdAt && action.createdAt !== action.applicationDate && (
+                                        <BaseText className={cl("date")} size="xs" weight="medium" defaultColor={false}>
+                                            Created {formatDate(action.createdAt)}
+                                        </BaseText>
+                                    )}
                                 </div>
                             </div>
                         </Clickable>
@@ -280,6 +414,17 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                                         <BaseText className={cl("facts")} size="sm" weight="medium" defaultColor={false}>
                                             {getBreachSummary(breach)}
                                         </BaseText>
+                                        <div className={cl("details")}>
+                                            {breach.ip && breach.ip !== "None" && (
+                                                <ActionDetailRow label="IP" value={breach.ip} />
+                                            )}
+                                            {breach.discordid && (
+                                                <ActionDetailRow label="Discord ID" value={breach.discordid} />
+                                            )}
+                                            {(breach.discriminator || breach.tag) && (
+                                                <ActionDetailRow label="Tag" value={`#${breach.discriminator || breach.tag}`} />
+                                            )}
+                                        </div>
                                         {!!tags.length && (
                                             <div className={cl("chip-row")}>
                                                 {tags.map(tag => (
@@ -307,6 +452,13 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                         onClick={() => VencordNative.native.openExternal(buildDsaBrowseUrl(user.id))}
                     />
                 )}
+                {isReady && breachStatus === "error" && (
+                    <StatusCard
+                        title="Breach Lookup Error"
+                        message={breachError ?? "The upstream breach provider returned an error for this lookup."}
+                        onClick={() => VencordNative.native.openExternal(buildCordCatUrl(user.id))}
+                    />
+                )}
                 {isReady && breachStatus === "unavailable" && breaches.length === 0 && (
                     <StatusCard
                         title="Breach Lookup Unavailable"
@@ -314,24 +466,17 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                         onClick={() => VencordNative.native.openExternal(buildCordCatUrl(user.id))}
                     />
                 )}
-                {isCaptcha && (
-                    <StatusCard
-                        title="Captcha Required"
-                        message="Click to complete the DSA lookup challenge in a local Discord window, then this card will retry automatically."
-                        onClick={openCaptchaWindow}
-                    />
-                )}
                 {isUnavailable && (
                     <StatusCard
                         title="Lookup Unavailable"
-                        message="The DSA service is temporarily unavailable. Click to retry in the public lookup page."
+                        message={result.error ?? "The DSA service is temporarily unavailable. Click to retry in the public lookup page."}
                         onClick={() => VencordNative.native.openExternal(buildDsaBrowseUrl(user.id))}
                     />
                 )}
                 {isError && (
                     <StatusCard
                         title="Lookup Failed"
-                        message="The DSA lookup request failed. Click to retry with a local lookup window."
+                        message={result.error ?? "The DSA lookup request failed. Click to retry with a local lookup window."}
                         onClick={openCaptchaWindow}
                     />
                 )}
@@ -360,6 +505,7 @@ export default definePlugin({
     tags: ["Privacy", "Utility"],
     authors: [EquicordDevs.omaw],
     settings,
+    settingsAboutComponent: ApiKeyNotice,
     managedStyle,
     renderProfileCollection: {
         priority: 0,

@@ -1,13 +1,13 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 import { addContextMenuPatch, removeContextMenuPatch } from "@api/ContextMenu";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { Menu, RestAPI, Toasts, React, FluxDispatcher, GuildStore, GuildChannelStore, ActiveJoinedThreadsStore, ReadStateStore, ChannelStore } from "@webpack/common";
+import { ActiveJoinedThreadsStore, ChannelStore,FluxDispatcher, GuildChannelStore, GuildStore, Menu, React, ReadStateStore, RestAPI, Toasts } from "@webpack/common";
 
 const GuildStoreModule = findByPropsLazy("getGuilds");
 
@@ -111,7 +111,7 @@ async function muteAllServers() {
     }
 
     Toasts.show({
-        message: `Everything is now muted and read!`,
+        message: "Everything is now muted and read!",
         type: Toasts.Type.SUCCESS,
         id: Toasts.genId(),
     });
@@ -139,7 +139,7 @@ const guildContextPatch = (children: any, { guild }: { guild?: any; }) => {
 export default definePlugin({
     name: "MuteAllServers",
     description: "Right-click a server → mute all servers and mark all as read in one click.",
-    tags: ["Notifications", "Servers", "Utility"],
+    tags: ["Notifications", "Servers", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
 
     start() {

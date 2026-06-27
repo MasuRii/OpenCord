@@ -1,20 +1,18 @@
 /*
  * Vencord, a Discord client mod
- * Copyright (c) 2025 Vendicated and contributors
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
- * 
- * I dont care about lint
  */
 
 import { Message } from "@vencord/discord-types";
 import { ChannelStore, RelationshipStore } from "@webpack/common";
 
 import { handleAnalysis } from "./AnalysisAccesory";
+import { analyzeBotProfile } from "./analyzers/BotProfile";
 import { analyzeWithCertPL } from "./analyzers/CertPL";
 import { analyzeDiscordInvite, isDiscordInvite } from "./analyzers/DiscordInvite";
 import { analyzeWithFishFish } from "./analyzers/FishFish";
 import { analyzeFileWithHybridAnalysis, analyzeUrlWithHybridAnalysis } from "./analyzers/HybridAnalysis";
-import { analyzeBotProfile } from "./analyzers/BotProfile";
 import { runModularScan } from "./analyzers/ModularScan";
 import { analyzeWithSucuriDetailed } from "./analyzers/Sucuri";
 import { analyzeWithVirusTotal } from "./analyzers/VirusTotal";
@@ -142,7 +140,7 @@ function walkMessageValue(value: unknown, urls: Set<string>, seen: WeakSet<objec
     }
 
     for (const [key, nestedValue] of Object.entries(value)) {
-        // skip CDN URLs 
+        // skip CDN URLs
         if (/^(image|thumbnail|cdn|media)/.test(key)) continue;
 
         if (typeof nestedValue === "string" && /url|href|link/i.test(key)) {
@@ -318,7 +316,7 @@ function isScannableAttachment(attachment: Message["attachments"][number]): bool
 }
 
 function matchesFilter(module: ModularScanModule, target: string): boolean {
-    const filter = module.filter;
+    const { filter } = module;
     if (!filter || filter.type === "none") return true;
 
     if (filter.type === "contains") {
@@ -417,7 +415,7 @@ export function autoAnalyzeMessage(message: Message) {
         }
     }
 
-    // auto-scan CDN file URLs 
+    // auto-scan CDN file URLs
     if (s.autoScanFiles) {
         const skipFiles = s.autoScanFilesDirectMessageOnly && !isDM(message.channel_id);
         if (!skipFiles) {

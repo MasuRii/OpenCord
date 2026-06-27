@@ -416,9 +416,22 @@ function MessageContextMenu(children: React.ReactNode[], props: ZipMessageContex
     }
 }
 
-// Store for expanded state and loaded blobs per attachment
+// Store for expanded state and loaded blobs per attachment.
+// blobCache holds decompressed blobs in memory, so cap it with LRU eviction.
 const expandedState = new Map<string, boolean>();
 const blobCache = new Map<string, Blob>();
+const MAX_BLOB_CACHE = 30;
+
+function cacheBlob(key: string, blob: Blob) {
+    // Refresh insertion order so the most recently used key is last
+    if (blobCache.has(key)) blobCache.delete(key);
+    blobCache.set(key, blob);
+    while (blobCache.size > MAX_BLOB_CACHE) {
+        const oldest = blobCache.keys().next().value;
+        if (oldest === undefined) break;
+        blobCache.delete(oldest);
+    }
+}
 
 // Component to render inside each zip attachment
 function ZipAttachmentPreview({ attachment }: { attachment: ZipAttachmentLike; }) {
@@ -464,7 +477,7 @@ function ZipAttachmentPreview({ attachment }: { attachment: ZipAttachmentLike; }
 
                 if (mounted) {
                     setBlob(b);
-                    blobCache.set(cacheKey, b);
+                    cacheBlob(cacheKey, b);
                 }
             } catch {
                 if (mounted) setError("Failed to fetch archive");
@@ -529,5 +542,7 @@ export default definePlugin({
         document.removeEventListener("drop", handleDrop, true);
         document.removeEventListener("paste", handlePaste, true);
         interceptingEvents = false;
+        blobCache.clear();
+        expandedState.clear();
     }
 });

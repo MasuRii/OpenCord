@@ -1,0 +1,94 @@
+/* Vencord / Equicord - PurgeDMs */
+
+.vc-purgedms-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+}
+
+.vc-purgedms-stats {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-weight: 600;
+}
+
+.vc-purgedms-stat {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+}
+
+.vc-purgedms-stat-num {
+    font-size: 22px;
+    color: var(--header-primary);
+}
+
+.vc-purgedms-stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-muted);
+}
+
+.vc-purgedms-status {
+    font-size: 13px;
+    color: var(--text-normal);
+}
+
+.vc-purgedms-status[data-state="running"] { color: var(--status-danger, #f23f43); }
+.vc-purgedms-status[data-state="done"]    { color: var(--text-positive); }
+.vc-purgedms-status[data-state="stopped"] { color: var(--text-warning); }
+.vc-purgedms-status[data-state="error"]   { color: var(--text-danger, #f23f43); }
+
+.vc-purgedms-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    height: 320px;
+    overflow-y: auto;
+    background: var(--background-tertiary);
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 13px;
+}
+
+.vc-purgedms-line {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    padding: 3px 6px;
+    border-radius: 4px;
+    animation: vc-purgedms-flash .5s ease-out;
+}
+
+.vc-purgedms-line-killed { color: var(--text-muted); }
+.vc-purgedms-line-failed { color: var(--text-warning); }
+
+.vc-purgedms-tag {
+    flex: 0 0 auto;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--status-danger, #f23f43);
+    color: #fff;
+}
+
+.vc-purgedms-line-failed .vc-purgedms-tag { background: var(--text-warning); }
+
+.vc-purgedms-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: line-through;
+    opacity: .8;
+}
+
+@keyframes vc-purgedms-flash {
+    from { background: var(--status-danger-background, rgba(240, 71, 71, .25)); }
+    to   { background: transparent; }
+}

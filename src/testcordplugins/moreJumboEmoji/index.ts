@@ -4,11 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import {definePluginSettings} from "@api/Settings";
-import {Devs} from "@utils/constants";
-import definePlugin, {makeRange, OptionType} from "@utils/types";
-
+import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
+import definePlugin, { makeRange, OptionType } from "@utils/types";
 
 const settings = definePluginSettings({
     threshold: {
@@ -45,8 +43,3 @@ export default definePlugin({
         return !(settings.store.unlimited || (emojiCount <= settings.store.threshold));
     }
 });
-
-
-
-
-

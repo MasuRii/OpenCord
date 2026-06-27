@@ -154,6 +154,17 @@ let mediaEngine: any = null;
 let connectionHandler: ((...args: any[]) => void) | null = null;
 const patchedConnections = new Set<string>();
 const activeConnections = new Set<any>();
+const patchedConns = new Set<any>();
+
+function unpatchConn(conn: any) {
+    try {
+        if (conn?._micQualityOrig) {
+            conn.setTransportOptions = conn._micQualityOrig;
+            delete conn._micQualityOrig;
+        }
+    } catch { }
+    patchedConns.delete(conn);
+}
 
 function triggerLiveUpdate() {
     for (const connection of activeConnections) {
@@ -196,6 +207,8 @@ function onConnection(connection: any) {
     logger.info("Patching audio connection", connId);
 
     const origSetTransportOptions = connection.conn.setTransportOptions;
+    connection.conn._micQualityOrig = origSetTransportOptions;
+    patchedConns.add(connection.conn);
     connection.conn.setTransportOptions = function (this: any, options: Record<string, any>) {
         patchTransportOptions(options, connection);
         logger.info("Overridden audio transport options", options);
@@ -219,6 +232,7 @@ function onConnection(connection: any) {
     const onDestroy = () => {
         patchedConnections.delete(connId);
         activeConnections.delete(connection);
+        unpatchConn(connection.conn);
         try {
             emitter.removeListener("connected", onConnected);
             emitter.removeListener("destroy", onDestroy);
@@ -486,6 +500,8 @@ export default definePlugin({
             }
             connectionHandler = null;
             mediaEngine = null;
+            for (const conn of patchedConns) unpatchConn(conn);
+            patchedConns.clear();
             patchedConnections.clear();
             activeConnections.clear();
             logger.info("CustomMicQuality stopped");

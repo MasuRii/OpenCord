@@ -10,7 +10,7 @@ import { Margins } from "@utils/margins";
 import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize } from "@utils/modal";
 import { Button, Forms, IconUtils, showToast, Text, TextInput, Toasts, UserStore,useState } from "@webpack/common";
 
-import { clearTarget, getCachedTarget, loadTarget, logger, setEnabled, settings } from "./data";
+import { clearTarget, getCachedTarget, loadTarget, logger, resolveTargetUserId, setEnabled, settings } from "./data";
 
 const ID_RE = /^\d{17,20}$/;
 
@@ -26,9 +26,10 @@ export function FakeUserProfileModal({ modalProps }: { modalProps: ModalProps; }
     const [target, setTarget] = useState(initial);
 
     async function apply() {
-        const id = value.trim();
-        if (!ID_RE.test(id)) {
-            showToast("Enter a valid Discord user ID.", Toasts.Type.FAILURE);
+        const input = value.trim();
+        const id = resolveTargetUserId(input);
+        if (!id) {
+            showToast("Enter a valid Discord user ID or cached username.", Toasts.Type.FAILURE);
             return;
         }
         const me = UserStore.getCurrentUser();

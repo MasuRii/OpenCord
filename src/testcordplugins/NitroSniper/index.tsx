@@ -107,17 +107,20 @@ export default definePlugin({
         MESSAGE_CREATE({ message }) {
             if (!message.content) return;
 
+            if (!message.content.includes("discord.gift") && !message.content.includes("discord.com/gift")) return;
             const match = message.content.match(/(?:discord\.gift\/|discord\.com\/gifts?\/)([a-zA-Z0-9]{16,24})/);
             if (!match) return;
 
             if (new Date(message.timestamp).getTime() < startTime) return;
 
-            codeQueue.push({
-                code: match[1],
-                channelId: message.channel_id,
-                guildId: message.guild_id,
-                messageId: message.id
-            });
+            if (codeQueue.length < 50) {
+                codeQueue.push({
+                    code: match[1],
+                    channelId: message.channel_id,
+                    guildId: message.guild_id,
+                    messageId: message.id
+                });
+            }
             processQueue();
         }
     }

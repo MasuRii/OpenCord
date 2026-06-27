@@ -1,6 +1,6 @@
 /* eslint-disable simple-header/header*/
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { findByPropsLazy, findComponentByCodeLazy } from "@webpack";
 
@@ -52,8 +52,3 @@ export default definePlugin({
         </>;
     }
 });
-
-
-
-
-

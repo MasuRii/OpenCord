@@ -1,3 +1,9 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import definePlugin from "@utils/types";
 
 const CSS = `
@@ -77,7 +83,7 @@ section[class*="panels_"] > div[class*="container_"]:not(:has([class*="avatar_"]
 export default definePlugin({
     name: "UserAreaTweaks",
     description: "Creates an elegant floating dock for Testcord plugins using pure CSS, preventing overlap and crashes.",
-    tags: ["Appearance", "Utility"],
+    tags: ["Appearance", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
 
     start() {

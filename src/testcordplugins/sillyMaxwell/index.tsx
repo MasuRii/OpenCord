@@ -4,12 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { sleep } from "@utils/index";
 import { TestcordDevs } from "@utils/constants";
+import { sleep } from "@utils/index";
 import definePlugin from "@utils/types";
 
-
 import { settings } from "./settings";
+
+let maxwellRunning = false;
 
 export default definePlugin({
     name: "Maxwell :3",
@@ -19,13 +20,14 @@ export default definePlugin({
     dependencies: ["CommandsAPI"],
     settings,
     async start() {
+        maxwellRunning = true;
         await sleep(5);
         for (let i = 0; i < settings.store.concurrentMaxwells ; i +=1) {
             addGifToScreen();
         }
-
     },
     stop() {
+        maxwellRunning = false;
         let gifElement = document.querySelector(".moving-gif");
         while (gifElement) {
             if (gifElement) {
@@ -33,9 +35,7 @@ export default definePlugin({
             }
             gifElement = document.querySelector(".moving-gif");
         }
-
     }
-
 
 });
 
@@ -69,11 +69,12 @@ export async function addGifToScreen() {
     };
 
     const timeToGetReallySilly = async () => {
-        while (true) {
+        while (maxwellRunning) {
             // spinny spinny spinny spinny spinny spinny spinny
             gifElement.src = settings.store.gifLink2;
             gifElement.style.transition = "none";
             await new Promise(resolve => setTimeout(resolve, getRandTime(4000, 8000)));
+            if (!maxwellRunning) break;
 
             // dancy dancy dancy dancy dancy dancy dancy
             const { x, y } = getRandPos();
@@ -82,17 +83,13 @@ export async function addGifToScreen() {
             gifElement.style.left = `${x}px`;
             gifElement.style.bottom = `${y}px`;
 
-            await new Promise(resolve => {
-                gifElement.addEventListener("transitionend", resolve, { once: true });
+            if (!gifElement.parentNode) break;
+            await new Promise<void>(resolve => {
+                if (!gifElement.parentNode) return resolve();
+                gifElement.addEventListener("transitionend", () => resolve(), { once: true });
             });
         }
     };
 
-    timeToGetReallySilly();
+    if (maxwellRunning) timeToGetReallySilly();
 }
-
-
-
-
-
-

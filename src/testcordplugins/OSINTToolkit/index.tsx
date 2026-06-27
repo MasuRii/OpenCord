@@ -109,7 +109,6 @@ function normalizeUsername(input: string): string {
     return input.trim().replace(/^@+/, "");
 }
 
-
 async function getDomainInfo(domain: string): Promise<DomainInfo | null> {
     try {
         const response = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`);
@@ -320,7 +319,6 @@ function parseProviderResponse(data: any, ip?: string): IPInfo {
         }
     }
 }
-
 
 async function getIPInfo(ip: string): Promise<IPInfo | null> {
     try {
@@ -559,7 +557,6 @@ function createIPMessage(info: IPInfo) {
 function openUrl(url: string) {
     window.open(url, "_blank", "noopener,noreferrer");
 }
-
 
 const messageContextMenuPatch: NavContextMenuPatchCallback = (children, { message }) => {
     if (!message || !message.author) return;

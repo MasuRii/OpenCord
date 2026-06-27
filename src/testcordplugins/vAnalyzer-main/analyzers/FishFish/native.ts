@@ -41,7 +41,7 @@ export async function queryFishFish(_: IpcMainInvokeEvent, domain: string): Prom
         // exact domain match
         let found = domainSet.has(normalizedDomain);
 
-        // check parent domains 
+        // check parent domains
         if (!found) {
             const parts = normalizedDomain.split(".");
             for (let i = 1; i < parts.length - 1; i++) {

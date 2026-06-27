@@ -13,7 +13,7 @@ import { TestcordDevs } from "@utils/constants";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { findByProps } from "@webpack";
-import { Forms, React, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
+import { Forms, React, showToast, Toasts, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
 
 import { t } from "../autoTranslateNightcord";
 
@@ -51,7 +51,34 @@ const settings = definePluginSettings({
         description: "Encrypt saved tokens at rest using Electron safeStorage (OS keychain / DPAPI). When off, tokens are stored in plaintext in IndexedDB.",
         default: true,
     },
+    enableQuickSwitch: {
+        type: OptionType.BOOLEAN,
+        description: "Enable an Alt+G hotkey to quickly open the account switcher.",
+        default: false,
+    },
+    importDestination: {
+        type: OptionType.SELECT,
+        description: "Where bulk-imported tokens are saved. TokenImporter is this plugin's own encrypted store; Login Manager is the TokenLoginManager vault.",
+        options: [
+            { label: "Both", value: "both", default: true },
+            { label: "TokenImporter only", value: "importer" },
+            { label: "Login Manager only", value: "loginManager" },
+        ],
+    },
 });
+
+// Routes parsed tokens into the TokenLoginManager vault, mirroring the original
+// ImportMultiTokens behavior so that import path is preserved losslessly. Guarded
+// so a missing or disabled TokenLoginManager plugin fails softly.
+function routeToLoginManager(accounts: Array<{ username: string; token: string; }>): { ok: boolean; reason?: string; } {
+    const plugin = Vencord.Plugins.plugins.TokenLoginManager as any;
+    if (!plugin) return { ok: false, reason: "TokenLoginManager plugin not found" };
+    if (!Vencord.Plugins.isPluginEnabled("TokenLoginManager")) return { ok: false, reason: "TokenLoginManager is disabled" };
+    const manager = plugin.tokenLoginManager;
+    if (!manager) return { ok: false, reason: "TokenLoginManager not initialized" };
+    for (const { username, token } of accounts) manager.addAccount({ username, token });
+    return { ok: true };
+}
 
 // Dangerous settings that surface a one-time confirmation the first time they're enabled.
 const DANGEROUS_SETTINGS = [
@@ -249,6 +276,40 @@ function extractTokens(raw: string): string[] {
     return Array.from(found);
 }
 
+// Bulk parser folded from ImportMultiTokens: supports three paste formats
+// (3-line userId/blank/token, comma-separated, one-per-line), dedups, and
+// strips wrapping quotes. Falls back to a plain regex scan so any token
+// embedded in arbitrary text is still recovered. Returns deduped tokens.
+function parseBulkTokens(input: string): string[] {
+    const cleaned = input.trim();
+    if (!cleaned) return [];
+
+    const stripQuotes = (s: string) => s.trim().replace(/^["']|["']$/g, "");
+    const lines = cleaned.split("\n");
+
+    // 3-line format first (userId, blank, token), repeating every 3 lines.
+    if (lines.length >= 3) {
+        const seen = new Set<string>();
+        for (let i = 0; i < lines.length; i += 3) {
+            const userId = lines[i]?.trim();
+            const token = stripQuotes(lines[i + 2] ?? "");
+            if (userId && token) seen.add(token);
+        }
+        if (seen.size > 0) return Array.from(seen);
+    }
+
+    const seen = new Set<string>();
+    const parts = cleaned.includes(",") ? cleaned.split(",") : lines;
+    for (const part of parts) {
+        const token = stripQuotes(part);
+        if (token) seen.add(token);
+    }
+    if (seen.size > 0) return Array.from(seen);
+
+    // Fallback: recover any token embedded in free-form text.
+    return extractTokens(cleaned);
+}
+
 interface TokenResult { token: string; status: "pending" | "checking" | "valid" | "invalid" | "error" | "rate_limited"; username?: string; avatar?: string; id?: string; }
 
 function RemoveInvalidModal({ rootProps, invalidAccounts, onConfirm }: {
@@ -373,13 +434,14 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
         }
     }
 
-    async function processTokens(raw: string) {
-        const tokens = extractTokens(raw);
+    async function processTokens(raw: string, destOverride?: "importer" | "loginManager" | "both") {
+        const tokens = parseBulkTokens(raw);
         if (!tokens.length) { setResults([{ token: "No tokens found", status: "invalid" }]); return; }
         const initial: TokenResult[] = tokens.map(t => ({ token: t, status: "pending" as const }));
         setResults(initial); setChecking(true); setDone(false);
         const updated = [...initial];
         const existing = await getAccounts();
+        const validForRouting: Array<{ username: string; token: string; }> = [];
         for (let i = 0; i < tokens.length; i++) {
             updated[i] = { ...updated[i], status: "checking" }; setResults([...updated]);
             try {
@@ -387,12 +449,14 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
                 if (result.valid && result.user) {
                     const u = result.user;
                     const av = getAvatarUrl(u.id, u.avatar);
-                    if (!existing.find(a => a.id === u.id)) {
+                    const saveLocally = (destOverride ?? settings.store.importDestination ?? "both") !== "loginManager";
+                    if (saveLocally && !existing.find(a => a.id === u.id)) {
                         existing.push({ id: u.id, token: tokens[i], username: u.global_name || u.username, discriminator: u.discriminator ?? "0", avatar: av });
                         await saveAccounts(existing);
                         await patchTokenStore();
                         setAccounts([...existing]);
                     }
+                    validForRouting.push({ username: u.global_name || u.username, token: tokens[i] });
                     updated[i] = { ...updated[i], status: "valid", username: u.global_name || u.username, id: u.id, avatar: av };
                 } else {
                     updated[i] = { ...updated[i], status: (result as any).error === "rate_limited" ? "rate_limited" : (result as any).error ? "error" : "invalid" };
@@ -400,6 +464,12 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
             } catch { updated[i] = { ...updated[i], status: "error" }; }
             setResults([...updated]);
             await new Promise(r => setTimeout(r, 200));
+        }
+        const dest = destOverride ?? settings.store.importDestination ?? "both";
+        if (dest !== "importer" && validForRouting.length) {
+            const routed = routeToLoginManager(validForRouting);
+            if (!routed.ok) showToast(`Login Manager import skipped: ${routed.reason}`, Toasts.Type.FAILURE);
+            else showToast(`Sent ${validForRouting.length} account(s) to Login Manager`, Toasts.Type.SUCCESS);
         }
         setChecking(false); setDone(true);
     }
@@ -415,7 +485,7 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
         setPaste(val);
         if (detectTimer.current) clearTimeout(detectTimer.current);
         detectTimer.current = setTimeout(() => {
-            setDetectedCount(extractTokens(val).length);
+            setDetectedCount(parseBulkTokens(val).length);
         }, 150);
     }
 
@@ -529,12 +599,18 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
 
                 {tab === "add" && (
                     <div className="ti-add-body">
-                        <textarea className="ti-textarea ti-textarea-mask" placeholder="Paste your Discord tokens here... (1 per line, or pasted together)" value={pasteValue} onChange={e => handlePasteChange(e.target.value)} autoFocus />
+                        <textarea className="ti-textarea ti-textarea-mask" placeholder="Paste your Discord tokens here... (one per line, comma-separated, or 3-line userId/blank/token format)" value={pasteValue} onChange={e => handlePasteChange(e.target.value)} autoFocus />
                         <div className="ti-add-footer">
                             <span className="ti-detected">{detectedCount} token{detectedCount !== 1 ? "s" : ""} detected</span>
                             <button className="ti-file-btn" onClick={() => fileRef.current?.click()}>File .txt</button>
+                            <button className="ti-submit-btn" disabled={checking || detectedCount === 0} onClick={() => processTokens(pasteValue, "importer")}>
+                                {checking ? "Checking..." : "→ Importer"}
+                            </button>
+                            <button className="ti-submit-btn" disabled={checking || detectedCount === 0} onClick={() => processTokens(pasteValue, "loginManager")}>
+                                {checking ? "Checking..." : "→ Login Manager"}
+                            </button>
                             <button className="ti-submit-btn" disabled={checking || detectedCount === 0} onClick={() => processTokens(pasteValue)}>
-                                {checking ? "Checking..." : "Verify & Add"}
+                                {checking ? "Checking..." : "→ Both"}
                             </button>
                         </div>
                         <input ref={fileRef} type="file" accept=".txt,text/plain" style={{ display: "none" }} onChange={handleFile} />
@@ -677,13 +753,23 @@ function TokenImporterButton() {
 export default definePlugin({
     name: "TokenImporter",
     description: "Import and verify Discord tokens.",
-    tags: ["Utility", "Utility"],
+    tags: ["Utility", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }, TestcordDevs.x2b, TestcordDevs.sirphantom89],
     dependencies: ["HeaderBarAPI"],
     settings,
     settingsAboutComponent: TokenImporterAbout,
+    _injectTimer: null as ReturnType<typeof setTimeout> | null,
+    handleQuickSwitch(event: KeyboardEvent) {
+        if (event.altKey && event.key === "g") {
+            event.preventDefault();
+            openModal(props => <TokenModal rootProps={props} />);
+        }
+    },
     async start() {
         addHeaderBarButton("nightcord-token-importer", () => <TokenImporterButton />, 10);
+        if (settings.store.enableQuickSwitch) {
+            document.addEventListener("keydown", this.handleQuickSwitch);
+        }
         try {
             const existing = await getAccounts();
             // Auto-scan requires BOTH the local-scan capability and the auto-on-startup toggle.
@@ -713,7 +799,7 @@ export default definePlugin({
                 }
             }
             if (settings.store.injectIntoMultiAccountStore) {
-                setTimeout(() => this._injectAccounts(), 5000);
+                this._injectTimer = setTimeout(() => { this._injectTimer = null; this._injectAccounts(); }, 5000);
             }
         } catch (e) {
             console.error("[TokenImporter] Startup failed:", e);
@@ -747,6 +833,8 @@ export default definePlugin({
         } catch (e) { console.error("[TokenImporter] inject:", e); }
     },
     stop() {
+        if (this._injectTimer) { clearTimeout(this._injectTimer); this._injectTimer = null; }
+        document.removeEventListener("keydown", this.handleQuickSwitch);
         removeHeaderBarButton("nightcord-token-importer");
         if (tokenModulePatched) {
             try {

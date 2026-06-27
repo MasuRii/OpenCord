@@ -1,5 +1,11 @@
-import { User } from "@vencord/discord-types";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { PluginNative } from "@utils/types";
+import { User } from "@vencord/discord-types";
 import { Toasts } from "@webpack/common";
 
 import { settings } from "../../settings";

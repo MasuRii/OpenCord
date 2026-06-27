@@ -1,17 +1,19 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
-import { openModal, ModalRoot, ModalHeader, ModalContent, ModalCloseButton } from "@utils/modal";
-import definePlugin from "@utils/types";
-import { Forms, UserStore } from "@webpack/common";
-import { React, useState, useRef, useEffect } from "@webpack/common";
-import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { t } from "../autoTranslateNightcord";
 import "./styles.css";
+
+import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
+import { ModalCloseButton,ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
+import definePlugin from "@utils/types";
+import { findByPropsLazy, findStoreLazy } from "@webpack";
+import { Forms, UserStore } from "@webpack/common";
+import { React, useEffect,useRef, useState } from "@webpack/common";
+
+import { t } from "../autoTranslateNightcord";
 
 const GuildStore = findStoreLazy("GuildStore");
 const GuildChannelStore = findStoreLazy("GuildChannelStore");
@@ -32,8 +34,6 @@ interface VoiceChannel {
     // Pre-built unique search index: "channel name · server name"
     searchIndex: string;
 }
-
-
 
 // Scan cache — avoids rescanning if done recently
 let scanCache: VoiceChannel[] | null = null;
@@ -74,9 +74,9 @@ async function scan(): Promise<VoiceChannel[]> {
                     const allChannels = GuildChannelStore.getChannels?.(guildId) ?? {};
                     // Iterate through all categories: VOCAL, GUILD_STAGE_VOICE, and raw arrays
                     const voiceItems: any[] = [
-                        ...(allChannels["VOCAL"] ?? []),
-                        ...(allChannels[2] ?? []),   // type 2 = voice
-                        ...(allChannels[13] ?? []),  // type 13 = stage
+                        ...(allChannels.VOCAL ?? []),
+                        ...(allChannels[2] ?? []), // type 2 = voice
+                        ...(allChannels[13] ?? []), // type 13 = stage
                     ];
                     // Deduplicate by id
                     const seen = new Set<string>();
@@ -307,7 +307,7 @@ function VCSHeaderButton() {
 export default definePlugin({
     name: "VoiceChannelSearch",
     description: "Search and join any voice channel across all your servers.",
-    tags: ["Voice", "Utility", "Utility"],
+    tags: ["Voice", "Utility", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     dependencies: ["HeaderBarAPI"],
 

@@ -4,14 +4,19 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import "./style.css";
+
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
 import { getCurrentGuild } from "@utils/discord";
+import { Logger } from "@utils/Logger";
 import { ModalContent, ModalFooter, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy,findStoreLazy } from "@webpack";
 import { Button, ChannelStore, FluxDispatcher, Forms, Menu, React, TextInput, Toasts, UserStore } from "@webpack/common";
+
+const logger = new Logger("vcOwnerDetector");
 
 const Flex = ({ children, style, ...props }: React.PropsWithChildren<{ style?: React.CSSProperties; }>) => (
     <div style={{ display: "flex", ...style }} {...props}>{children}</div>
@@ -85,7 +90,7 @@ function checkvcownerlol(guildId: string, channelId?: string) {
     let ownerFound = false;
     let ownerName = "";
 
-    permissions.forEach((perm: any) => {
+    permissions.forEach((perm: PermissionOverwrite) => {
         const { id, allow } = perm;
 
         try {
@@ -99,19 +104,19 @@ function checkvcownerlol(guildId: string, channelId?: string) {
 
                     // Try to get guild member info for server nickname
                     const guild = getCurrentGuild();
-                    let memberInfo = null;
+                    let memberInfo: { nick?: string; } | null = null;
                     if (guild) {
                         try {
                             // Try to get guild member store
                             const GuildMemberStore = findStoreLazy("GuildMemberStore");
                             memberInfo = GuildMemberStore?.getMember(guild.id, id);
                         } catch (e) {
-                            console.log("Could not get guild member info");
+                            logger.warn("Could not get guild member info");
                         }
                     }
 
                     // Priority: server nickname > global display name > username
-                    ownerName = ((memberInfo as any)?.nick) || user.globalName || (user as any).displayName || user.username || "Unknown User";
+                    ownerName = memberInfo?.nick || user.globalName || user.username || "Unknown User";
 
                     const cleanId = id.toString().replace(/[^0-9]/g, "");
                     veryimportantmap.add(cleanId);
@@ -132,7 +137,7 @@ function checkvcownerlol(guildId: string, channelId?: string) {
                 }
             }
         } catch (e) {
-            console.error("Permission conversion error:", e);
+            logger.error("Permission conversion error:", e);
         }
     });
 
@@ -149,11 +154,23 @@ function checkvcownerlol(guildId: string, channelId?: string) {
     }
 }
 
-function toBigIntSafe(value: any): bigint {
+function toBigIntSafe(value: unknown): bigint {
     if (typeof value === "bigint") return value;
     if (typeof value === "number") return BigInt(value);
     if (typeof value === "string") return BigInt(value.replace(/n$/, "").trim());
     return BigInt(0);
+}
+
+interface PermissionOverwrite {
+    id: string;
+    allow: unknown;
+}
+
+interface VoiceState {
+    userId: string;
+    channelId?: string;
+    guildId: string;
+    oldChannelId?: string;
 }
 
 function ChannelMenuItem(guildId: string, channelId?: string) {
@@ -206,7 +223,7 @@ export default definePlugin({
             document.addEventListener("keydown", Kbind);
             this.initializePlugin();
         } catch (e) {
-            console.error("Plugin start error:", e);
+            logger.error("Plugin start error:", e);
         }
     },
 
@@ -218,13 +235,12 @@ export default definePlugin({
                 clearInterval(checkInterval);
                 checkInterval = null;
             }
-            document.getElementById("vc-owner-styles")?.remove();
         } catch (e) {
-            console.error("Plugin stop error:", e);
+            logger.error("Plugin stop error:", e);
         }
     },
 
-    handleVoiceStateUpdate({ voiceStates }: { voiceStates: any[]; }) {
+    handleVoiceStateUpdate({ voiceStates }: { voiceStates: VoiceState[]; }) {
         const clientUserId = UserStore.getCurrentUser().id;
 
         voiceStates.forEach(state => {
@@ -251,7 +267,7 @@ export default definePlugin({
 
             if ((oldChannelId && !channelId) && (userId === clientUserId)) {
                 if (settings.store.amivcowner) {
-                    console.log("You (owner) left VC");
+                    logger.info("You (owner) left VC");
                     settings.store.amivcowner = false;
                 }
             }
@@ -261,20 +277,8 @@ export default definePlugin({
     initializePlugin() {
         settings.store.amivcowner = false;
 
-        // Add CSS for yellow username
-        if (!document.getElementById("vc-owner-styles")) {
-            const style = document.createElement("style");
-            style.id = "vc-owner-styles";
-            style.textContent = `
-                .vc-owner-yellow {
-                    color: #fbbf24 !important;
-                    font-weight: bold !important;
-                }
-            `;
-            document.head.appendChild(style);
-        }
-
         // Check VC ownership periodically (but don't show toasts)
+        if (checkInterval) clearInterval(checkInterval);
         checkInterval = setInterval(() => {
             try {
                 const guild = getCurrentGuild();
@@ -286,7 +290,7 @@ export default definePlugin({
                 // Silent check - only update internal state, no toasts
                 this.silentOwnerCheck(guild.id, voiceState.channelId);
             } catch (e) {
-                console.error("Periodic check error:", e);
+                logger.error("Periodic check error:", e);
             }
         }, 2000);
     },
@@ -305,7 +309,7 @@ export default definePlugin({
             const currentUserId = UserStore.getCurrentUser().id;
             const permRequirement = guildSetting.permrequirements;
 
-            permissions.forEach((perm: any) => {
+            permissions.forEach((perm: PermissionOverwrite) => {
                 const { id, allow } = perm;
 
                 try {
@@ -321,7 +325,7 @@ export default definePlugin({
                         }
                     }
                 } catch (e) {
-                    console.error("Permission conversion error:", e);
+                    logger.error("Permission conversion error:", e);
                 }
             });
         }

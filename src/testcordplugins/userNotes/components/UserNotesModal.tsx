@@ -67,5 +67,3 @@ export const openUserNotesModal = async (user: User | string, saveCallback?: () 
         />
     ));
 };
-
-

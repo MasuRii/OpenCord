@@ -69,5 +69,3 @@ export function EmojiTextInput(props: EmojiTextInputProps) {
         </Flex>
     );
 }
-
-

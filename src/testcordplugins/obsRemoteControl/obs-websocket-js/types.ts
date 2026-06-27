@@ -67,7 +67,6 @@ export enum WebSocketOpCode {
 	RequestBatchResponse = 9,
 }
 
-
 export enum EventSubscription {
 	/**
 	 * Subcription value used to disable all events.
@@ -172,7 +171,6 @@ export enum EventSubscription {
 	 */
 	SceneItemTransformChanged = (1 << 19),
 }
-
 
 export enum RequestBatchExecutionType {
 	/**

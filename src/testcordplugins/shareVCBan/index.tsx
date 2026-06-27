@@ -1,8 +1,14 @@
-import { definePluginSettings } from "@api/Settings";
-import definePlugin, { OptionType } from "@utils/types";
-import { TestcordDevs } from "@utils/constants";
-import { FluxDispatcher, UserStore, RestAPI, ChannelStore, Menu, React, Toasts } from "@webpack/common";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { definePluginSettings } from "@api/Settings";
+import { TestcordDevs } from "@utils/constants";
+import definePlugin, { OptionType } from "@utils/types";
+import { ChannelStore, FluxDispatcher, Menu, React, RestAPI, Toasts,UserStore } from "@webpack/common";
 
 const settings = definePluginSettings({
     enabled: {
@@ -190,7 +196,7 @@ class ShareBanManager {
             return;
         }
 
-        const targetUserId = args[1].replace(/[<@!>]/g, '');
+        const targetUserId = args[1].replace(/[<@!>]/g, "");
 
         if (!/^\d{17,19}$/.test(targetUserId)) {
             this.showError("Invalid user ID format!");
@@ -239,7 +245,7 @@ class ShareBanManager {
                     await this.sendCommand(cmd.channelId, cmd.command);
                     console.log(`📤 Executed command: "${cmd.command}"`);
                 } catch (error) {
-                    console.error(`❌ Failed to execute command:`, error);
+                    console.error("❌ Failed to execute command:", error);
                 }
 
                 await this.sleep(cmd.delay + Math.random() * 500 + 200);
@@ -261,7 +267,7 @@ class ShareBanManager {
             });
             return true;
         } catch (error) {
-            console.error(`Failed to send command via API:`, error);
+            console.error("Failed to send command via API:", error);
             return false;
         }
     }
@@ -378,7 +384,7 @@ function ShareBanMenuItem(userId: string, username: string) {
 function handleMessageCreate(data: any) {
     if (!settings.store.enabled) return;
 
-    const message = data.message;
+    const { message } = data;
     if (!message?.author || !message.id || !message.channel_id) return;
 
     shareBanManager.handleMessage(message);

@@ -22,5 +22,3 @@ export async function openLockModal(channelId: string) {
         }} />;
     });
 }
-
-

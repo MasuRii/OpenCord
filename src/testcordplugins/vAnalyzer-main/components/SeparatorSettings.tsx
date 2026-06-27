@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { Divider } from "@components/Divider";
+import { HeadingSecondary } from "@components/Heading";
 import { Margins } from "@components/margins";
 import { React } from "@webpack/common";
-import { HeadingSecondary } from "@components/Heading";
-import { Divider } from "@components/Divider";
 
 export default function SeparatorSettings({ label }: { label: string; }) {
     return (

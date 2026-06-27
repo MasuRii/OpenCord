@@ -8,17 +8,16 @@ import {
   findGroupChildrenByChildId,
   NavContextMenuPatchCallback,
 } from "@api/ContextMenu";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import {
   ChannelStore,
   FluxDispatcher,
+  Menu,
   showToast,
   Toasts,
-  Menu,
 } from "@webpack/common";
-import { Channel } from "@vencord/discord-types";
 
 // Find ChannelActionCreators to close DMs
 const ChannelActionCreators = findByPropsLazy(
@@ -36,7 +35,7 @@ async function closeDMWithDelay(
   channelId: string,
   delay: number
 ): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     setTimeout(() => {
       try {
         const channel = ChannelStore.getChannel(channelId);
@@ -84,7 +83,7 @@ async function closeAllDMs() {
     });
 
     if (dmsToClose.length === 0) {
-      showToast(Toasts.Type.MESSAGE, "ℹ️ No DMs to close");
+      showToast("ℹ️ No DMs to close", Toasts.Type.MESSAGE);
       return;
     }
 
@@ -96,12 +95,12 @@ async function closeAllDMs() {
 
     // Success notification
     showToast(
-      Toasts.Type.SUCCESS,
-      `✅ ${closedCount} DM(s) closed with 50ms rate limit`
+      `✅ ${closedCount} DM(s) closed with 50ms rate limit`,
+      Toasts.Type.SUCCESS
     );
   } catch (error) {
     console.error("Error closing DMs:", error);
-    showToast(Toasts.Type.FAILURE, "❌ Error closing DMs");
+    showToast("❌ Error closing DMs", Toasts.Type.FAILURE);
   }
 }
 
@@ -169,8 +168,3 @@ export default definePlugin({
     "guild-context": ServerContextMenuPatch,
   },
 });
-
-
-
-
-

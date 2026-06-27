@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { ApplicationCommandInputType, ApplicationCommandOptionType } from "@api/Commands";
+import { ApplicationCommandInputType, ApplicationCommandOptionType, findOption } from "@api/Commands";
 import { openUserProfile } from "@utils/discord";
 import { sleep } from "@utils/misc";
-import { ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
+import { ModalContent, ModalFooter, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
 import { React, Text } from "@webpack/common";
@@ -1324,7 +1324,7 @@ export default definePlugin({
             execute: async (opts, ctx) => {
                 console.log("[AutoSync] Command executed with:", opts);
                 try {
-                    const state = opts[0]?.value?.toLowerCase();
+                    const state = findOption(opts, "state", "")?.toLowerCase();
 
                     if (state === "on") {
                         startAutoSync();

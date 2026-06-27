@@ -69,6 +69,11 @@ const settings = definePluginSettings({
         description: "Log blocked privacy requests.",
         default: false,
     },
+    warnOnIcePolicyOverride: {
+        type: OptionType.BOOLEAN,
+        description: "Warn when Discord tries to change the WebRTC ICE policy away from the configured value.",
+        default: false,
+    },
 });
 
 type XhrOpen = typeof XMLHttpRequest.prototype.open;
@@ -300,6 +305,15 @@ function createPatchedConnection(OriginalConnection: typeof RTCPeerConnection): 
         }
 
         setConfiguration(configuration: RTCConfiguration): void {
+            if (
+                settings.store.warnOnIcePolicyOverride &&
+                settings.store.webRtcIcePolicy === "relay" &&
+                configuration?.iceTransportPolicy &&
+                configuration.iceTransportPolicy !== "relay"
+            ) {
+                logger.warn(`Discord tried to set iceTransportPolicy to "${configuration.iceTransportPolicy}", forcing "relay".`);
+            }
+
             super.setConfiguration(getWebRtcConfiguration(configuration));
         }
     };

@@ -17,7 +17,7 @@
 */
 
 import { ApplicationCommandInputType, ApplicationCommandOptionType, findOption, sendBotMessage } from "@api/Commands";
-import { definePluginSettings, Settings } from "@api/Settings";
+import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
@@ -122,7 +122,7 @@ export default definePlugin({
         const originalFileName = upload.filename;
         const tarMatch = tarExtMatcher.exec(originalFileName);
         const extIdx = tarMatch?.index ?? originalFileName.lastIndexOf(".");
-        let ext = extIdx !== -1 ? originalFileName.slice(extIdx) : "";
+        const ext = extIdx !== -1 ? originalFileName.slice(extIdx) : "";
         const addSpoilerPrefix = (str: string) => settings.store.spoilerMessages ? "SPOILER_" + str : str;
 
         if ((upload[ANONYMISE_UPLOAD_SYMBOL] ?? settings.store.anonymiseByDefault) === false) return addSpoilerPrefix(originalFileName + ext);
