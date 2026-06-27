@@ -460,9 +460,9 @@ function tryInject(): void {
 }
 
 let observer: MutationObserver | null = null;
+let injectTimer: ReturnType<typeof setTimeout> | null = null;
 
 function startObserver(): void {
-    let injectTimer: ReturnType<typeof setTimeout> | null = null;
     observer = new MutationObserver(() => {
         if (injectTimer) return;
         injectTimer = setTimeout(() => {
@@ -475,6 +475,10 @@ function startObserver(): void {
 }
 
 function stopObserver(): void {
+    if (injectTimer) {
+        clearTimeout(injectTimer);
+        injectTimer = null;
+    }
     observer?.disconnect();
     observer = null;
     document.querySelectorAll(`#${BUTTONS_ID}`).forEach(el => el.remove());
