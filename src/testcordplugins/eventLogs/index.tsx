@@ -10,8 +10,7 @@ import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api
 import { ModalCloseButton,ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { ContextMenuApi, Forms, Menu, Select,showToast, Toasts } from "@webpack/common";
-import { React, useCallback,useEffect, useMemo, useState } from "@webpack/common";
+import { ContextMenuApi, Forms, Menu, React, Select, showToast, Toasts, useCallback, useEffect, useMemo, useState } from "@webpack/common";
 
 import { t, useTranslation } from "../autoTranslateNightcord";
 
@@ -70,6 +69,7 @@ interface LogEntry {
 
 const MAX_LOGS = 10000;
 const PAGE_SIZE = 40;
+const MAX_VOICE_STATES = 2000;
 let logs: LogEntry[] = [];
 
 // Track the user's current voice channel ID for "My Voice" filter
@@ -87,6 +87,7 @@ function loadPersistLogs() {
             const parsed = JSON.parse(s);
             if (Array.isArray(parsed)) {
                 logs = parsed.concat(logs).sort((a, b) => b.timestamp - a.timestamp);
+                if (logs.length > MAX_LOGS) logs.length = MAX_LOGS;
                 logCount = logs.length;
             }
         }
@@ -95,7 +96,7 @@ function loadPersistLogs() {
 
 function savePersistLogs() {
     try {
-        const toSave = logs.filter(l => PERSISTENT_TYPES.has(l.type));
+        const toSave = logs.filter(l => PERSISTENT_TYPES.has(l.type)).slice(0, MAX_LOGS);
         localStorage.setItem("nightcord_logs", JSON.stringify(toSave));
     } catch { }
 }
@@ -133,7 +134,10 @@ function fmtNow(): string {
 
 function pushLog(entry: Omit<LogEntry, "id" | "timestamp" | "timeStr">) {
     const now = Date.now();
-    if (logs.length >= MAX_LOGS) logs.pop();
+    if (logs.length >= MAX_LOGS) {
+        const removed = logs.pop();
+        if (removed) unreadLogEntries.delete(removed);
+    }
     const newLog: LogEntry = { id: `${now}_${logCount++}`, timestamp: now, timeStr: fmtNow(), ...(entry as any) };
     logs.unshift(newLog);
     if (NOTIF_TYPES.has(newLog.type)) {
@@ -184,6 +188,22 @@ function cacheMsg(msg: any) {
     }
     const a = authorFrom(msg);
     msgCache.set(msg.id, { content: msg.content ?? "", authorId: a.authorId ?? "", authorName: a.authorName, authorAvatar: a.authorAvatar });
+}
+
+function purgeMsgCache() {
+    while (msgCache.size > MSG_CACHE_MAX - MSG_CACHE_PURGE) {
+        const oldest = msgCache.keys().next().value;
+        if (!oldest) break;
+        msgCache.delete(oldest);
+    }
+}
+
+function prunePrevVS() {
+    while (prevVS.size > MAX_VOICE_STATES) {
+        const oldest = prevVS.keys().next().value;
+        if (!oldest) break;
+        prevVS.delete(oldest);
+    }
 }
 
 const CFG: Record<LogType, { label: string; color: string; }> = {
@@ -469,8 +489,12 @@ function LogsModal({ rootProps }: { rootProps: any; }) {
     const clearLogs = useCallback(() => {
         if (filter === "all" && selectedGuild === "all") {
             logs = [];
+            unreadLogEntries.clear();
         } else {
             const matchesFilter = (l: LogEntry) => applyFilter([l], filter, "", selectedGuild).length > 0;
+            for (const l of unreadLogEntries) {
+                if (matchesFilter(l)) unreadLogEntries.delete(l);
+            }
             logs = logs.filter(l => !matchesFilter(l));
         }
         globalVersion++; setVersion(globalVersion);
@@ -661,19 +685,13 @@ function subscribeToEvents() {
                 isLoadingMessages = true;
                 try { for (const m of msgs) cacheMsg(m); } finally { isLoadingMessages = false; }
                 // Deferred purge if the cache exceeds the limit
-                if (msgCache.size >= MSG_CACHE_MAX) {
-                    const keys = Array.from(msgCache.keys());
-                    for (let i = 0; i < MSG_CACHE_PURGE; i++) msgCache.delete(keys[i]);
-                }
+                if (msgCache.size >= MSG_CACHE_MAX) purgeMsgCache();
             }, { timeout: 3000 });
         } else {
             setTimeout(() => {
                 isLoadingMessages = true;
                 try { for (const m of msgs) cacheMsg(m); } finally { isLoadingMessages = false; }
-                if (msgCache.size >= MSG_CACHE_MAX) {
-                    const keys = Array.from(msgCache.keys());
-                    for (let i = 0; i < MSG_CACHE_PURGE; i++) msgCache.delete(keys[i]);
-                }
+                if (msgCache.size >= MSG_CACHE_MAX) purgeMsgCache();
             }, 100);
         }
     });
@@ -744,6 +762,7 @@ function subscribeToEvents() {
                 if (s.selfStream !== p.selfStream) pushLog({ type: "voice_stream", content: s.selfStream ? t("Stream started") : t("Stream stopped"), ...b });
             }
             prevVS.set(userId, s);
+            prunePrevVS();
         }
     });
     const relUser = (data: any) => {
@@ -816,7 +835,7 @@ export default definePlugin({
         removeHeaderBarButton("nightcord-event-logs");
         unsubs.forEach(fn => fn()); unsubs = [];
         if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
-        logs = []; msgCache.clear(); prevVS.clear(); updateListeners.clear();
+        logs = []; msgCache.clear(); prevVS.clear(); unreadLogEntries.clear(); updateListeners.clear();
         isLoadingMessages = false;
         myVoiceChannelId = null;
     },
