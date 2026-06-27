@@ -86,6 +86,20 @@ export const shouldShowContributorBadge = (id: string) => isPluginDev(id) && Ven
 export const isEquicordPluginDev = (id: string) => Object.hasOwn(EquicordDevsById, id);
 export const shouldShowEquicordContributorBadge = (id: string) => isEquicordPluginDev(id) && EquicordDevsById[id].badge !== false;
 
+export const isMallCordPluginDev = (id: string) => Object.hasOwn(MallCordDevsById, id);
+
+/**
+ * Whether a channel belongs to the MallCord support guild.
+ * MallCord's support guild is not part of OpenCord, so this is always false here.
+ */
+export const isMallCordGuild = (_channelId: string) => false;
+
+/**
+ * Whether a user is MallCord support staff.
+ * MallCord's support roster is not part of OpenCord, so this is always false here.
+ */
+export const isMallCordSupport = (_userId: string) => false;
+
 export const isAnyPluginDev = (id: string) => SourceDevsById.some(devs => Object.hasOwn(devs, id));
 
 export function pluralise(amount: number, singular: string, plural = singular + "s") {

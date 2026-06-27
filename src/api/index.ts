@@ -23,6 +23,7 @@ import * as $Commands from "./Commands";
 import * as $ContextMenu from "./ContextMenu";
 import * as $DataStore from "./DataStore";
 import * as $GifPickerContextMenu from "./GifPickerContextMenu";
+import * as $TestcordRequestCoordinator from "./TestcordRequestCoordinator";
 import * as $HeaderBar from "./HeaderBar";
 import * as $MemberListDecorators from "./MemberListDecorators";
 import * as $MessageAccessories from "./MessageAccessories";
@@ -192,3 +193,8 @@ export const ProfileSections = $ProfileSections;
  * without conflicting with each other.
  */
 export const GifPickerContextMenu = $GifPickerContextMenu;
+
+/**
+ * TTL-cached request coordinator used by TestCord plugins.
+ */
+export const TestcordRequestCoordinator = $TestcordRequestCoordinator.TestcordRequestCoordinator;
