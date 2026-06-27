@@ -1,0 +1,443 @@
+/* ── Fake User Switcher: ported profile-cosmetic manual fields ── */
+
+/* Compact icon buttons for Save Me / Export / Import in the Saved Identities header. */
+.fus-io-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 6px;
+    border: 1px solid var(--border-neutral-semi-weak, rgba(255, 255, 255, 0.15));
+    background: var(--background-tertiary);
+    color: var(--text-muted, #949ba4);
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.fus-io-btn:hover {
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.08));
+    color: #fff;
+    border-color: var(--border-neutral-medium, rgba(255, 255, 255, 0.25));
+}
+
+.fus-io-btn--green:hover {
+    color: var(--status-positive, #23a55a);
+    border-color: var(--status-positive, #23a55a);
+}
+
+.fus-mf-field {
+    margin-bottom: 14px;
+}
+
+/* Collapsible header for long option grids (decorations, effects, badges). */
+.fus-mf-collapse-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.fus-mf-collapse-header:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+    color: #fff;
+}
+
+.fus-mf-collapse-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.fus-mf-collapse-chevron {
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.fus-mf-collapse-body {
+    margin-top: 8px;
+}
+
+/* Nameplate picker — wide rectangular tiles (nameplates are banners, not
+   circular like avatar decorations). */
+.fus-mf-nameplate-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 4px 0;
+}
+
+.fus-mf-nameplate-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 132px;
+    padding: 6px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.fus-mf-nameplate-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.fus-mf-nameplate-item--selected {
+    background: rgba(88, 101, 242, 0.2);
+    border-color: #5865f2;
+}
+
+.fus-mf-nameplate-item--disabled {
+    opacity: 0.45;
+}
+
+.fus-mf-nameplate-item--disabled:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.fus-mf-nameplate-preview {
+    width: 120px;
+    height: 48px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.fus-mf-nameplate-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fus-mf-nameplate-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Cap an open grid's height so it scrolls internally instead of pushing the
+   sections below it out of the accordion's reach. */
+.fus-mf-grid-scroll {
+    max-height: 260px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.fus-mf-grid-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.fus-mf-grid-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+}
+
+.fus-mf-grid-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.fus-mf-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(255, 255, 255, 0.45);
+    margin-bottom: 6px;
+}
+
+.fus-mf-input {
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.2);
+    color: #fff;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.15s;
+    /* Force dark rendering of native controls (the date picker's text, calendar
+       popup and spinner) instead of the OS default light theme. */
+    color-scheme: dark;
+}
+
+/* Tint the native date-picker calendar icon so it's visible on the dark input. */
+.fus-mf-input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.6);
+    cursor: pointer;
+}
+
+.fus-mf-input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    filter: invert(1) opacity(0.9);
+}
+
+.fus-mf-input:focus {
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.fus-mf-input::placeholder {
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.fus-mf-color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fus-mf-color-swatch {
+    width: 38px;
+    height: 38px;
+    padding: 2px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.fus-mf-color-input {
+    flex: 1;
+    width: auto;
+}
+
+.fus-mf-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.fus-mf-badge {
+    padding: 5px 12px;
+    border-radius: 99px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.7);
+    transition: all 0.1s;
+}
+
+.fus-mf-badge:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #fff;
+}
+
+.fus-mf-badge--on {
+    background: rgba(88, 101, 242, 0.2);
+    border-color: #5865f2;
+    color: #fff;
+    font-weight: 700;
+}
+
+.fus-mf-image-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.fus-mf-file-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.fus-mf-file-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.fus-mf-preview-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    flex-shrink: 0;
+}
+
+.fus-mf-clear-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: color 0.1s;
+}
+
+.fus-mf-clear-btn:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.fus-mf-url-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.fus-mf-decoration-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 4px 0;
+}
+
+.fus-mf-decoration-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 80px;
+    padding: 10px 6px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.fus-mf-decoration-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.fus-mf-decoration-item--selected {
+    background: rgba(88, 101, 242, 0.2);
+    border-color: #5865f2;
+}
+
+.fus-mf-decoration-preview {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.fus-mf-decoration-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fus-mf-decoration-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fus-mf-effect-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 4px 0;
+}
+
+.fus-mf-effect-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 80px;
+    padding: 4px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.05);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.fus-mf-effect-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.fus-mf-effect-item--selected {
+    background: rgba(88, 101, 242, 0.2);
+    border-color: #5865f2;
+}
+
+.fus-mf-effect-preview {
+    width: 72px;
+    height: 108px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.fus-mf-effect-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.fus-mf-effect-label {
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    line-height: 1.2;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

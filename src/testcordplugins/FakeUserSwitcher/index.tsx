@@ -6,16 +6,16 @@
 
 import { addProfileBadge, BadgePosition, type ProfileBadge, removeProfileBadge } from "@api/Badges";
 import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
-import { UserAreaButton, UserAreaRenderProps } from "@api/UserArea";
+import { addUserAreaButton, buttons, UserAreaButton, UserAreaRenderProps } from "@api/UserArea";
 import BadgeAPIPlugin from "@plugins/_api/badges";
 import { TestcordDevs } from "@utils/constants";
 import { openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import type { User } from "@vencord/discord-types";
-import { waitFor } from "@webpack";
-import { ApplicationAssetUtils, ChannelStore, FluxDispatcher, GuildMemberStore, IconUtils, Menu, PresenceStore, React, RestAPI, showToast, Toasts, UsernameUtils, UserStore } from "@webpack/common";
+import { findByProps, waitFor } from "@webpack";
+import { ApplicationAssetUtils, ChannelStore, FluxDispatcher, GuildMemberStore, IconUtils, Menu, PresenceStore, React, RestAPI, showToast, SnowflakeUtils, Toasts, Tooltip, UsernameUtils, UserStore } from "@webpack/common";
 
-import { getActiveTargetForGuild, getCachedTarget, getFakeIdFromDate, getOriginalMeId, getSavedUsers, isActive, isCurrentUser, loadCacheFromSettings, loadTarget, logger, preLoadGuildTargets, resolveBadge, setEnabled, setOriginalGetCurrentUser, settings, subscribe, targetsCache } from "./data";
+import { _setOriginalGetCurrentUser, clearTarget, getActiveTargetForGuild, getCachedTarget, getOriginalMeId, getRealCurrentUser, getSavedIdentityForSwitcherId, getSavedUsers, getSwitcherAccounts, isActive, isCurrentUser, isManualSavedIdentity, loadCacheFromSettings, loadTarget, logger, makeDateInRange, preLoadGuildTargets, resolveBadge, setEnabled, setSavedUsers, setTarget, settings, subscribe, targetsCache } from "./data";
 import { FakeUserProfileModal } from "./legacyModal";
 import { FakeUserSwitcherModal } from "./modal";
 
@@ -78,6 +78,86 @@ const FLAG_BADGES: { flag: number; image: string; description: string; }[] = [
     { flag: 1 << 22, image: "https://cdn.discordapp.com/badge-icons/6bdc42827a38498929a4920da12695d9.png", description: "Active Developer" },
 ];
 
+const NITRO_TIER_NAMES = ["", "Bronze", "Silver", "Gold", "Platinum", "Diamond", "Emerald", "Ruby", "Opal"];
+
+const NITRO_BADGE_ICONS = [
+    "https://cdn.discordapp.com/badge-icons/2ba85e8026a8614b640c2837bcdfe21b.png",
+    "https://cdn.discordapp.com/badge-icons/4f33c4a9c64ce221936bd256c356f91f.png",
+    "https://cdn.discordapp.com/badge-icons/4514fab914bdbfb4ad2fa23df76121a6.png",
+    "https://cdn.discordapp.com/badge-icons/2895086c18d5531d499862e41d1155a6.png",
+    "https://cdn.discordapp.com/badge-icons/0334688279c8359120922938dcb1d6f8.png",
+    "https://cdn.discordapp.com/badge-icons/0d61871f72bb9a33a7ae568c1fb4f20a.png",
+    "https://cdn.discordapp.com/badge-icons/11e2d339068b55d3a506cff34d3780f3.png",
+    "https://cdn.discordapp.com/badge-icons/cd5e2cfd9d7f27a8cdcd3e8a8d5dc9f4.png",
+    "https://cdn.discordapp.com/badge-icons/5b154df19c53dce2af92c9b61e6be5e2.png",
+];
+// Indexed by manualNitroLevel (0 = basic Nitro, 1 = Bronze … 8 = Opal). Each
+// entry is the badge-tier age in months that the modal label promises, so the
+// "Subscriber since" date lands in the right year. Aligned 1:1 with
+// NITRO_TIER_NAMES / NITRO_BADGE_ICONS (all length 9).
+const NITRO_TIER_MONTHS = [0, 1, 2, 3, 6, 12, 24, 36, 72];
+
+const BOOST_BADGE_ICONS = [
+    "https://cdn.discordapp.com/badge-icons/51040c70d4f20a921ad6674ff86fc95c.png",
+    "https://cdn.discordapp.com/badge-icons/0e4080d1d333bc7ad29ef6528b6f2fb7.png",
+    "https://cdn.discordapp.com/badge-icons/72bed924410c304dbe3d00a6e593ff59.png",
+    "https://cdn.discordapp.com/badge-icons/df199d2050d3ed4ebf84d64ae83989f8.png",
+    "https://cdn.discordapp.com/badge-icons/996b3e870e8a22ce519b3a50e6bdd52f.png",
+    "https://cdn.discordapp.com/badge-icons/991c9f39ee33d7537d9f408c3e53141e.png",
+    "https://cdn.discordapp.com/badge-icons/cb3ae83c15e970e8f3d410bc62cb8b99.png",
+    "https://cdn.discordapp.com/badge-icons/7142225d31238f6387d9f09efaa02759.png",
+    "https://cdn.discordapp.com/badge-icons/ec92202290b48d0879b7413d2dde3bab.png",
+];
+const BOOST_MONTHS = [1, 2, 3, 6, 9, 12, 15, 18, 24];
+const BOOST_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function NitroBadgeTooltip({ icon, tierName, dateStr, premiumType }: { icon: string; tierName: string; dateStr: string; premiumType: number; }) {
+    const accentColor = premiumType === 1 ? "#2dc770" : "#a970ff";
+    return (
+        <Tooltip
+            text={
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "12px 16px", gap: 2, position: "relative", overflow: "hidden", minWidth: 120 }}>
+                    <div style={{ position: "absolute", top: -20, left: -20, width: 60, height: 60, borderRadius: "50%", background: accentColor, opacity: 0.25, filter: "blur(16px)", pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", top: -20, right: -20, width: 60, height: 60, borderRadius: "50%", background: accentColor, opacity: 0.25, filter: "blur(16px)", pointerEvents: "none" }} />
+                    <img src={icon} alt="" style={{ width: 72, height: 72, objectFit: "contain", marginBottom: 6, position: "relative" }} />
+                    <div style={{ fontWeight: 700, fontSize: 14, letterSpacing: "0.04em", lineHeight: 1.3, position: "relative", color: "#fff" }}>NITRO</div>
+                    {tierName && <div style={{ fontWeight: 400, fontSize: 13, lineHeight: 1.2, position: "relative", color: "#fff" }}>{tierName.toUpperCase()}</div>}
+                    <div style={{ fontSize: 12, opacity: 0.7, position: "relative", marginTop: 2 }}>Subscriber since</div>
+                    <div style={{ fontSize: 12, opacity: 0.7, position: "relative" }}>{dateStr}</div>
+                </div>
+            }
+        >
+            {(tooltipProps: any) => (
+                <img {...tooltipProps} src={icon} alt="Nitro" style={{ borderRadius: "50%", width: "22px", height: "22px", cursor: "pointer" }} />
+            )}
+        </Tooltip>
+    );
+}
+
+/**
+ * Resolve the spoofed avatar-decoration descriptor for the current user. The
+ * `getAvatarDecorationURL` patch only rewrites the decoration's image URL once
+ * a component has already decided to render a ring; this hook is what makes the
+ * component decide to render one in the first place (and with which asset).
+ * Without it, the avatar component reads the real user's decoration (none) and
+ * falls back to the broken placeholder preset — which is the bug. Resolves from
+ * the active target's avatarDecorationData (set by buildManualActiveTarget for
+ * manual mode, or carried from a cloned target).
+ */
+function useUserAvatarDecoration(user: User): { asset: string; skuId: string; animated: boolean; } | undefined {
+    if (!isActive()) return undefined;
+    if (!isCurrentUser(user?.id)) return undefined;
+    const t = getTargetUser() as any;
+    const deco = t?.avatarDecorationData;
+    const asset = deco?.asset;
+    if (!asset) return undefined;
+    return {
+        asset,
+        skuId: deco?.skuId || asset,
+        animated: deco?.animated ?? asset.startsWith("a_"),
+    };
+}
+
 const SNOWFLAKE_EPOCH = 1420070400000n;
 function makeSnowflake(): string {
     return ((BigInt(Date.now()) - SNOWFLAKE_EPOCH) << 22n).toString();
@@ -104,6 +184,28 @@ function getTargetProfile(): any {
 function buildOverrides(active: any): Record<string, unknown> {
     const { user: target, profile, isManual, manualData } = active;
 
+    // Overlay mode: keep the REAL identity, apply cosmetics only. We must NOT set
+    // username / globalName / avatar / discriminator / id / tag here — overriding
+    // identity on your own user is what makes the patched getCurrentUser resolve
+    // against a second "target" that is also you, re-entering and freezing Discord.
+    if (manualData?.overlaySelf) {
+        const ov: Record<string, unknown> = {};
+        if (target.avatarDecorationData !== undefined) ov.avatarDecorationData = target.avatarDecorationData;
+        if (target.collectibles !== undefined) ov.collectibles = target.collectibles;
+        ov.publicFlags = target.publicFlags ?? target.flags ?? 0;
+        ov.flags = target.flags ?? 0;
+        // Same premiumType≠0 guard as below (0 crashes the popout's SKU lookup).
+        ov.premiumType = (() => {
+            const fromProfile = profile?.premiumType;
+            const fromTarget = target.premiumType;
+            if (fromProfile != null && fromProfile !== 0) return fromProfile;
+            if (fromTarget != null && fromTarget !== 0) return fromTarget;
+            return 2;
+        })();
+        if (target.accentColor != null) ov.accentColor = target.accentColor;
+        return ov;
+    }
+
     const banner = target.banner ?? profile?.banner ?? null;
     const overrides: Record<string, unknown> = {
         username: target.username,
@@ -114,7 +216,23 @@ function buildOverrides(active: any): Record<string, unknown> {
         banner,
         publicFlags: target.publicFlags ?? target.flags ?? 0,
         flags: target.flags ?? 0,
-        premiumType: profile?.premiumType ?? target.premiumType ?? 0,
+        // Never feed Discord premiumType=0 on a patched user — its ProductCatalog
+        // has no SKU mapping for that value, which throws inside `canRedeemPremiumPerks`
+        // / `canUseIncreasedMessageLength` and crashes the user popout with
+        // `Cannot read properties of undefined (reading 'length')`. Prefer any
+        // non-zero value from target or profile, otherwise default to 2 (Nitro)
+        // — a guaranteed-valid SKU. We deliberately do NOT call back into
+        // UserStore.getCurrentUser() here (even the original) because
+        // buildOverrides runs inside wrapUser, which runs inside the patched
+        // getCurrentUser, and any re-entry can trigger a Flux render loop that
+        // freezes Discord.
+        premiumType: (() => {
+            const fromProfile = profile?.premiumType;
+            const fromTarget = target.premiumType;
+            if (fromProfile != null && fromProfile !== 0) return fromProfile;
+            if (fromTarget != null && fromTarget !== 0) return fromTarget;
+            return 2;
+        })(),
         accentColor: target.accentColor ?? profile?.accentColor ?? null,
         usernameNormalized: typeof target.username === "string" ? target.username.toLowerCase() : undefined,
         bot: target.bot ?? false,
@@ -143,8 +261,11 @@ function buildOverrides(active: any): Record<string, unknown> {
             const parsedDate = new Date(dateStr);
             if (!isNaN(parsedDate.getTime())) {
                 overrides.createdAt = parsedDate;
-                const timestampMs = BigInt(parsedDate.getTime());
-                overrides.id = ((timestampMs - 1420070400000n) << 22n).toString();
+                // Do NOT override user.id — that breaks the avatar URL (CDN 404s on
+                // a fake snowflake id) and Discord's "is this me" check for the
+                // Edit Profile button. "Member Since" is handled by patchSnowflake /
+                // spoofMemberSinceTimestamp at runtime, which intercepts
+                // extractTimestamp(user.id) and returns the spoofed date.
             }
         }
         const tag = manualData?.manualClanTag || manualData?.clanTag;
@@ -171,7 +292,8 @@ function buildOverrides(active: any): Record<string, unknown> {
             overrides.primary_guild = null;
         }
     } else {
-        // Do NOT override id to target.id — this breaks Discord's UserProfileInteractionContextProvider.
+        // Do NOT override id to target.id — this breaks Discord's
+        // UserProfileInteractionContextProvider and hides the "Edit Profile" button.
         // The createdAt is set from the target's snowflake for display purposes only.
         overrides.createdAt = target.createdAt ?? getCreatedAtFromId(target.id);
     }
@@ -208,7 +330,6 @@ function mergeUser(base: any, overrides: Record<string, unknown>): any {
     }
     return wrap;
 }
-
 let wrappedUsers = new WeakMap<any, any>();
 
 function cloneWithPremium(user: any, months: number): any {
@@ -278,20 +399,38 @@ function wrapUser(base: any): any {
     return wrapped;
 }
 
+let cachedManualWrap: { base: any; manualId: string; active: any; wrap: any; } | null = null;
+
+function wrapUserForManualId(base: any, manualId: string, active: any): any {
+    if (cachedManualWrap && cachedManualWrap.base === base && cachedManualWrap.manualId === manualId && cachedManualWrap.active === active) {
+        return cachedManualWrap.wrap;
+    }
+    const overrides = {
+        ...buildOverrides(active),
+        id: manualId,
+    };
+    let wrap = mergeUser(base, overrides);
+    if (settings.store.fakeNitroMonths && settings.store.fakeNitroMonths > 0) {
+        wrap = cloneWithPremium(wrap, settings.store.fakeNitroMonths);
+    }
+    cachedManualWrap = { base, manualId, active, wrap };
+    return wrap;
+}
+
 function clearWrapCache() {
     wrappedUsers = new WeakMap<any, any>();
+    cachedManualWrap = null;
 }
 
 let originalGetUser: typeof UserStore.getUser | null = null;
 let originalGetCurrentUser: typeof UserStore.getCurrentUser | null = null;
+let originalSet: typeof buttons.set | null = null;
 let originalGetUserAvatarURL: typeof IconUtils.getUserAvatarURL | null = null;
 let originalGetUserBannerURL: typeof IconUtils.getUserBannerURL | null = null;
 let originalGetName: typeof UsernameUtils.getName | null = null;
 let originalGetGlobalName: typeof UsernameUtils.getGlobalName | null = null;
 let originalGetFormattedName: typeof UsernameUtils.getFormattedName | null = null;
 let originalGetUserTag: typeof UsernameUtils.getUserTag | null = null;
-let originalUseName: typeof UsernameUtils.useName | null = null;
-let originalUseUserTag: typeof UsernameUtils.useUserTag | null = null;
 let originalGetStatus: typeof PresenceStore.getStatus | null = null;
 let originalGetClientStatus: typeof PresenceStore.getClientStatus | null = null;
 let originalGetActivities: typeof PresenceStore.getActivities | null = null;
@@ -309,21 +448,105 @@ let presencePatched = false;
 let memberPatched = false;
 let apiPatched = false;
 
+const SWITCHER_DROPDOWN_SELECTORS = [
+    "[class*='accountProfileCard']",
+    "[class*='accountOption']",
+    "[class*='accountSwitcher']",
+    "[class*='multiAccount']"
+];
+
+let switcherDropdownOpen = false;
+let switcherDropdownObserver: MutationObserver | null = null;
+let switcherDropdownCheckQueued = false;
+let accountSwitcherRenderUntil = 0;
+
+function readSwitcherDropdownOpen(): boolean {
+    try {
+        return SWITCHER_DROPDOWN_SELECTORS.some(sel => !!document.querySelector(sel));
+    } catch {
+        return false;
+    }
+}
+
+function startSwitcherDropdownObserver() {
+    if (switcherDropdownObserver || typeof document === "undefined") return;
+
+    const { body } = document;
+    if (!body) {
+        setTimeout(startSwitcherDropdownObserver, 0);
+        return;
+    }
+
+    switcherDropdownOpen = readSwitcherDropdownOpen();
+    switcherDropdownObserver = new MutationObserver(() => {
+        // Coalesce: class mutations fire continuously across the whole body
+        // (hover, typing, animations). Schedule at most one querySelector scan
+        // per frame instead of running it on every mutation record.
+        if (switcherDropdownCheckQueued) return;
+        switcherDropdownCheckQueued = true;
+        requestAnimationFrame(() => {
+            switcherDropdownCheckQueued = false;
+            switcherDropdownOpen = readSwitcherDropdownOpen();
+        });
+    });
+    switcherDropdownObserver.observe(body, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["class"]
+    });
+}
+
+function stopSwitcherDropdownObserver() {
+    switcherDropdownObserver?.disconnect();
+    switcherDropdownObserver = null;
+    switcherDropdownOpen = false;
+    switcherDropdownCheckQueued = false;
+    accountSwitcherRenderUntil = 0;
+}
+
+function markAccountSwitcherRendering() {
+    accountSwitcherRenderUntil = Date.now() + 1500;
+}
+
+function isAccountSwitcherCall(): boolean {
+    return switcherDropdownOpen;
+}
+
+let isGettingUsers = false;
+
 function patchStore() {
     if (storePatched) return;
     storePatched = true;
 
     originalGetUser = UserStore.getUser;
     originalGetCurrentUser = UserStore.getCurrentUser;
-    setOriginalGetCurrentUser(originalGetCurrentUser);
+
+    // Capture the real current-user id BEFORE wrapping, otherwise getOriginalMeId
+    // would read the wrapped (fake) id and break isCurrentUser checks.
+    try { _setOriginalGetCurrentUser(originalGetCurrentUser); } catch { /* ignore */ }
 
     UserStore.getUser = function (userId: string) {
-        if (isActive() && isCurrentUser(userId)) {
-            if (settings.store.patchInternalAccountSwitcher && userId === getOriginalMeId() && isAccountSwitcherCall()) {
-                return originalGetUser!.call(UserStore, userId);
+        if (isGettingUsers || isAccountSwitcherCall()) {
+            return originalGetUser!.call(this, userId);
+        }
+        if (isActive()) {
+            const active = getActiveTargetForGuild(undefined);
+            const originalMeId = getOriginalMeId();
+            if (active) {
+                if (userId === originalMeId) {
+                    const me = originalGetCurrentUser!.call(UserStore);
+                    if (me) return wrapUser(me);
+                } else if (userId === active.user.id) {
+                    if (active.isManual) {
+                        const me = originalGetCurrentUser!.call(UserStore);
+                        if (me) return wrapUserForManualId(me, active.user.id, active);
+                    } else {
+                        const u = originalGetUser!.call(this, userId);
+                        if (u) return wrapUser(u);
+                    }
+                }
             }
-            const me = originalGetCurrentUser!.call(UserStore);
-            if (me) return wrapUser(me);
         }
         const u = originalGetUser!.call(this, userId);
         if (!isActive()) {
@@ -339,6 +562,9 @@ function patchStore() {
 
     UserStore.getCurrentUser = function () {
         const u = originalGetCurrentUser!.call(this);
+        if (isGettingUsers || isAccountSwitcherCall()) {
+            return u;
+        }
         if (!isActive()) {
             if (u && settings.store.fakeNitroMonths && settings.store.fakeNitroMonths > 0) {
                 return wrapUser(u);
@@ -357,6 +583,10 @@ function patchStore() {
             const m = originalGetMember!.call(this, guildId, userId);
             if (isActive(guildId) && isCurrentUser(userId)) {
                 const active = getActiveTargetForGuild(guildId);
+                // Overlay mode keeps your REAL identity — return your genuine member
+                // (real nick/name) so sent messages and the member list show you, not
+                // "FakeUser". Cosmetics are applied elsewhere, not via the member nick.
+                if (active?.manualData?.overlaySelf) return m;
                 if (active) {
                     if (active.isManual) {
                         const nick = active.manualData?.manualUsername || active.manualData?.name || "FakeUser";
@@ -416,6 +646,8 @@ function patchStore() {
         GuildMemberStore.getNick = function (guildId: string, userId: string) {
             if (isActive(guildId) && isCurrentUser(userId)) {
                 const active = getActiveTargetForGuild(guildId);
+                // Overlay mode keeps your REAL nick — fall through to the original.
+                if (active?.manualData?.overlaySelf) return originalGetNick!.call(this, guildId, userId);
                 if (active) {
                     if (active.isManual) {
                         return active.manualData?.manualUsername || active.manualData?.name || "FakeUser";
@@ -514,13 +746,16 @@ function patchUtils() {
     originalGetGlobalName = UsernameUtils.getGlobalName;
     originalGetFormattedName = UsernameUtils.getFormattedName;
     originalGetUserTag = UsernameUtils.getUserTag;
-    originalUseName = UsernameUtils.useName;
-    originalUseUserTag = UsernameUtils.useUserTag;
 
     IconUtils.getUserAvatarURL = function (user: any, animated?: any, size?: any, format?: any) {
         if (isActive() && user && (isCurrentUser(user.id) || user.id === "0")) {
             const active = getActiveTargetForGuild(undefined);
             if (active) {
+                // Overlay mode keeps the REAL account's avatar — only cosmetics are
+                // applied on top, identity (incl. pfp) stays the logged-in user.
+                if (active.manualData?.overlaySelf) {
+                    return originalGetUserAvatarURL!.call(this, user, animated, size, format);
+                }
                 if (active.isManual) {
                     return active.manualData?.manualAvatar || active.manualData?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png";
                 }
@@ -535,7 +770,18 @@ function patchUtils() {
         if (isActive(params?.guildId ?? params?.guild_id) && params && isCurrentUser(params.id)) {
             const active = getActiveTargetForGuild(params.guildId ?? params.guild_id);
             if (active) {
+                // Overlay mode: use the overlay banner if the user set one, otherwise
+                // fall through to the REAL account's banner (the default).
+                if (active.manualData?.overlaySelf) {
+                    const ovDataUrl = active.manualData?.manualOverlayBannerDataUrl;
+                    if (ovDataUrl) return ovDataUrl;
+                    const ovBanner = active.manualData?.manualOverlayBanner;
+                    if (ovBanner && !ovBanner.startsWith("#")) return ovBanner;
+                    return originalGetUserBannerURL!.call(this, params);
+                }
                 if (active.isManual) {
+                    const dataUrl = active.manualData?.manualBannerDataUrl;
+                    if (dataUrl) return dataUrl;
                     const banner = active.manualData?.manualBanner || active.manualData?.banner;
                     if (banner && !banner.startsWith("#")) {
                         return banner;
@@ -552,8 +798,47 @@ function patchUtils() {
         return originalGetUserBannerURL!.call(this, params);
     };
 
+    // When manual mode is active (especially with a spoofed creation date that makes
+    // the synthetic user.id a fake snowflake not present in UserStore), do NOT hand
+    // the synthetic user back to Discord's name selectors — they internally re-query
+    // UserStore.getUser(syntheticId), which round-trips through our patch and can end
+    // up returning the raw real user, breaking the displayed name in the user-area
+    // popout and the full profile popup. Instead, short-circuit and return the spoofed
+    // display name directly.
+    function getManualDisplayName(): string | undefined {
+        const active = getActiveTargetForGuild(undefined);
+        if (!active?.isManual) return undefined;
+        // Overlay mode keeps your REAL name — return undefined so name resolvers fall
+        // through to the genuine account instead of the spoofed "FakeUser".
+        if (active.manualData?.overlaySelf) return undefined;
+        const md = active.manualData;
+        return (
+            md?.manualDisplayName
+            || md?.manualUsername
+            || md?.name
+            || (active.user as any)?.globalName
+            || (active.user as any)?.global_name
+            || (active.user as any)?.username
+            || "FakeUser"
+        );
+    }
+
+    function getManualUsername(): string | undefined {
+        const active = getActiveTargetForGuild(undefined);
+        if (!active?.isManual) return undefined;
+        if (active.manualData?.overlaySelf) return undefined;
+        const md = active.manualData;
+        return md?.manualUsername || md?.name || (active.user as any)?.username || "FakeUser";
+    }
+
+    // Overlay mode keeps your real identity — never override your name in any name
+    // resolver, so messages, the member list, etc. all show your genuine account.
+    const isOverlayActive = () => !!getActiveTargetForGuild(undefined)?.manualData?.overlaySelf;
+
     UsernameUtils.getName = function (user: User) {
-        if (isActive() && user && isCurrentUser(user.id)) {
+        if (isActive() && !isOverlayActive() && user && isCurrentUser(user.id)) {
+            const manualName = getManualDisplayName();
+            if (manualName != null) return manualName;
             const t = getTargetUser();
             if (t) return originalGetName!.call(this, t);
         }
@@ -561,7 +846,9 @@ function patchUtils() {
     };
 
     UsernameUtils.getGlobalName = function (user: User) {
-        if (isActive() && user && isCurrentUser(user.id)) {
+        if (isActive() && !isOverlayActive() && user && isCurrentUser(user.id)) {
+            const manualName = getManualDisplayName();
+            if (manualName != null) return manualName;
             const t = getTargetUser();
             if (t) return originalGetGlobalName!.call(this, t);
         }
@@ -569,7 +856,15 @@ function patchUtils() {
     };
 
     UsernameUtils.getFormattedName = function (user: User, useTag?: boolean) {
-        if (isActive() && user && isCurrentUser(user.id)) {
+        if (isActive() && !isOverlayActive() && user && isCurrentUser(user.id)) {
+            const manualName = getManualDisplayName();
+            if (manualName != null) {
+                if (useTag) {
+                    const uname = getManualUsername();
+                    return uname ? `${manualName} (${uname})` : manualName;
+                }
+                return manualName;
+            }
             const t = getTargetUser();
             if (t) return originalGetFormattedName!.call(this, t, useTag);
         }
@@ -577,28 +872,43 @@ function patchUtils() {
     };
 
     UsernameUtils.getUserTag = function (user: User, options?: any) {
-        if (isActive() && user && isCurrentUser(user.id)) {
+        if (isActive() && !isOverlayActive() && user && isCurrentUser(user.id)) {
             const t = getTargetUser();
-            if (t) return originalGetUserTag!.call(this, t, options);
+            if (t) {
+                // Build a synthetic user that carries the spoofed manual names so
+                // Discord's own getUserTag formats them correctly per `options`,
+                // without us guessing the format string.
+                const manualName = getManualDisplayName();
+                const manualUname = getManualUsername();
+                if (manualName != null || manualUname != null) {
+                    const synth = {
+                        ...t,
+                        username: manualUname ?? (t as any).username,
+                        globalName: manualName ?? (t as any).globalName,
+                        global_name: manualName ?? (t as any).global_name,
+                    };
+                    return originalGetUserTag!.call(this, synth as any, options);
+                }
+                return originalGetUserTag!.call(this, t, options);
+            }
         }
         return originalGetUserTag!.call(this, user, options);
     };
 
-    UsernameUtils.useName = function (user: User) {
-        if (isActive() && user && isCurrentUser(user.id)) {
-            const t = getTargetUser();
-            if (t) return originalUseName!.call(this, t);
-        }
-        return originalUseName!.call(this, user);
-    };
-
-    UsernameUtils.useUserTag = function (user: User, options?: any) {
-        if (isActive() && user && isCurrentUser(user.id)) {
-            const t = getTargetUser();
-            if (t) return originalUseUserTag!.call(this, t, options);
-        }
-        return originalUseUserTag!.call(this, user, options);
-    };
+    // INTENTIONALLY NOT PATCHING useName / useUserTag.
+    //
+    // These are React hooks. Monkey-patching a hook at runtime is unsafe because
+    // the hook's internal call count can shift between renders when its input
+    // (the `user` object) changes shape — which is exactly what happens when
+    // spoofing flips on, because UserStore.getCurrentUser starts returning a
+    // wrapped user with a different id. React then crashes with
+    // "Should have a queue. You are likely calling Hooks conditionally".
+    //
+    // The non-hook getters above (getName / getGlobalName / getFormattedName /
+    // getUserTag) already cover every name-display path. The synthetic
+    // USER_UPDATE dispatch from notifyUpdate() will cause any component using
+    // useName/useUserTag to re-render, and on re-render those hooks read from
+    // UserStore.getUser — which IS patched — so the spoofed name still appears.
 }
 
 function unpatchUtils() {
@@ -609,8 +919,6 @@ function unpatchUtils() {
     if (originalGetGlobalName) UsernameUtils.getGlobalName = originalGetGlobalName;
     if (originalGetFormattedName) UsernameUtils.getFormattedName = originalGetFormattedName;
     if (originalGetUserTag) UsernameUtils.getUserTag = originalGetUserTag;
-    if (originalUseName) UsernameUtils.useName = originalUseName;
-    if (originalUseUserTag) UsernameUtils.useUserTag = originalUseUserTag;
     utilsPatched = false;
 }
 
@@ -671,6 +979,51 @@ function getManualActivityListFor(manualData: any) {
         manualActivityStartTimestamp = 0;
     }
     return [];
+}
+
+let _origExtractTimestamp: ((id: string) => number) | null = null;
+let _snowflakePatchTimer: any = null;
+function patchSnowflake() {
+    if (_origExtractTimestamp) return;
+    let su: any = SnowflakeUtils;
+    if (!su?.extractTimestamp) {
+        try { su = (window as any).Vencord?.Webpack?.findByProps?.("extractTimestamp", "fromTimestamp"); } catch { /* ignore */ }
+    }
+    if (!su?.extractTimestamp) {
+        if (!_snowflakePatchTimer) {
+            _snowflakePatchTimer = setInterval(() => {
+                patchSnowflake();
+                if (_origExtractTimestamp && _snowflakePatchTimer) {
+                    clearInterval(_snowflakePatchTimer);
+                    _snowflakePatchTimer = null;
+                }
+            }, 500);
+        }
+        return;
+    }
+    try {
+        _origExtractTimestamp = su.extractTimestamp.bind(su);
+        const orig = _origExtractTimestamp!;
+        const wrapped = function (id: string) {
+            try {
+                if (id && typeof id === "string" && id === getOriginalMeId()) {
+                    const spoofed = plugin.spoofMemberSinceTimestamp(id);
+                    if (spoofed != null) return spoofed;
+                }
+            } catch { /* ignore */ }
+            return orig(id);
+        };
+        try { su.extractTimestamp = wrapped; } catch { /* ignore */ }
+        try { Object.defineProperty(su, "extractTimestamp", { value: wrapped, writable: true, configurable: true, enumerable: true }); } catch { /* ignore */ }
+    } catch { /* ignore */ }
+}
+function unpatchSnowflake() {
+    if (_snowflakePatchTimer) { clearInterval(_snowflakePatchTimer); _snowflakePatchTimer = null; }
+    if (_origExtractTimestamp) {
+        const su: any = SnowflakeUtils ?? (typeof window !== "undefined" ? (window as any).Vencord?.Webpack?.findByProps?.("extractTimestamp", "fromTimestamp") : null);
+        try { if (su) su.extractTimestamp = _origExtractTimestamp; } catch { /* ignore */ }
+        _origExtractTimestamp = null;
+    }
 }
 
 function patchPresence() {
@@ -833,6 +1186,35 @@ function unpatchPresence() {
 let originalGetTestcordCustomBadges: any = null;
 let badgesPatched = false;
 
+function getSpoofedCreatedAtMs(): number | null {
+    const active = getActiveTargetForGuild(undefined);
+    if (!active) return null;
+    if (active.isManual) {
+        const dateStr = active.manualData?.manualCreatedAt || settings.store.manualCreatedAt;
+        if (!dateStr || dateStr.trim() === "") return null;
+        // Match the same parsing rules used by getFakeIdFromDate so the popout's
+        // displayed "Member Since" matches the snowflake id we generated for the
+        // manual user. A bare YYYY-MM-DD is parsed in local time (mid-day) to
+        // avoid timezone rollover making the displayed day off-by-one.
+        let d: Date;
+        const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+        if (ymd) {
+            d = new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0, 0);
+        } else {
+            d = new Date(dateStr);
+        }
+        return isNaN(d.getTime()) ? null : d.getTime();
+    }
+    const t = active.user;
+    if (!t) return null;
+    if (t.createdAt instanceof Date) return t.createdAt.getTime();
+    if (typeof t.createdAt === "string") {
+        const d = new Date(t.createdAt);
+        if (!isNaN(d.getTime())) return d.getTime();
+    }
+    return getCreatedAtFromId(t.id).getTime();
+}
+
 function patchBadges() {
     if (badgesPatched) return;
     if (typeof BadgeAPIPlugin?.getTestCordCustomBadges !== "function") return;
@@ -853,279 +1235,36 @@ function unpatchBadges() {
     badgesPatched = false;
 }
 
-// ── Native account switcher integration ────────────────────────────────────
-// AGENTS.md normally forbids document.querySelector / [class*=] selectors, but
-// Discord's native account switcher exposes no stable CSS-module prop names we
-// can resolve via findCssClassesLazy. The base module prefixes below are the
-// least-bad heuristic available; they are scoped strictly to this feature.
-function isSwitcherDropdownOpen(): boolean {
-    try {
-        const selectors = [
-            "[class*='accountProfileCard']",
-            "[class*='accountOption']",
-            "[class*='accountSwitcher']",
-            "[class*='multiAccount']"
-        ];
-        return selectors.some(sel => !!document.querySelector(sel));
-    } catch {
-        return false;
-    }
-}
-
-function isAccountSwitcherCall(): boolean {
-    if (isSwitcherDropdownOpen()) return true;
-    try {
-        const { stack } = new Error();
-        if (!stack) return false;
-        const lower = stack.toLowerCase();
-        return (
-            lower.includes("accountswitcher") ||
-            lower.includes("multiaccount") ||
-            lower.includes("switchtoaccount") ||
-            lower.includes("removeaccount") ||
-            lower.includes("getswitcheraccounts") ||
-            lower.includes("accountoption") ||
-            lower.includes("getusers") ||
-            lower.includes("getvalidusers") ||
-            lower.includes("gethasloggedinaccounts")
-        );
-    } catch {
-        return false;
-    }
-}
-
-function getSwitcherAccounts(): any[] {
-    const saved = getSavedUsers();
-    const accounts: any[] = [];
-    for (const s of saved) {
-        const isManual = !!s.isManual || (typeof s.id === "string" && s.id.startsWith("manual_"));
-        if (isManual) {
-            accounts.push({
-                id: getFakeIdFromDate(s.manualCreatedAt),
-                username: s.manualUsername ?? s.name ?? "FakeUser",
-                globalName: s.manualDisplayName ?? s.manualUsername ?? s.name ?? "FakeUser",
-                global_name: s.manualDisplayName ?? s.manualUsername ?? s.name ?? "FakeUser",
-                discriminator: "0",
-                avatar: s.manualAvatar ?? s.avatar ?? null,
-                tokenStatus: 1,
-                pushSyncToken: null,
-            });
-        } else {
-            const cachedTarget = targetsCache.get(s.id);
-            const user = cachedTarget?.user ?? (originalGetUser ? originalGetUser.call(UserStore, s.id) : UserStore.getUser(s.id));
-            if (!user) continue;
-            accounts.push({
-                id: s.id,
-                username: user.username,
-                globalName: (user as any).globalName ?? user.username,
-                global_name: (user as any).global_name ?? (user as any).globalName ?? user.username,
-                discriminator: user.discriminator ?? "0",
-                avatar: user.avatar ?? null,
-                tokenStatus: 1,
-                pushSyncToken: null,
-            });
-        }
-    }
-    return accounts;
-}
-
-function applyManualSavedIdentity(s: any) {
-    settings.store.manualUsername = s.manualUsername ?? s.name ?? "FakeUser";
-    settings.store.manualDisplayName = s.manualDisplayName ?? "";
-    settings.store.manualClanTag = s.manualClanTag ?? "";
-    settings.store.manualAvatar = s.manualAvatar ?? s.avatar ?? "";
-    settings.store.manualBio = s.manualBio ?? "";
-    settings.store.manualPronouns = s.manualPronouns ?? "";
-    settings.store.manualBanner = s.manualBanner ?? "";
-    settings.store.manualEmail = s.manualEmail ?? "";
-    settings.store.manualPhone = s.manualPhone ?? "";
-    settings.store.manualCreatedAt = s.manualCreatedAt ?? "";
-    settings.store.manualClanGuildId = s.manualClanGuildId ?? "";
-    settings.store.manualClanBadge = s.manualClanBadge ?? "";
-    settings.store.manualClanBadgeCustom = s.manualClanBadgeCustom ?? "";
-    settings.store.manualStatus = s.manualStatus ?? "online";
-    settings.store.manualActivityName = s.manualActivityName ?? "";
-    settings.store.manualActivityType = s.manualActivityType ?? 0;
-    settings.store.manualActivityState = s.manualActivityState ?? "";
-    settings.store.manualActivityDetails = s.manualActivityDetails ?? "";
-    settings.store.manualActivityStartTimer = !!s.manualActivityStartTimer;
-    settings.store.manualActivityLargeImage = s.manualActivityLargeImage ?? "";
-    settings.store.manualActivityLargeText = s.manualActivityLargeText ?? "";
-    settings.store.manualActivitySmallImage = s.manualActivitySmallImage ?? "";
-    settings.store.manualActivitySmallText = s.manualActivitySmallText ?? "";
-    settings.store.customRpcEnabled = !!(s.manualActivityName || s.activity);
-}
-
-async function activateSwitcherIdentity(action: any) {
-    if (!settings.store.patchInternalAccountSwitcher) return;
-    logger.log("[FakeUserSwitcher] activateSwitcherIdentity triggered with action:", JSON.stringify(action));
-    const id = action?.targetUserId ?? action?.userId ?? action?.user_id ?? action?.id ?? action?.account?.id ?? action?.user?.id;
-    if (!id) return;
-    const originalId = getOriginalMeId();
-    if (originalId && id === originalId) {
-        setEnabled(false);
-        settings.store.manualMode = false;
-        return;
-    }
-    const saved = getSavedUsers();
-    const cloner = saved.find(s => !(!!s.isManual || (typeof s.id === "string" && s.id.startsWith("manual_"))) && s.id === id);
-    if (cloner) {
-        try {
-            await loadTarget(cloner.id);
-            settings.store.manualMode = false;
-            setEnabled(true);
-            showToast(`Spoofing as ${cloner.name}`, Toasts.Type.SUCCESS);
-        } catch (e: any) {
-            logger.error("activateSwitcherIdentity: cloner load failed", e);
-            showToast(e?.message || "Failed to activate fake identity.", Toasts.Type.FAILURE);
-        }
-        return;
-    }
-    const manual = saved.find(s => (!!s.isManual || (typeof s.id === "string" && s.id.startsWith("manual_"))) && getFakeIdFromDate(s.manualCreatedAt) === id);
-    if (manual) {
-        applyManualSavedIdentity(manual);
-        settings.store.manualMode = true;
-        setEnabled(true);
-        showToast(`Spoofing as ${manual.manualUsername ?? manual.name}`, Toasts.Type.SUCCESS);
-    }
-}
-
-let multiAccountStore: any = null;
-let originalGetUsers: (() => any[]) | null = null;
-let originalGetValidUsers: (() => any[]) | null = null;
-let originalGetHasLoggedInAccounts: (() => boolean) | null = null;
-let switcherPatched = false;
-let switcherRunning = false;
-let isGettingUsers = false;
-
-function isMultiAccountStore(mod: any): boolean {
-    try {
-        if (typeof mod.getUsers !== "function") return false;
-        if (typeof mod.getValidUsers !== "function" && typeof mod.getHasLoggedInAccounts !== "function") return false;
-        const users = mod.getUsers();
-        if (!Array.isArray(users)) return false;
-        if (users.length > 0) {
-            const first = users[0];
-            if (typeof first !== "object" || first === null) return false;
-            if (typeof first.id !== "string") return false;
-            if (!("tokenStatus" in first) && !("pushSyncToken" in first)) {
-                if ("type" in first || "permissions" in first || "parentId" in first) return false;
-            }
-        }
-        if (typeof mod.getFrequentlyUsedEmojis === "function") return false;
-        return true;
-    } catch {
-        return false;
-    }
-}
-
-const withFakeAccounts = (real: any[]) => {
-    isGettingUsers = true;
-    queueMicrotask(() => {
-        isGettingUsers = false;
-    });
-    if (!settings.store.patchInternalAccountSwitcher) return real;
-    const originalId = getOriginalMeId();
-    const realMe = originalGetUser && originalId ? originalGetUser.call(UserStore, originalId) : originalGetCurrentUser?.call(UserStore);
-    let hasRealAccount = false;
-    const displayReal = real.map(user => {
-        if (realMe && originalId && user?.id === originalId) {
-            hasRealAccount = true;
-            return {
-                ...user,
-                id: originalId,
-                username: realMe.username,
-                globalName: (realMe as any).globalName ?? realMe.username,
-                global_name: (realMe as any).global_name ?? (realMe as any).globalName ?? realMe.username,
-                discriminator: realMe.discriminator ?? "0",
-                avatar: realMe.avatar ?? null,
-            };
-        }
-        return user;
-    });
-    if (realMe && originalId && !hasRealAccount) {
-        displayReal.unshift({
-            id: originalId,
-            username: realMe.username,
-            globalName: (realMe as any).globalName ?? realMe.username,
-            global_name: (realMe as any).global_name ?? (realMe as any).globalName ?? realMe.username,
-            discriminator: realMe.discriminator ?? "0",
-            avatar: realMe.avatar ?? null,
-            tokenStatus: 1,
-            pushSyncToken: null,
-        });
-    }
-    const realIds = new Set(displayReal.map(user => user?.id));
-    const extras = getSwitcherAccounts().filter(user => !realIds.has(user.id));
-    const combined = extras.length ? [...displayReal, ...extras] : displayReal;
-
-    const seenIds = new Set<string>();
-    const deduplicated: any[] = [];
-    for (const u of combined) {
-        if (u && u.id && !seenIds.has(u.id)) {
-            seenIds.add(u.id);
-            deduplicated.push(u);
-        }
-    }
-    return deduplicated;
-};
-
-function patchInternalAccountSwitcher() {
-    if (switcherPatched || !multiAccountStore) return;
-    switcherPatched = true;
-
-    originalGetUsers = multiAccountStore.getUsers.bind(multiAccountStore);
-    originalGetValidUsers = multiAccountStore.getValidUsers?.bind(multiAccountStore) ?? null;
-    originalGetHasLoggedInAccounts = multiAccountStore.getHasLoggedInAccounts?.bind(multiAccountStore) ?? null;
-
-    multiAccountStore.getUsers = () => withFakeAccounts(originalGetUsers?.() ?? []);
-    if (originalGetValidUsers) {
-        const origValid = originalGetValidUsers;
-        multiAccountStore.getValidUsers = () => withFakeAccounts(origValid() ?? []);
-    }
-    if (originalGetHasLoggedInAccounts) {
-        multiAccountStore.getHasLoggedInAccounts = () => true;
-    }
-}
-
-function unpatchInternalAccountSwitcher() {
-    if (!switcherPatched || !multiAccountStore) {
-        switcherPatched = false;
-        return;
-    }
-    if (originalGetUsers) multiAccountStore.getUsers = originalGetUsers;
-    if (originalGetValidUsers) multiAccountStore.getValidUsers = originalGetValidUsers;
-    if (originalGetHasLoggedInAccounts) multiAccountStore.getHasLoggedInAccounts = originalGetHasLoggedInAccounts;
-    originalGetUsers = null;
-    originalGetValidUsers = null;
-    originalGetHasLoggedInAccounts = null;
-    switcherPatched = false;
-    try { multiAccountStore.emitChange?.(); } catch { /* ignore */ }
-}
-
 function notifyUpdate() {
+    clearWrapCache();
     const me = originalGetCurrentUser ? originalGetCurrentUser.call(UserStore) : UserStore.getCurrentUser();
     if (!me) return;
-    clearWrapCache();
     setTimeout(() => {
         try {
             FluxDispatcher.dispatch({ type: "USER_UPDATE", user: me });
+            FluxDispatcher.dispatch({ type: "CURRENT_USER_UPDATE", user: { ...me } });
+            FluxDispatcher.dispatch({ type: "USER_SETTINGS_PROTO_UPDATE", settings: { type: 1, proto: {} } });
+            FluxDispatcher.dispatch({ type: "IDLE" });
         } catch (e) {
             logger.warn("USER_UPDATE dispatch failed", e);
+        }
+        try {
+            UserStore.emitChange();
+            PresenceStore.emitChange();
+            GuildMemberStore?.emitChange?.();
+        } catch (e) {
+            logger.warn("Manual emitChange failed", e);
         }
     }, 0);
 }
 
-let syncSpoofStateTimer: ReturnType<typeof setTimeout> | undefined;
 function syncSpoofState() {
-    if (syncSpoofStateTimer) return;
-    syncSpoofStateTimer = setTimeout(() => {
-        syncSpoofStateTimer = undefined;
-        clearWrapCache();
-        resolveManualAssets().then(() => {
-            notifyUpdate();
-        });
-    }, 0);
+    const generation = switcherGeneration;
+    clearWrapCache();
+    resolveManualAssets().then(() => {
+        if (generation !== switcherGeneration) return;
+        notifyUpdate();
+    });
 }
 
 function FakeUserSwitcherIcon({ className, style }: { className?: string; style?: React.CSSProperties; }) {
@@ -1141,6 +1280,29 @@ function FakeUserSwitcherIcon({ className, style }: { className?: string; style?
 function FakeUserSwitcherButton({ iconForeground, hideTooltips, nameplate }: UserAreaRenderProps) {
     const [, force] = React.useReducer(x => x + 1, 0);
     React.useEffect(() => subscribe(() => force()), []);
+
+    // Ensure our button sits exactly between Game Activity toggle and Spotify toggle
+    React.useEffect(() => {
+        let changed = false;
+        try {
+            const gameToggle = buttons.get("GameActivityToggle");
+            if (gameToggle && gameToggle.priority !== -2) {
+                gameToggle.priority = -2;
+                changed = true;
+            }
+            const spotifyToggle = buttons.get("SpotifyActivityToggle");
+            if (spotifyToggle && spotifyToggle.priority !== 0) {
+                spotifyToggle.priority = 0;
+                changed = true;
+            }
+            if (changed) {
+                const selfButton = buttons.get("FakeUserSwitcher");
+                if (selfButton) {
+                    addUserAreaButton("FakeUserSwitcher", selfButton.render, -1);
+                }
+            }
+        } catch { /* ignore */ }
+    }, []);
 
     const activeTarget = getActiveTargetForGuild(undefined);
     const active = !!activeTarget;
@@ -1219,12 +1381,65 @@ const dynamicBadge: ProfileBadge = {
             }
         }
 
+        const active = getActiveTargetForGuild(undefined);
+        const manual = active?.isManual ? active.manualData : null;
+
+        // Parse a user-entered YYYY-MM-DD (or any Date-parseable string) to a Date,
+        // mid-day local to avoid timezone day-rollover. Returns null when blank/invalid
+        // so callers fall back to the auto makeDateInRange date.
+        const parseManualSince = (raw: string | undefined | null): Date | null => {
+            if (!raw || raw.trim() === "") return null;
+            const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw.trim());
+            const d = ymd
+                ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]), 12, 0, 0, 0)
+                : new Date(raw);
+            return isNaN(d.getTime()) ? null : d;
+        };
+
         const premium = (target as any).premiumType ?? 0;
         if (premium >= 1) {
+            const nitroLevel: number = manual?.manualNitroLevel ?? -1;
+            const icon = nitroLevel >= 0 && nitroLevel < NITRO_BADGE_ICONS.length ? NITRO_BADGE_ICONS[nitroLevel] : NITRO_BADGE_ICONS[0];
+            const tierName = nitroLevel >= 0 && nitroLevel < NITRO_TIER_NAMES.length ? NITRO_TIER_NAMES[nitroLevel] : "";
+            let dateStr = "";
+            if (nitroLevel != null && nitroLevel >= 1) {
+                // Prefer the user-specified 'Nitro since' date; fall back to the auto date.
+                const manualSince = parseManualSince(manual?.manualNitroSince);
+                const nitroDate = manualSince ?? makeDateInRange(
+                    target.id,
+                    NITRO_TIER_MONTHS[nitroLevel] ?? 1,
+                    NITRO_TIER_MONTHS[nitroLevel + 1] ?? (NITRO_TIER_MONTHS[nitroLevel] ?? 1) + 12
+                );
+                dateStr = `${nitroDate.getMonth() + 1}/${nitroDate.getDate()}/${String(nitroDate.getFullYear()).slice(-2)}`;
+            }
+            const description = dateStr ? `NITRO ${tierName}\nSubscriber since ${dateStr}` : (tierName ? `NITRO ${tierName}` : "Discord Nitro");
             badges.push({
                 id: "fakeuserswitcher-nitro",
-                description: "Discord Nitro",
-                iconSrc: "https://cdn.discordapp.com/badge-icons/2ba85e8026a8614b640c2837bcdfe21b.png",
+                description,
+                iconSrc: icon,
+                position: BadgePosition.END,
+                props: { style: { borderRadius: "50%", width: "22px", height: "22px" } },
+                component: () => (
+                    <NitroBadgeTooltip icon={icon} tierName={tierName} dateStr={dateStr} premiumType={premium} />
+                ),
+            });
+        }
+
+        // Boost tier badge (manual mode only — derived from the chosen boost tier)
+        const boostMonths: number = manual?.manualBoostMonths ?? -1;
+        if (boostMonths >= 0 && boostMonths < BOOST_BADGE_ICONS.length) {
+            // Prefer the user-specified 'Boosting since' date; fall back to the auto date.
+            const manualBoostSince = parseManualSince(manual?.manualBoostSince);
+            const boostDate = manualBoostSince ?? makeDateInRange(
+                target.id,
+                BOOST_MONTHS[boostMonths] ?? 1,
+                BOOST_MONTHS[boostMonths + 1] ?? (BOOST_MONTHS[boostMonths] ?? 1) + 6
+            );
+            const dateStr = `${BOOST_MONTH_NAMES[boostDate.getMonth()]} ${boostDate.getDate()}, ${boostDate.getFullYear()}`;
+            badges.push({
+                id: "fakeuserswitcher-boost",
+                description: `Server boosting since ${dateStr}`,
+                iconSrc: BOOST_BADGE_ICONS[boostMonths],
                 position: BadgePosition.END,
             });
         }
@@ -1319,6 +1534,367 @@ const userContextMenuPatch: NavContextMenuPatchCallback = (children, { user }) =
     );
 };
 
+let multiAccountStore: any = null;
+let switcherRunning = false;
+let switcherGeneration = 0;
+let originalMultiGetUsers: any = null;
+let originalMultiGetValidUsers: any = null;
+let originalMultiGetHasLoggedInAccounts: any = null;
+let multiAuthModule: any = null;
+let originalSwitchAccount: any = null;
+let switcherClickInterceptor: ((event: MouseEvent) => void) | null = null;
+
+function isHttpUrl(value: unknown): value is string {
+    return typeof value === "string" && /^(https?:|data:)/.test(value);
+}
+
+function normalizeSwitcherAvatar(user: any): string | null {
+    const avatar = user?.avatar ?? null;
+    if (isHttpUrl(avatar)) return avatar;
+    if (avatar) return avatar;
+    return null;
+}
+
+function getAvatarUrlForSwitcher(user: any, size = 80): string | null {
+    const avatar = normalizeSwitcherAvatar(user);
+    if (!avatar) return null;
+    if (isHttpUrl(avatar)) return avatar;
+    const id = user?.id ?? user?.userId;
+    if (!id) return null;
+    const animated = String(avatar).startsWith("a_");
+    return `https://cdn.discordapp.com/avatars/${id}/${avatar}.${animated ? "gif" : "png"}?size=${size}`;
+}
+
+function buildSwitcherUser(user: any, extra?: Record<string, unknown>) {
+    const id = String(user?.id ?? user?.userId ?? "");
+    const username = user?.username ?? user?.name ?? `User_${id.slice(-4)}`;
+    const globalName = user?.globalName ?? user?.global_name ?? username;
+
+    return {
+        ...user,
+        ...extra,
+        id,
+        userId: id,
+        username,
+        globalName,
+        global_name: globalName,
+        discriminator: user?.discriminator ?? "0",
+        avatar: normalizeSwitcherAvatar(user),
+        avatarURL: getAvatarUrlForSwitcher(user),
+        avatarUrl: getAvatarUrlForSwitcher(user),
+        getAvatarURL: (_guildId?: string, size?: number) => getAvatarUrlForSwitcher(user, size) ?? undefined,
+        tokenStatus: user?.tokenStatus ?? 1,
+        pushSyncToken: user?.pushSyncToken ?? null,
+    };
+}
+
+function getSwitcherActionId(action: any): string | undefined {
+    const nested = action?.account ?? action?.user;
+    const raw = action?.targetUserId
+        ?? action?.userId
+        ?? action?.user_id
+        ?? action?.id
+        ?? action?.targetId
+        ?? action?.target_id
+        ?? nested?.id
+        ?? nested?.userId;
+
+    return raw != null ? String(raw) : undefined;
+}
+
+function looksLikeMultiAccountStore(mod: any): boolean {
+    try {
+        if (typeof mod?.getUsers !== "function") return false;
+        if (typeof mod.getValidUsers !== "function" && typeof mod.getHasLoggedInAccounts !== "function") return false;
+        const users = mod.getUsers();
+        if (!Array.isArray(users)) return false;
+        if (typeof mod.getFrequentlyUsedEmojis === "function") return false;
+        if (!users.length) return true;
+        const first = users[0];
+        if (!first || typeof first !== "object") return false;
+        if (typeof first.id !== "string") return false;
+        if (!("tokenStatus" in first) && !("pushSyncToken" in first)) {
+            if ("type" in first || "permissions" in first || "parentId" in first) return false;
+        }
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function injectFakes(real: any[]): any[] {
+    markAccountSwitcherRendering();
+    isGettingUsers = true;
+    queueMicrotask(() => {
+        isGettingUsers = false;
+    });
+
+    if (!settings.store.patchInternalAccountSwitcher) return real;
+    const originalId = getOriginalMeId();
+    const realMe = originalGetUser && originalId ? originalGetUser.call(UserStore, originalId) : originalGetCurrentUser?.call(UserStore);
+    let hasRealAccount = false;
+
+    const displayReal = real.map(user => {
+        if (realMe && originalId && user?.id === originalId) {
+            hasRealAccount = true;
+            return buildSwitcherUser({
+                ...realMe,
+                ...user,
+                id: originalId,
+                userId: originalId,
+                username: realMe.username,
+                globalName: (realMe as any).globalName ?? realMe.username,
+                global_name: (realMe as any).global_name ?? (realMe as any).globalName ?? realMe.username,
+                discriminator: realMe.discriminator ?? "0",
+                avatar: realMe.avatar ?? null,
+                tokenStatus: user?.tokenStatus ?? 1,
+                pushSyncToken: user?.pushSyncToken ?? null,
+            });
+        }
+        return buildSwitcherUser(user);
+    });
+
+    if (realMe && originalId && !hasRealAccount) {
+        displayReal.unshift(buildSwitcherUser({
+            ...realMe,
+            id: originalId,
+            userId: originalId,
+            tokenStatus: 1,
+            pushSyncToken: null,
+        }));
+    }
+
+    const realIds = new Set(displayReal.map(user => user?.id));
+    const extras = getSwitcherAccounts()
+        .map(user => buildSwitcherUser(user))
+        .filter(user => !realIds.has(user.id));
+    const combined = extras.length ? [...displayReal, ...extras] : displayReal;
+
+    const seenIds = new Set<string>();
+    const deduplicated: any[] = [];
+    for (const user of combined) {
+        if (user?.id && !seenIds.has(user.id)) {
+            seenIds.add(user.id);
+            deduplicated.push(user);
+        }
+    }
+    return deduplicated;
+}
+
+function patchInternalAccountSwitcher() {
+    if (originalMultiGetUsers) return;
+
+    waitFor(["getUsers", "getValidUsers", "getHasLoggedInAccounts"], (store: any) => {
+        if (originalMultiGetUsers || !looksLikeMultiAccountStore(store)) return;
+
+        multiAccountStore = store;
+        originalMultiGetUsers = store.getUsers.bind(store);
+        originalMultiGetValidUsers = store.getValidUsers?.bind(store) ?? null;
+        originalMultiGetHasLoggedInAccounts = store.getHasLoggedInAccounts?.bind(store) ?? null;
+
+        const withFakeAccounts = injectFakes;
+
+        store.getUsers = () => withFakeAccounts(originalMultiGetUsers?.() ?? []);
+        if (store.getValidUsers) {
+            store.getValidUsers = () => withFakeAccounts(originalMultiGetValidUsers?.() ?? []);
+        }
+        if (store.getHasLoggedInAccounts) {
+            store.getHasLoggedInAccounts = () => {
+                isGettingUsers = true;
+                queueMicrotask(() => {
+                    isGettingUsers = false;
+                });
+                if (settings.store.patchInternalAccountSwitcher && getSwitcherAccounts().length) return true;
+                return originalMultiGetHasLoggedInAccounts?.() ?? false;
+            };
+        }
+
+        store.emitChange?.();
+    });
+
+    waitFor(["switchAccount"], (module: any) => {
+        multiAuthModule = module;
+        originalSwitchAccount = module.switchAccount;
+        module.switchAccount = function (id: string, ...args: any[]) {
+            if (settings.store.patchInternalAccountSwitcher) {
+                const saved = getSavedIdentityForSwitcherId(id);
+                if (saved) {
+                    void activateSwitcherIdentity({ type: "FAKE_USER_SWITCHER_CLICK", targetUserId: id });
+                    return;
+                }
+            }
+            return originalSwitchAccount.call(this, id, ...args);
+        };
+    });
+}
+
+function unpatchInternalAccountSwitcher() {
+    if (!multiAccountStore || !originalMultiGetUsers) return;
+    multiAccountStore.getUsers = originalMultiGetUsers;
+    if (originalMultiGetValidUsers) multiAccountStore.getValidUsers = originalMultiGetValidUsers;
+    if (originalMultiGetHasLoggedInAccounts) multiAccountStore.getHasLoggedInAccounts = originalMultiGetHasLoggedInAccounts;
+    multiAccountStore.emitChange?.();
+    multiAccountStore = null;
+    originalMultiGetUsers = null;
+    originalMultiGetValidUsers = null;
+    originalMultiGetHasLoggedInAccounts = null;
+
+    if (multiAuthModule && originalSwitchAccount) {
+        multiAuthModule.switchAccount = originalSwitchAccount;
+        multiAuthModule = null;
+        originalSwitchAccount = null;
+    }
+}
+
+function emitInternalAccountSwitcherChange() {
+    if (settings.store.patchInternalAccountSwitcher) multiAccountStore?.emitChange?.();
+}
+
+function switchRealAccount(id: string): boolean {
+    if (id === getOriginalMeId()) return false;
+    if (getSavedIdentityForSwitcherId(id)) return false;
+
+    try {
+        const multiAuth = findByProps("switchAccount", "loginToken") ?? findByProps("switchAccount");
+        if (multiAuth?.switchAccount) {
+            multiAuth.switchAccount(id);
+            return true;
+        }
+    } catch (e) {
+        logger.warn("Native switchAccount failed", e);
+    }
+
+    return false;
+}
+
+async function activateSwitcherIdentity(action: any) {
+    if (!settings.store.patchInternalAccountSwitcher) return;
+    logger.log("[FakeUserSwitcher] activateSwitcherIdentity triggered with action:", JSON.stringify(action));
+    const id = getSwitcherActionId(action);
+    if (!id) return;
+    if (id === getOriginalMeId()) {
+        if (settings.store.spoofActive) {
+            clearTarget();
+            emitInternalAccountSwitcherChange();
+            showToast("Restored your real account locally.", Toasts.Type.SUCCESS);
+        }
+        return;
+    }
+
+    const saved = getSavedIdentityForSwitcherId(id);
+    if (!saved) {
+        switchRealAccount(id);
+        logger.log("[FakeUserSwitcher] No saved identity found for ID:", id);
+        return;
+    }
+
+    try {
+        if (isManualSavedIdentity(saved)) {
+            settings.store.manualUsername = saved.manualUsername ?? saved.name;
+            settings.store.manualDisplayName = saved.manualDisplayName ?? "";
+            settings.store.manualAvatar = saved.manualAvatar ?? saved.avatar ?? "";
+            settings.store.manualMode = true;
+            setEnabled(true);
+            showToast(`Spoofing as ${saved.name}`, Toasts.Type.SUCCESS);
+        } else {
+            const cachedTarget = targetsCache.get(saved.id);
+            if (cachedTarget) {
+                setTarget(cachedTarget);
+                settings.store.manualMode = false;
+                setEnabled(true);
+                showToast(`Spoofing as ${cachedTarget.user.globalName || cachedTarget.user.username}`, Toasts.Type.SUCCESS);
+                loadTarget(saved.id, true, true).catch(() => { });
+            } else {
+                const next = await loadTarget(saved.id);
+                settings.store.manualMode = false;
+                setEnabled(true);
+                showToast(`Spoofing as ${next.user.globalName || next.user.username}`, Toasts.Type.SUCCESS);
+            }
+        }
+        emitInternalAccountSwitcherChange();
+    } catch (e) {
+        logger.error("Failed to activate fake account-switcher identity", e);
+        showToast("Failed to activate fake identity.", Toasts.Type.FAILURE);
+    }
+}
+
+function removeSwitcherIdentity(action: any) {
+    const id = getSwitcherActionId(action);
+    if (!id) return;
+    const saved = getSavedIdentityForSwitcherId(id);
+    if (saved) {
+        const list = getSavedUsers().filter(s => s.id !== id);
+        setSavedUsers(list);
+        emitInternalAccountSwitcherChange();
+        showToast(`Removed saved identity: ${saved.name}`, Toasts.Type.SUCCESS);
+        if (settings.store.spoofActive && settings.store.targetId === id) {
+            clearTarget();
+        }
+    }
+}
+
+function getClickedSwitcherIdentity(event: MouseEvent): string | undefined {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return undefined;
+
+    const option = target.closest(SWITCHER_DROPDOWN_SELECTORS.join(","));
+    if (!option) return undefined;
+
+    const accounts = [...getSwitcherAccounts()];
+    const originalId = getOriginalMeId();
+    if (originalId) {
+        const realMe = originalGetUser?.call(UserStore, originalId) ?? originalGetCurrentUser?.call(UserStore);
+        if (realMe) accounts.unshift(buildSwitcherUser(realMe, { id: originalId, userId: originalId }));
+    }
+
+    const optionText = option.textContent?.toLowerCase() ?? "";
+    for (const account of accounts) {
+        const id = String(account.id);
+        const names = [account.username, account.globalName, account.global_name, account.name]
+            .filter((name): name is string => typeof name === "string" && name.length > 0)
+            .map(name => name.toLowerCase());
+
+        if (optionText.includes(id) || names.some(name => optionText.includes(name))) return id;
+    }
+
+    const imgs = Array.from(option.querySelectorAll("img"));
+    for (const img of imgs) {
+        const src = img.getAttribute("src") ?? "";
+        const account = accounts.find(user => {
+            const avatar = normalizeSwitcherAvatar(user);
+            return avatar && (src.includes(avatar) || src === avatar || src.includes(encodeURIComponent(avatar)));
+        });
+        if (account?.id) return String(account.id);
+    }
+
+    return undefined;
+}
+
+function startSwitcherClickInterceptor() {
+    if (switcherClickInterceptor || typeof document === "undefined") return;
+
+    switcherClickInterceptor = event => {
+        if (!settings.store.patchInternalAccountSwitcher) return;
+        const id = getClickedSwitcherIdentity(event);
+        if (!id || !getSavedIdentityForSwitcherId(id)) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        void activateSwitcherIdentity({ type: "FAKE_USER_SWITCHER_CLICK", targetUserId: id });
+    };
+
+    document.addEventListener("click", switcherClickInterceptor, true);
+    document.addEventListener("mouseup", switcherClickInterceptor, true);
+}
+
+function stopSwitcherClickInterceptor() {
+    if (!switcherClickInterceptor || typeof document === "undefined") return;
+    document.removeEventListener("click", switcherClickInterceptor, true);
+    document.removeEventListener("mouseup", switcherClickInterceptor, true);
+    switcherClickInterceptor = null;
+}
+
 let unsub: (() => void) | null = null;
 
 const plugin = definePlugin({
@@ -1333,30 +1909,64 @@ const plugin = definePlugin({
     userAreaButton: {
         icon: FakeUserSwitcherIcon,
         render: (props: UserAreaRenderProps) => <FakeUserSwitcherButton {...props} />,
-        priority: -5,
+        priority: -1,
     },
 
     async start() {
+        const generation = ++switcherGeneration;
+        logger.info("[FUS-BUILD-CHECK] build loaded — badge+overlay+message fixes v3 active");
         loadCacheFromSettings();
         addProfileBadge(dynamicBadge);
+        startSwitcherDropdownObserver();
+        startSwitcherClickInterceptor();
         patchStore();
         patchUtils();
         patchBadges();
         patchPresence();
+        patchSnowflake();
+        patchInternalAccountSwitcher();
+
+        // Intercept registrations on the buttons Map to enforce priority sorting
+        originalSet = buttons.set.bind(buttons);
+        buttons.set = function (key, value) {
+            if (key === "GameActivityToggle") {
+                value.priority = -2;
+            } else if (key === "SpotifyActivityToggle") {
+                value.priority = 0;
+            }
+            return originalSet!(key, value);
+        };
+
+        // Adjust priorities of other toggles to ensure FakeUserSwitcher is between them
+        try {
+            const gameToggle = buttons.get("GameActivityToggle");
+            if (gameToggle) gameToggle.priority = -2;
+            const spotifyToggle = buttons.get("SpotifyActivityToggle");
+            if (spotifyToggle) spotifyToggle.priority = 0;
+        } catch { /* ignore */ }
+
+        FluxDispatcher.subscribe("MULTI_ACCOUNT_SWITCH_ATTEMPT", activateSwitcherIdentity);
+        FluxDispatcher.subscribe("MULTI_ACCOUNT_SWITCH_FAILURE", activateSwitcherIdentity);
+        FluxDispatcher.subscribe("MULTI_ACCOUNT_REMOVE_ACCOUNT", removeSwitcherIdentity);
 
         addContextMenuPatch("user-context", userContextMenuPatch);
         addContextMenuPatch("user-profile-actions", userContextMenuPatch);
 
-        unsub = subscribe(syncSpoofState);
+        unsub = subscribe(() => {
+            syncSpoofState();
+            emitInternalAccountSwitcherChange();
+        });
 
         const { targetId } = settings.store;
         if (targetId && !settings.store.manualMode) {
             try {
                 await loadTarget(targetId);
+                if (generation !== switcherGeneration) return;
             } catch (e) {
                 logger.warn("Failed to restore cached target", e);
             }
         }
+        if (generation !== switcherGeneration) return;
 
         preLoadGuildTargets();
 
@@ -1368,7 +1978,7 @@ const plugin = definePlugin({
             switcherRunning = true;
             waitFor(["getUsers", "getValidUsers", "getHasLoggedInAccounts"], (mod: any) => {
                 if (!switcherRunning) return;
-                if (!isMultiAccountStore(mod)) {
+                if (!looksLikeMultiAccountStore(mod)) {
                     logger.warn("Store ignored — doesn't look like MultiAccountStore:", mod);
                     return;
                 }
@@ -1380,19 +1990,28 @@ const plugin = definePlugin({
     },
 
     stop() {
-        if (syncSpoofStateTimer !== undefined) {
-            clearTimeout(syncSpoofStateTimer);
-            syncSpoofStateTimer = undefined;
+        switcherGeneration++;
+        if (originalSet) {
+            buttons.set = originalSet;
+            originalSet = null;
         }
         switcherRunning = false;
         unpatchInternalAccountSwitcher();
         multiAccountStore = null;
         clearWrapCache();
+        stopSwitcherDropdownObserver();
+        stopSwitcherClickInterceptor();
+        unpatchSnowflake();
         unpatchPresence();
         unpatchBadges();
         unpatchUtils();
         unpatchStore();
+        unpatchInternalAccountSwitcher();
         removeProfileBadge(dynamicBadge);
+
+        FluxDispatcher.unsubscribe("MULTI_ACCOUNT_SWITCH_ATTEMPT", activateSwitcherIdentity);
+        FluxDispatcher.unsubscribe("MULTI_ACCOUNT_SWITCH_FAILURE", activateSwitcherIdentity);
+        FluxDispatcher.unsubscribe("MULTI_ACCOUNT_REMOVE_ACCOUNT", removeSwitcherIdentity);
 
         removeContextMenuPatch("user-context", userContextMenuPatch);
         removeContextMenuPatch("user-profile-actions", userContextMenuPatch);
@@ -1416,14 +2035,14 @@ const plugin = definePlugin({
         {
             find: ",getUserTag:",
             replacement: {
-                match: /if\(\i\((\i)(?:\.global_name\)|\)\.global_name)\)return(?=.{0,100}return"\?\?\?")/,
-                replace: "const vcFupName=$self.getUsername($1);if(vcFupName)return vcFupName;$&"
+                match: /getName:([A-Za-z_$][\w$]*),/,
+                replace: "getName:e=>$self.getUsername(e)??$1(e),"
             }
         },
         {
             find: "getUserAvatarURL:",
             replacement: {
-                match: /(getUserAvatarURL:)(\i),/,
+                match: /(getUserAvatarURL:)([^,]+),/,
                 replace: "$1$self.wrapAvatar($2),"
             }
         },
@@ -1434,6 +2053,49 @@ const plugin = definePlugin({
                 replace: "const vcFupDeco=$self.getAvatarDecorationURL(arguments[0]);if(vcFupDeco)return vcFupDeco;"
             }
         },
+        {
+            // Render patch: inject the spoofed decoration into the avatar component
+            // so it actually decides to render a ring. Without this, the URL patch
+            // above fires too late and Discord shows the placeholder preset.
+            find: "isAvatarDecorationAnimating:",
+            group: true,
+            replacement: [
+                {
+                    match: /(?<=\.avatarDecoration,guildId:\i\}\)\),)(?<=user:(\i).+?)/,
+                    replace: "vcFusAvatarDecoration=$self.useUserAvatarDecoration($1),"
+                },
+                {
+                    match: /(?<={avatarDecoration:).{1,20}?(?=,)(?<=avatarDecorationOverride:(\i).+?)/,
+                    replace: "$1??vcFusAvatarDecoration??($&)"
+                },
+                {
+                    match: /(?<=size:\i}\),\[)/,
+                    replace: "vcFusAvatarDecoration,"
+                }
+            ]
+        },
+        {
+            find: "#{intl::ACCOUNT_SPEAKING_WHILE_MUTED}",
+            replacement: [
+                {
+                    match: /(?<=\i\)\({avatarDecoration:)\i(?=,)(?<=currentUser:(\i).+?)/,
+                    replace: "$self.useUserAvatarDecoration($1)??$&"
+                }
+            ]
+        },
+        ...[
+            '"Message Username"',
+            ".nameplatePreview,{",
+            "#{intl::ayozFl::raw}",
+        ].map(find => ({
+            find,
+            replacement: [
+                {
+                    match: /(\i)\.length>0\?void 0:(\i)\.avatarDecoration/,
+                    replace: "$self.useUserAvatarDecoration($2)??$2.avatarDecoration"
+                }
+            ]
+        })),
         {
             find: "UserProfileStore",
             replacement: {
@@ -1446,6 +2108,13 @@ const plugin = definePlugin({
             replacement: {
                 match: /(?<=void 0:)\i\.getPreviewBanner\(\i,\i,\i\)/,
                 replace: "($self.bannerHook(arguments[0])??($&))"
+            }
+        },
+        {
+            find: "\"ProfileEffectStore\"",
+            replacement: {
+                match: /getProfileEffectById\((\i)\){return null!=\i\?(\i)\[\i\]:void 0/,
+                replace: "getProfileEffectById($1){return $self.getProfileEffectById($1,$2)??(null!=$2?$2[$1]:void 0)"
             }
         },
         {
@@ -1462,7 +2131,83 @@ const plugin = definePlugin({
                 replace: "$1$self.wrapBadge($2),"
             }
         },
+        {
+            find: "memberSinceWrapper",
+            replacement: [
+                {
+                    match: /([A-Za-z_$][\w$]*(?:\.default)?)\.extractTimestamp\(([A-Za-z_$][\w$]*)\)/g,
+                    replace: "($self.spoofMemberSinceTimestamp($2)??$1.extractTimestamp($2))",
+                    noWarn: true
+                },
+                {
+                    match: /\(0,([A-Za-z_$][\w$]*(?:\.default)?)\.extractTimestamp\)\(([A-Za-z_$][\w$]*)\)/g,
+                    replace: "($self.spoofMemberSinceTimestamp($2)??(0,$1.extractTimestamp)($2))",
+                    noWarn: true
+                }
+            ]
+        },
+        {
+            find: "fromTimestamp:",
+            replacement: [
+                // `extractTimestamp: function(x){...}`
+                {
+                    match: /(extractTimestamp\s*:\s*function\s*\(\s*([A-Za-z_$][\w$]*)\s*\)\s*\{)/,
+                    replace: "$1const __vcFupSpoof=$self.spoofMemberSinceTimestamp($2);if(__vcFupSpoof!=null)return __vcFupSpoof;"
+                },
+                // `extractTimestamp: (x) => expr` (arrow, expression body)
+                {
+                    match: /extractTimestamp\s*:\s*\(\s*([A-Za-z_$][\w$]*)\s*\)\s*=>\s*([^,}]+)/,
+                    replace: "extractTimestamp:($1)=>{const __s=$self.spoofMemberSinceTimestamp($1);return __s!=null?__s:($2);}",
+                    noWarn: true
+                },
+                // `extractTimestamp(x){...}` (shorthand method form, most common in modern minified bundles)
+                {
+                    match: /(extractTimestamp\s*\(\s*([A-Za-z_$][\w$]*)\s*\)\s*\{)/,
+                    replace: "$1const __vcFupSpoof=$self.spoofMemberSinceTimestamp($2);if(__vcFupSpoof!=null)return __vcFupSpoof;",
+                    noWarn: true
+                },
+                // `function extractTimestamp(x){...}` (top-level function declaration form)
+                {
+                    match: /(function\s+extractTimestamp\s*\(\s*([A-Za-z_$][\w$]*)\s*\)\s*\{)/,
+                    replace: "$1const __vcFupSpoof=$self.spoofMemberSinceTimestamp($2);if(__vcFupSpoof!=null)return __vcFupSpoof;",
+                    noWarn: true
+                }
+            ]
+        },
+        {
+            find: "getIsValidatingUsers",
+            replacement: {
+                match: /getUsers\(\)\{return (\i)\}/,
+                replace: "getUsers(){return $self.injectFakes($1)}"
+            }
+        },
+        {
+            find: "multiAccountUsers",
+            replacement: {
+                match: /(\w+)\.default\.track\((\w+)\.HAw\.MULTI_ACCOUNT_SWITCH_ATTEMPT[^)]+\),(\w+)\.Mx\((\w+)\)/,
+                replace: "$1.default.track($2.HAw.MULTI_ACCOUNT_SWITCH_ATTEMPT,{location:{section:$2.JJy.USER_PROFILE}}),$self.handleSwitch($3.Mx.bind($3),$4)"
+            }
+        }
     ],
+
+    injectFakes(real: any[]): any[] {
+        return injectFakes(real);
+    },
+
+    handleSwitch(originalFn: (id: string) => void, userId: string) {
+        if (settings.store.patchInternalAccountSwitcher) {
+            const saved = getSavedIdentityForSwitcherId(userId);
+            if (saved) {
+                void activateSwitcherIdentity({ type: "FAKE_USER_SWITCHER_CLICK", targetUserId: userId });
+                return;
+            }
+        }
+        if (settings.store.spoofActive) {
+            clearTarget();
+            emitInternalAccountSwitcherChange();
+        }
+        originalFn(userId);
+    },
 
     getUsername(user: User) {
         if (!isActive() || !isCurrentUser(user?.id)) return undefined;
@@ -1471,13 +2216,29 @@ const plugin = definePlugin({
         return t.globalName || t.username;
     },
 
+    spoofMemberSinceTimestamp(userId: string) {
+        try {
+            if (!isActive() || !userId || typeof userId !== "string") return undefined;
+            // Only spoof the member-since date when resolving our own account ID.
+            // Target IDs and manual synthetic IDs already encode their correct dates,
+            // and checking isCurrentUser on every snowflake creates high CPU overhead.
+            if (userId !== getOriginalMeId()) return undefined;
+            return getSpoofedCreatedAtMs() ?? undefined;
+        } catch {
+            return undefined;
+        }
+    },
+
     wrapAvatar(original: any) {
         return (user: User, animated: boolean, size: number) => {
             if (isActive() && (isCurrentUser(user?.id) || user?.id === "0")) {
                 const active = getActiveTargetForGuild(undefined);
                 if (active) {
+                    if (active.manualData?.overlaySelf) {
+                        return original(getRealCurrentUser() ?? user, animated, size);
+                    }
                     if (active.isManual) {
-                        return active.manualData?.manualAvatar || active.manualData?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png";
+                        return active.manualData?.manualAvatarDataUrl || active.manualData?.manualAvatar || active.manualData?.avatar || "https://cdn.discordapp.com/embed/avatars/0.png";
                     }
                     const t = active.user;
                     if (t) return original(t, animated, size);
@@ -1496,6 +2257,8 @@ const plugin = definePlugin({
         };
     },
 
+    useUserAvatarDecoration,
+
     getAvatarDecorationURL({ user, canAnimate }: { user?: User; avatarDecoration?: any; canAnimate?: boolean; }) {
         if (!isActive()) return undefined;
         const targetUserId = user?.id;
@@ -1503,8 +2266,36 @@ const plugin = definePlugin({
         const t = getTargetUser() as any;
         const deco = t?.avatarDecorationData;
         if (!deco?.asset) return undefined;
-        const asset = canAnimate && deco.asset.startsWith("a_") ? deco.asset : deco.asset.replace(/^a_/, "");
-        return `https://cdn.discordapp.com/avatar-decoration-presets/${asset}.png${canAnimate && deco.asset.startsWith("a_") ? "" : "?passthrough=false"}`;
+        // Mirror Discord's own preset URL exactly (same as the modal grid preview,
+        // which renders correctly). For a static render of an animated asset, strip
+        // the a_ prefix and request passthrough=false so the APNG collapses to its
+        // first frame; otherwise use the bare preset URL with no query string. A
+        // stray ?passthrough=false on a non-animated preset returns an invalid
+        // response, which is what produced the broken-image placeholder.
+        // Discord serves decoration presets (free AND animated shop-style a_ assets)
+        // from avatar-decoration-presets, but the `passthrough` query param is
+        // mandatory and decides animation:
+        //   animated + allowed to animate -> a_<hash>.png?passthrough=true  (APNG)
+        //   otherwise                      -> <hash without a_>.png?passthrough=false (static frame)
+        // The previous code omitted passthrough entirely on the animated branch,
+        // which made the CDN return an unusable response -> broken-image placeholder.
+        const isAnimated = deco.asset.startsWith("a_");
+        let url: string;
+        if (isAnimated && canAnimate) {
+            url = `https://cdn.discordapp.com/avatar-decoration-presets/${deco.asset}.png?passthrough=true`;
+        } else {
+            const staticAsset = deco.asset.replace(/^a_/, "");
+            url = `https://cdn.discordapp.com/avatar-decoration-presets/${staticAsset}.png?passthrough=false`;
+        }
+        return url;
+    },
+
+    getProfileEffectById(skuId: string, effects: Record<string, any>) {
+        if (!isActive() || !settings.store.spoofProfileEffect) return null;
+        const targetProfile = getTargetProfile();
+        const eff = targetProfile?.profileEffect;
+        if (eff && (eff.skuId === skuId || (eff as any).id === skuId)) return eff;
+        return (effects && effects[skuId]) || null;
     },
 
     profileHook(userId: string, original: any) {
@@ -1533,10 +2324,41 @@ const plugin = definePlugin({
         overrides.user = wrapUser(targetUser);
 
         if (activeSpoof && isManual) {
+            const overlaySelf = !!manualData?.overlaySelf;
+            // Propagate fake creation date into the profile object so the popout's "Member Since"
+            // section reflects the manual date. Discord reads user.createdAt for this; we shadow it
+            // on the wrapped user above. We also pass it on the profile for any code that checks it there.
+            // Skipped in overlay mode — your real Member Since stays intact.
+            const manualDateStr = manualData?.manualCreatedAt || settings.store.manualCreatedAt;
+            if (!overlaySelf && manualDateStr && manualDateStr.trim() !== "") {
+                const parsedManualDate = new Date(manualDateStr);
+                if (!isNaN(parsedManualDate.getTime())) {
+                    overrides.createdAt = parsedManualDate;
+                    overrides.created_at = parsedManualDate.toISOString();
+                    overrides.premiumGuildSince = overrides.premiumGuildSince; // no-op, just keeping context
+                }
+            }
             overrides.bio = manualData?.manualBio || manualData?.bio || "";
             overrides.pronouns = manualData?.manualPronouns || manualData?.pronouns || "";
-            overrides.banner = manualData?.manualBanner || manualData?.banner || null;
-            const bannerColor = manualData?.manualBanner || manualData?.banner;
+            // Banner source differs by mode:
+            //  - identity mode: the manual-identity banner fields (manualBanner*).
+            //  - overlay mode: the dedicated overlay banner fields (manualOverlayBanner*),
+            //    which default to blank so the REAL account banner is kept.
+            // Prefer an uploaded data URL, then a URL/hex string.
+            const overlayBanner = overlaySelf
+                ? (manualData?.manualOverlayBannerDataUrl || manualData?.manualOverlayBanner)
+                : (manualData?.manualBannerDataUrl || manualData?.manualBanner || manualData?.banner);
+            if (!overlaySelf) {
+                overrides.banner = overlayBanner || null;
+            } else if (overlayBanner && !overlayBanner.startsWith("#")) {
+                // Image/gif banner set in overlay mode -> override; a #hex is handled
+                // below as an accent/theme color, not a banner image.
+                overrides.banner = overlayBanner;
+            }
+            // A #hex banner (either mode's banner field) becomes the accent/theme color.
+            const bannerColor = overlaySelf
+                ? (manualData?.manualOverlayBanner || "")
+                : (manualData?.manualBanner || manualData?.banner || "");
             if (bannerColor && bannerColor.startsWith("#")) {
                 try {
                     const cleanHex = bannerColor.replace("#", "");
@@ -1544,8 +2366,43 @@ const plugin = definePlugin({
                     if (!isNaN(colorVal)) overrides.accentColor = colorVal;
                 } catch { /* ignore */ }
             }
-            const tag = manualData?.manualClanTag || manualData?.clanTag;
-            if (tag && tag.trim() !== "") {
+            // Explicit accent color + gradient (overrides any hex-banner-derived accent above).
+            const accent1 = manualData?.manualAccentColor && String(manualData.manualAccentColor).trim() !== ""
+                ? Number(manualData.manualAccentColor) : null;
+            const accent2 = manualData?.manualAccentColor2 && String(manualData.manualAccentColor2).trim() !== ""
+                ? Number(manualData.manualAccentColor2) : null;
+            if (accent1 != null && !isNaN(accent1)) {
+                overrides.accentColor = accent1;
+                overrides.themeColors = [accent1, (accent2 != null && !isNaN(accent2)) ? accent2 : accent1];
+            }
+            // Avatar decoration (asset already normalized onto active.user by buildManualActiveTarget).
+            if (active.user?.avatarDecorationData) {
+                overrides.avatarDecorationData = active.user.avatarDecorationData;
+            }
+            // Profile effect.
+            if (settings.store.spoofProfileEffect && targetProfile?.profileEffect) {
+                overrides.profileEffect = targetProfile.profileEffect;
+                if (targetProfile.profileEffectId != null) overrides.profileEffectId = targetProfile.profileEffectId;
+                if (targetProfile.profileEffectExpiresAt !== undefined) overrides.profileEffectExpiresAt = targetProfile.profileEffectExpiresAt;
+            }
+
+            // Drop Discord's NATIVE premium/boost badges so only our rich dynamic ones
+            // (dynamicBadge.getBadges, with the custom NITRO/Subscriber-since tooltip)
+            // render. In overlay mode the account's REAL premiumSince/premiumGuildSince
+            // make Discord derive and draw its own Nitro/boost tier badge live, which
+            // duplicated ours (and the live component re-rendering looked like the
+            // tooltip "reopening"). Clearing the *Since fields removes Discord's tier
+            // derivation; premiumType stays non-zero to avoid the popout SKU crash.
+            const spoofNitroTier = (manualData?.manualNitroLevel ?? -1) >= 0;
+            const spoofBoostTier = (manualData?.manualBoostMonths ?? -1) >= 0;
+            if (spoofNitroTier) {
+                overrides.premiumSince = null;
+            }
+            if (spoofBoostTier) {
+                overrides.premiumGuildSince = null;
+            } // Clan / server-tag identity swap is skipped in overlay mode (keeps your real tag).
+            const tag = overlaySelf ? "" : (manualData?.manualClanTag || manualData?.clanTag);
+            if (!overlaySelf && tag && tag.trim() !== "") {
                 const guildId = manualData?.manualClanGuildId || settings.store.manualClanGuildId || "0";
                 const badgeVal = resolveBadge(
                     manualData?.manualClanBadge || settings.store.manualClanBadge || "",
@@ -1562,7 +2419,7 @@ const plugin = definePlugin({
                 overrides.clan = manualClan;
                 overrides.primaryGuild = manualClan;
                 overrides.primary_guild = manualClan;
-            } else {
+            } else if (!overlaySelf) {
                 overrides.clan = null;
                 overrides.primaryGuild = null;
                 overrides.primary_guild = null;
@@ -1571,7 +2428,7 @@ const plugin = definePlugin({
                 const since = new Date();
                 since.setMonth(since.getMonth() - settings.store.fakeNitroMonths);
                 overrides.premiumType = 2;
-                overrides.premiumSince = since;
+                overrides.premiumSince = since.toISOString();
             }
             overrides.widgets = [];
             overrides.connectedAccounts = [];
@@ -1597,18 +2454,19 @@ const plugin = definePlugin({
             overrides.primaryGuild = targetProfile?.primaryGuild ?? targetProfile?.primary_guild ?? targetUser.primaryGuild ?? targetUser.primary_guild ?? null;
             overrides.primary_guild = targetProfile?.primary_guild ?? targetProfile?.primaryGuild ?? targetUser.primary_guild ?? targetUser.primaryGuild ?? null;
 
+            const targetConnections = Array.isArray(targetProfile?.connectedAccounts)
+                ? targetProfile.connectedAccounts
+                : (Array.isArray(targetProfile?.connected_accounts)
+                    ? targetProfile.connected_accounts
+                    : []);
+            overrides.connectedAccounts = targetConnections;
+
             if (settings.store.spoofActivities) {
-                if (targetProfile && targetProfile.connectedAccounts) overrides.connectedAccounts = targetProfile.connectedAccounts;
-                if (targetProfile && targetProfile.legacyApplications) overrides.legacyApplications = targetProfile.legacyApplications;
-                if (targetProfile && targetProfile.applicationRoleConnections) overrides.applicationRoleConnections = targetProfile.applicationRoleConnections;
-                if (targetProfile && targetProfile.widgets !== undefined) {
-                    overrides.widgets = targetProfile.widgets;
-                } else {
-                    overrides.widgets = [];
-                }
+                overrides.legacyApplications = Array.isArray(targetProfile?.legacyApplications) ? targetProfile.legacyApplications : [];
+                overrides.applicationRoleConnections = Array.isArray(targetProfile?.applicationRoleConnections) ? targetProfile.applicationRoleConnections : [];
+                overrides.widgets = Array.isArray(targetProfile?.widgets) ? targetProfile.widgets : [];
             } else {
                 overrides.widgets = [];
-                overrides.connectedAccounts = [];
                 overrides.legacyApplications = [];
                 overrides.applicationRoleConnections = [];
             }
@@ -1618,7 +2476,7 @@ const plugin = definePlugin({
             const since = new Date();
             since.setMonth(since.getMonth() - settings.store.fakeNitroMonths);
             overrides.premiumType = 2;
-            overrides.premiumSince = since;
+            overrides.premiumSince = since.toISOString();
 
             if (original) {
                 if (original.bio != null) overrides.bio = original.bio;
@@ -1635,9 +2493,20 @@ const plugin = definePlugin({
 
         if (settings.store.fakeConnectionsEnabled) {
             try {
-                overrides.connectedAccounts = JSON.parse(settings.store.fakeConnectionsList || "[]");
+                const parsed = JSON.parse(settings.store.fakeConnectionsList || "[]");
+                if (Array.isArray(parsed)) overrides.connectedAccounts = parsed;
             } catch { /* ignore */ }
         }
+
+        // Final safety net: every array field the user popout reads must be a real array.
+        // Discord's profile hooks call .length / .map / .filter on these unconditionally,
+        // and an undefined or null value crashes the popout with
+        // "Cannot read properties of undefined (reading 'length')".
+        if (!Array.isArray(overrides.connectedAccounts)) overrides.connectedAccounts = Array.isArray(original?.connectedAccounts) ? original.connectedAccounts : [];
+        if (!Array.isArray(overrides.legacyApplications)) overrides.legacyApplications = Array.isArray(original?.legacyApplications) ? original.legacyApplications : [];
+        if (!Array.isArray(overrides.applicationRoleConnections)) overrides.applicationRoleConnections = Array.isArray(original?.applicationRoleConnections) ? original.applicationRoleConnections : [];
+        if (!Array.isArray(overrides.widgets)) overrides.widgets = Array.isArray(original?.widgets) ? original.widgets : [];
+        if (overrides.badges !== undefined && !Array.isArray(overrides.badges)) overrides.badges = [];
 
         // Mirror the userProfile sub-object so the popout's display-name section reflects the target.
         const targetUserProfile = (activeSpoof && !isManual) ? ((targetProfile as any)?.userProfile ?? {}) : {};
@@ -1653,36 +2522,53 @@ const plugin = definePlugin({
         };
 
         if (settings.store.spoofBadges || selfNitro) {
-            const baseBadges = original?.badges ?? (targetProfile?.badges || []);
-            const nitroBadge = {
-                id: "fakeuserswitcher-nitro",
-                description: "Discord Nitro",
-                icon: "https://cdn.discordapp.com/badge-icons/2ba85e8026a8614b640c2837bcdfe21b.png",
-            };
-            const hasNitro = (list: any[]) => list.some((b: any) => b.id === "nitro" || b.id === "fakeuserswitcher-nitro" || b.description === "Discord Nitro" || b.icon === "2ba85e8026a8614b640c2837bcdfe21b");
+            let baseBadges = original?.badges ?? (targetProfile?.badges || []);
 
-            let computed: any[] = [];
-            if (activeSpoof && targetProfile && targetProfile.badges && targetProfile.badges.length) {
-                computed = [...targetProfile.badges];
-            } else if (activeSpoof) {
-                const flags = (targetUser as any).publicFlags ?? (targetUser as any).flags ?? 0;
-                for (const fb of FLAG_BADGES) {
-                    if ((flags & fb.flag) === fb.flag) {
-                        computed.push({
-                            id: `fakeuserswitcher-flag-${fb.flag}`,
-                            description: fb.description,
-                            icon: fb.image,
-                        });
-                    }
-                }
-                const premium = overrides.premiumType ?? (targetUser as any).premiumType ?? 0;
-                if (premium >= 1) computed.push(nitroBadge);
-            } else {
-                computed = [...baseBadges];
+            // De-dupe real vs spoofed tier badges. When the user picks a spoofed Nitro
+            // or Boost tier, Discord still renders their REAL Nitro/boost badge from the
+            // profile's badges array, and dynamicBadge.getBadges adds the spoofed tier on
+            // top — producing two of the same kind (e.g. real Bronze + spoofed Opal).
+            // Strip the native premium / guild-boost badges here so only the spoofed
+            // tier (rendered by the dynamic profile badge) remains.
+            const spoofingNitroTier = isManual && (manualData?.manualNitroLevel ?? -1) >= 0;
+            const spoofingBoostTier = isManual && (manualData?.manualBoostMonths ?? -1) >= 0;
+            logger.info("[FUS-BADGE] profileHook badges — spoofNitro=", spoofingNitroTier, "spoofBoost=", spoofingBoostTier, "rawBadges=", JSON.stringify((Array.isArray(baseBadges) ? baseBadges : []).map((b: any) => ({ id: b?.id, desc: b?.description }))));
+            if (Array.isArray(baseBadges) && (spoofingNitroTier || spoofingBoostTier)) {
+                baseBadges = baseBadges.filter((b: any) => {
+                    const id = String(b?.id ?? "");
+                    const desc = String(b?.description ?? "");
+                    const isNativeNitro = id === "premium" || id === "nitro"
+                        || id.startsWith("premium") || /\bnitro\b/i.test(desc) || /\bnitro\b/i.test(id);
+                    const isNativeBoost = id.startsWith("guild_booster") || id === "premium_guild"
+                        || id.startsWith("guild_boost") || /boosting|server boost/i.test(desc) || /boost/i.test(id);
+                    if (spoofingNitroTier && isNativeNitro) { logger.info("[FUS-BADGE] stripping native nitro:", id, desc); return false; }
+                    if (spoofingBoostTier && isNativeBoost) { logger.info("[FUS-BADGE] stripping native boost:", id, desc); return false; }
+                    return true;
+                });
+                overrides.badges = baseBadges;
             }
 
-            if (selfNitro && !hasNitro(computed)) computed.push(nitroBadge);
-            if (computed.length) overrides.badges = computed;
+            const hasNitroBadge = baseBadges.some((b: any) => b.id === "nitro" || b.id === "fakeuserswitcher-nitro" || b.description === "Discord Nitro" || b.icon === "2ba85e8026a8614b640c2837bcdfe21b");
+            if (selfNitro && !hasNitroBadge) {
+                overrides.badges = [
+                    ...baseBadges,
+                    {
+                        id: "fakeuserswitcher-nitro",
+                        description: "Discord Nitro",
+                        icon: "https://cdn.discordapp.com/badge-icons/2ba85e8026a8614b640c2837bcdfe21b.png",
+                    }
+                ];
+            } else if (activeSpoof) {
+                // When spoofing a real target that carries its own profile badges,
+                // mirror them. Otherwise leave badges to the dynamic profile badge
+                // (addProfileBadge / dynamicBadge.getBadges), which already renders
+                // the flag + Nitro/Boost tier badges with the correct tier icon and
+                // subscriber-since tooltip. Recomputing them here produced a second,
+                // plain Nitro badge alongside the rich one.
+                if (targetProfile && targetProfile.badges && targetProfile.badges.length) {
+                    overrides.badges = targetProfile.badges;
+                }
+            }
         }
 
         if (activeSpoof && settings.store.spoofActivities && !isManual) {
@@ -1742,6 +2628,8 @@ const plugin = definePlugin({
         if (!active) return undefined;
 
         if (active.isManual) {
+            const dataUrl = active.manualData?.manualBannerDataUrl;
+            if (dataUrl) return dataUrl;
             const banner = active.manualData?.manualBanner || active.manualData?.banner;
             if (banner) {
                 if (banner.startsWith("#")) return "";
@@ -1761,6 +2649,11 @@ const plugin = definePlugin({
 
     onBeforeMessageSend(channelId, msg, options) {
         if (!isActive() || !settings.store.fakeMessages) return;
+        // Overlay mode keeps your REAL identity (only cosmetics are applied), so a
+        // message must send for real, as you — never replaced by a local fake authored
+        // as "FakeUser". Returning here lets Discord's normal send path run unchanged.
+        const active = getActiveTargetForGuild(undefined);
+        if (active?.manualData?.overlaySelf) return;
         const replyRef = options?.replyOptions?.messageReference;
         const fake = buildFakeMessage(channelId, msg.content, replyRef);
         if (!fake) return;
