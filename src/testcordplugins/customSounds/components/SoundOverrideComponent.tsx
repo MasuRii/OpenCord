@@ -87,6 +87,11 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
     const sound = React.useRef<SoundPlayer | null>(null);
     const update = useForceUpdater();
 
+    React.useEffect(() => () => {
+        sound.current?.stop();
+        sound.current = null;
+    }, []);
+
     const soundOptions = [
         { value: "default", label: "Default" },
     ];
@@ -250,7 +255,10 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
                     </Button>
                     <Button
                         color={Button.Colors.RED}
-                        onClick={() => sound.current?.stop()}
+                        onClick={() => {
+                            sound.current?.stop();
+                            sound.current = null;
+                        }}
                         className={Margins.left8}
                     >
                         Stop
