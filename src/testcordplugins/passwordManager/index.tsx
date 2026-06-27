@@ -287,6 +287,9 @@ const SetMasterPasswordModal = ({ manager, onSuccess, ...props }: Modal.ModalPro
     const [password, setPassword] = React.useState("");
     const [confirmPassword, setConfirmPassword] = React.useState("");
     const [error, setError] = React.useState("");
+    const mountedRef = React.useRef(true);
+
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
 
     return (
         <Modal.ModalRoot {...props}>
@@ -323,6 +326,7 @@ const SetMasterPasswordModal = ({ manager, onSuccess, ...props }: Modal.ModalPro
                                 return;
                             }
                             await manager.setMasterPassword(password);
+                            if (!mountedRef.current) return;
                             onSuccess?.();
                             props.onClose();
                         }}
@@ -355,6 +359,9 @@ const DeletePasswordModal = ({
 }) => {
     const [masterPassword, setMasterPassword] = React.useState("");
     const [error, setError] = React.useState("");
+    const mountedRef = React.useRef(true);
+
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
 
     return (
         <Modal.ModalRoot {...props}>
@@ -381,6 +388,7 @@ const DeletePasswordModal = ({
                         disabled={!masterPassword}
                         onClick={async () => {
                             const success = await manager.deletePassword(passwordId, masterPassword);
+                            if (!mountedRef.current) return;
                             if (success) {
                                 onSuccess();
                                 props.onClose();
@@ -414,9 +422,13 @@ const ViewPasswordModal = ({
     const [masterPassword, setMasterPassword] = React.useState("");
     const [showPassword, setShowPassword] = React.useState(false);
     const [error, setError] = React.useState("");
+    const mountedRef = React.useRef(true);
+
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
 
     const verifyAndShow = async () => {
         const isValid = await manager.verifyMasterPassword(masterPassword);
+        if (!mountedRef.current) return;
         if (isValid) {
             setShowPassword(true);
         } else {
@@ -501,15 +513,17 @@ const PasswordEntryComponent = ({ entry, manager, onDelete }: {
 
     React.useEffect(() => {
         if (entry.twoFactorSecret && entry.twoFactorType === "2fa_totp") {
+            let cancelled = false;
             const updateCode = async () => {
                 const code = await manager.generateTOTPCode(entry.twoFactorSecret!);
+                if (cancelled) return;
                 setTotpCode(code);
             };
             updateCode();
             const interval = setInterval(updateCode, 1000);
-            return () => clearInterval(interval);
+            return () => { cancelled = true; clearInterval(interval); };
         }
-    }, [entry.twoFactorSecret]);
+    }, [entry.twoFactorSecret, entry.twoFactorType, manager]);
 
     const copyToClipboard = async (text: string) => {
         try {
