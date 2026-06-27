@@ -46,17 +46,19 @@ export interface NativeFetchResponse {
 export async function sendWebhook(_: IpcMainInvokeEvent, webhookUrl: string, payload: string): Promise<NativeWebhookResponse> {
     try {
         const url = new URL(webhookUrl);
+        if (!isDiscordWebhookUrl(url)) throw new Error("Webhook URL is not allowed");
         url.searchParams.set("wait", "true");
 
         const response = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: payload,
+            signal: AbortSignal.timeout(PROXY_REQUEST_TIMEOUT_MS),
         });
 
         return {
             status: response.status,
-            data: await response.text(),
+            data: await readCappedText(response),
         };
     } catch (error) {
         return {
@@ -68,10 +70,13 @@ export async function sendWebhook(_: IpcMainInvokeEvent, webhookUrl: string, pay
 
 export async function fetchTextUrl(_: IpcMainInvokeEvent, url: string): Promise<NativeFetchResponse> {
     try {
-        const response = await fetch(url);
+        const parsed = new URL(url);
+        if (!isAllowedTextFetchUrl(parsed)) throw new Error("URL is not allowed");
+
+        const response = await fetch(parsed, { signal: AbortSignal.timeout(PROXY_REQUEST_TIMEOUT_MS) });
         return {
             status: response.status,
-            body: await response.text(),
+            body: await readCappedText(response),
         };
     } catch (error) {
         return {
@@ -116,7 +121,15 @@ export async function fetchUrlViaProxy(_: IpcMainInvokeEvent, url: string, proxy
             req.on("response", res => {
                 clearTimeout(timer);
                 const chunks: Buffer[] = [];
-                res.on("data", (chunk: Buffer) => chunks.push(chunk));
+                let bytes = 0;
+                res.on("data", (chunk: Buffer) => {
+                    bytes += chunk.byteLength;
+                    if (bytes > MAX_RESPONSE_BYTES) {
+                        res.destroy(new Error("Response was too large."));
+                        return;
+                    }
+                    chunks.push(chunk);
+                });
                 res.on("end", () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") }));
                 res.on("error", reject);
             });
@@ -141,6 +154,35 @@ const HTTPS_PORT = 443;
 const PROXY_CONNECT_TIMEOUT_MS = 10000;
 const PROXY_REQUEST_TIMEOUT_MS = 15000;
 const PROXY_CHECK_TIMEOUT_MS = 8000;
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+const MAX_BATCH_PROXY_CHECK_IPS = 100;
+const ALLOWED_TEXT_FETCH_HOSTS = new Set([
+    "api.proxyscrape.com",
+    "flashproxy.com",
+    "cdn.jsdelivr.net",
+    "proxylist.geonode.com",
+    "proxyradar.net",
+    "raw.githubusercontent.com",
+    "databay.com",
+    "vakhov.github.io"
+]);
+
+function isDiscordWebhookUrl(url: URL) {
+    return url.protocol === "https:" && ["discord.com", "ptb.discord.com", "canary.discord.com"].includes(url.hostname) && url.pathname.startsWith("/api/webhooks/");
+}
+
+function isAllowedTextFetchUrl(url: URL) {
+    return url.protocol === "https:" && ALLOWED_TEXT_FETCH_HOSTS.has(url.hostname);
+}
+
+async function readCappedText(response: Response) {
+    const length = Number(response.headers.get("content-length"));
+    if (Number.isFinite(length) && length > MAX_RESPONSE_BYTES) throw new Error("Response was too large.");
+
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) throw new Error("Response was too large.");
+    return text;
+}
 
 /**
  * Opens a CONNECT tunnel through an HTTP proxy and returns a TLS socket
@@ -200,15 +242,21 @@ function parseProxy(proxy: string): { host: string; port: number; } | null {
 }
 
 async function fetchJsonDirect<T>(url: string): Promise<T> {
+    const parsed = new URL(url);
+    if (!["proxycheck.io", "ip-api.com"].includes(parsed.hostname)) throw new Error("URL is not allowed");
+
     const response = await fetch(url, {
         signal: AbortSignal.timeout(PROXY_CHECK_TIMEOUT_MS),
         headers: { "Accept": "application/json" },
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json() as T;
+    return JSON.parse(await readCappedText(response)) as T;
 }
 
 async function fetchJsonDirectPost<T>(url: string, body: unknown): Promise<T> {
+    const parsed = new URL(url);
+    if (parsed.hostname !== "ip-api.com") throw new Error("URL is not allowed");
+
     const response = await fetch(url, {
         method: "POST",
         signal: AbortSignal.timeout(PROXY_CHECK_TIMEOUT_MS),
@@ -219,7 +267,7 @@ async function fetchJsonDirectPost<T>(url: string, body: unknown): Promise<T> {
         body: JSON.stringify(body),
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json() as T;
+    return JSON.parse(await readCappedText(response)) as T;
 }
 
 async function checkProxyIpWithService(proxyHost: string, service: NativeProxyCheckService): Promise<void> {
@@ -268,7 +316,15 @@ async function checkProxyExitWithIpify(proxyHost: string, proxyPort: number): Pr
             req.on("response", res => {
                 clearTimeout(timer);
                 const chunks: Buffer[] = [];
-                res.on("data", (chunk: Buffer) => chunks.push(chunk));
+                let bytes = 0;
+                res.on("data", (chunk: Buffer) => {
+                    bytes += chunk.byteLength;
+                    if (bytes > MAX_RESPONSE_BYTES) {
+                        res.destroy(new Error("Response was too large."));
+                        return;
+                    }
+                    chunks.push(chunk);
+                });
                 res.on("end", () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") }));
                 res.on("error", reject);
             });
@@ -326,7 +382,15 @@ function proxyRequest(
         req.on("response", res => {
             clearTimeout(timer);
             const chunks: Buffer[] = [];
-            res.on("data", (chunk: Buffer) => chunks.push(chunk));
+            let bytes = 0;
+            res.on("data", (chunk: Buffer) => {
+                bytes += chunk.byteLength;
+                if (bytes > MAX_RESPONSE_BYTES) {
+                    res.destroy(new Error("Response was too large."));
+                    return;
+                }
+                chunks.push(chunk);
+            });
             res.on("end", () => {
                 const responseBody = Buffer.concat(chunks).toString("utf8");
                 console.debug(`[QuestRegions/Native] ← ${method} ${path} status=${res.statusCode} body=${responseBody.slice(0, 300)}${responseBody.length > 300 ? "…" : ""}`);
@@ -417,7 +481,7 @@ export async function batchCheckProxyIps(
     service: NativeProxyCheckService,
     ips: string[],
 ): Promise<NativeBatchProxyCheckEntry[]> {
-    const uniqueIps = Array.from(new Set(ips.filter(Boolean)));
+    const uniqueIps = Array.from(new Set(ips.filter(Boolean))).slice(0, MAX_BATCH_PROXY_CHECK_IPS);
     if (uniqueIps.length === 0) return [];
     if (service === "ipify") return [];
 
@@ -542,7 +606,10 @@ export async function geoCheckProxy(
                 const innerTimer = setTimeout(() => { socket.destroy(); reject(new Error("Geo request timed out")); }, geoTimeoutMs);
                 let raw = "";
                 socket.write(`GET ${GEO_PATH} HTTP/1.1\r\nHost: ${GEO_HOST}\r\nConnection: close\r\n\r\n`);
-                socket.on("data", (chunk: Buffer) => { raw += chunk.toString(); });
+                socket.on("data", (chunk: Buffer) => {
+                    raw += chunk.toString();
+                    if (Buffer.byteLength(raw) > MAX_RESPONSE_BYTES) socket.destroy(new Error("Response was too large."));
+                });
                 socket.on("end", () => {
                     clearTimeout(innerTimer);
                     try {
