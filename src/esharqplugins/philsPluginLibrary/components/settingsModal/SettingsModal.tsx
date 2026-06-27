@@ -19,8 +19,8 @@
 import { BaseText } from "@components/BaseText";
 import { Button } from "@components/Button";
 import { Flex } from "@components/Flex";
-import { ContributorAuthorSummary } from "@esharqplugins/philsPluginLibrary/components/ContributorAuthorSummary";
-import { Author, Contributor } from "@esharqplugins/philsPluginLibrary/types";
+import { ContributorAuthorSummary } from "@plugins/philsPluginLibrary/components/ContributorAuthorSummary";
+import { Author, Contributor } from "@plugins/philsPluginLibrary/types";
 import * as ModalParts from "@utils/modal";
 import { RenderModalProps } from "@vencord/discord-types";
 import React, { ComponentType, JSX } from "react";

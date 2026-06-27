@@ -16,8 +16,7 @@ import {
     SelectedGuildStore,
     Constants,
 } from "@webpack/common";
-import { t } from "@esharqplugins/_esharqI18n";
-import { EsharqDevs } from "@utils/constants";
+import { t } from "@utils/esharqI18n";
 import definePlugin, { OptionType } from "@utils/types";
 import { User, VoiceState } from "@vencord/discord-types";
 
@@ -135,7 +134,7 @@ export default definePlugin({
     name: "Leash",
     description: "Leashes a user to you by automatically moving them to whatever voice channel you join.\n\n⚠️ WARNING: Moving users to voice channels without their consent may violate Discord's Terms of Service and community guidelines. This feature requires server moderation permissions. Use responsibly.",
     tags: ["Utility"],
-    authors: [EsharqDevs.x2b],
+    authors: [{ name: "x2b", id: 0n }],
     settingsAboutComponent: () => (
         <div style={{
             color: "var(--text-danger)",

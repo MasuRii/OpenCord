@@ -7,8 +7,8 @@
 import { HeaderBarButton } from "@api/HeaderBar";
 import { definePluginSettings, useSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { EsharqDevs } from "@utils/constants";
-import { t } from "@esharqplugins/_esharqI18n";
+import { EquicordDevs } from "@utils/constants";
+import { t } from "@utils/esharqI18n";
 import definePlugin, { OptionType } from "@utils/types";
 import { Button, openModal, React } from "@webpack/common";
 
@@ -24,9 +24,10 @@ function runScan() {
 function openDiagnostics() {
     const initial = runScan();          // single pass at click time
     const heapMB = sampleHeapMB();
+    const interval = settings.store.liveInterval ?? 5;   // live-monitoring refresh seconds
     openModal(props => (
         <ErrorBoundary>
-            <DiagnosticsModal modalProps={props} initial={initial} heapMB={heapMB} rescan={runScan} />
+            <DiagnosticsModal modalProps={props} initial={initial} heapMB={heapMB} rescan={runScan} interval={interval} />
         </ErrorBoundary>
     ));
     // `initial` is referenced only by the modal closure; released for GC when the modal unmounts.
@@ -53,6 +54,13 @@ function HeaderBarDiagnosticsButton() {
 }
 
 const settings = definePluginSettings({
+    liveInterval: {
+        type: OptionType.SLIDER,
+        description: t("الفاصل الزمني لتحديث المراقبة الحية (بالثواني)", "Live-monitoring refresh interval (seconds)"),
+        markers: [3, 5, 10, 15, 30],
+        default: 5,
+        stickToMarkers: true,
+    },
     open: {
         type: OptionType.COMPONENT,
         component: () => (
@@ -65,7 +73,7 @@ export default definePlugin({
     name: "EsharqDiagnostics",
     description: "On-demand, one-shot snapshot of each enabled plugin's footprint (patches, listeners, UI injects, load). Zero cost when idle.",
     tags: ["Utility"],
-    authors: [EsharqDevs.LOSTSTR],
+    authors: [EquicordDevs.LOSTSTR],
     dependencies: ["HeaderBarAPI"],
     settings,
 

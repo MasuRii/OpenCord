@@ -7,8 +7,7 @@
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
 
-import { t } from "@esharqplugins/_esharqI18n";
-import { EsharqDevs } from "@utils/constants";
+import { t } from "@utils/esharqI18n";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByCodeLazy } from "@webpack";
 import {
@@ -502,7 +501,7 @@ export default definePlugin({
     name: "GuildCopier",
     description: "Copy a full server including channels, roles, permissions, emojis, stickers, and categories to create an identical server.",
     tags: ["Servers", "Utility"],
-    authors: [EsharqDevs.x2b, EsharqDevs.nnenaza],
+    authors: [{ name: "x2b", id: 996137713432530976n }, { name: "nnenaza", id: 1501441039418785933n }],
     dependencies: [],
 
     settings,
