@@ -13,6 +13,7 @@ const LOG_PREFIX = "[DsaWarnings/native]";
 const CORS_PROXY = "https://cors.keiran0.workers.dev";
 const PARTITION = "persist:dsa-warnings";
 const FETCH_TIMEOUT_MS = 15_000;
+const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const WINDOW_WIDTH = 1120;
 const WINDOW_HEIGHT = 860;
 
@@ -36,6 +37,29 @@ function getSession() {
 
 function getMainWindow() {
     return BrowserWindow.getAllWindows().find(window => !window.isDestroyed()) ?? null;
+}
+
+function isSafeExternalUrl(url: string) {
+    try {
+        return new URL(url).protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+function getSafeCordQueryUrl(parsedId: string) {
+    const url = new URL(`/api/v2/query/${encodeURIComponent(parsedId)}`, getCordBaseUrl());
+    if (url.protocol !== "https:") throw new Error("CordCat API URL must use https.");
+    return url.toString();
+}
+
+async function readCappedText(response: Response) {
+    const length = Number(response.headers.get("content-length"));
+    if (Number.isFinite(length) && length > MAX_RESPONSE_BYTES) throw new Error("Response was too large.");
+
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) throw new Error("Response was too large.");
+    return text;
 }
 
 function buildBrowseUrl(parsedId?: string) {
@@ -84,7 +108,7 @@ export async function openCaptchaWindow(_: IpcMainInvokeEvent, parsedId?: string
     });
 
     win.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
+        if (isSafeExternalUrl(url)) void shell.openExternal(url);
         return { action: "deny" };
     });
 
@@ -106,7 +130,7 @@ async function tryDirectFetch(url: string, headers: Record<string, string>): Pro
     return {
         ok: true,
         status: response.status,
-        body: await response.text()
+        body: await readCappedText(response)
     };
 }
 
@@ -119,7 +143,7 @@ async function tryNodeFetch(url: string, headers: Record<string, string>): Promi
     return {
         ok: true,
         status: response.status,
-        body: await response.text()
+        body: await readCappedText(response)
     };
 }
 
@@ -133,7 +157,7 @@ async function tryProxiedFetch(targetUrl: string, headers: Record<string, string
     return {
         ok: true,
         status: response.status,
-        body: await response.text()
+        body: await readCappedText(response)
     };
 }
 
@@ -142,8 +166,7 @@ function isUsableResponse(result: NativeCordCatResult): boolean {
 }
 
 export async function fetchCordCatQuery(_: IpcMainInvokeEvent, parsedId: string): Promise<NativeCordCatResult> {
-    const cordBaseUrl = getCordBaseUrl();
-    const url = `${cordBaseUrl}/api/v2/query/${encodeURIComponent(parsedId)}`;
+    const url = getSafeCordQueryUrl(parsedId);
     const apiKey = getPluginSettings()?.cordCatApiKey;
 
     if (!apiKey || typeof apiKey !== "string" || apiKey.trim().length === 0) {
