@@ -9,7 +9,6 @@ import { definePluginSettings } from "@api/Settings";
 import { Link } from "@components/Link";
 import definePlugin, { OptionType } from "@utils/types";
 import { showToast, Toasts } from "@webpack/common";
-import { findByCode } from "@webpack";
 
 const LOCAL_FAVS_KEY = "UnlimitedFavoriteGIFs_localFavs";
 

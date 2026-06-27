@@ -1,7 +1,13 @@
-import definePlugin, { OptionType } from "@utils/types";
-import { FluxDispatcher, Toasts, UserStore } from "@webpack/common";
-import { findByPropsLazy } from "@webpack";
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { definePluginSettings } from "@api/Settings";
+import definePlugin, { OptionType } from "@utils/types";
+import { findByPropsLazy } from "@webpack";
+import { FluxDispatcher, Toasts, UserStore } from "@webpack/common";
 
 const languageKeywords: Record<string, string[]> = {
     es: [
@@ -167,21 +173,21 @@ const settings = definePluginSettings({
         type: OptionType.SELECT,
         description: "Language to automatically block",
         options: [
-            { label: "Spanish",    value: "es" },
-            { label: "English",    value: "en" },
-            { label: "Turkish",    value: "tr" },
+            { label: "Spanish", value: "es" },
+            { label: "English", value: "en" },
+            { label: "Turkish", value: "tr" },
             { label: "Portuguese", value: "pt" },
-            { label: "French",     value: "fr" },
-            { label: "German",     value: "de" },
-            { label: "Italian",    value: "it" },
-            { label: "Russian",    value: "ru" },
-            { label: "Japanese",   value: "ja" },
-            { label: "Chinese",    value: "zh" },
-            { label: "Korean",     value: "ko" },
-            { label: "Arabic",     value: "ar" },
-            { label: "Hindi",      value: "hi" },
-            { label: "Polish",     value: "pl" },
-            { label: "Dutch",      value: "nl" },
+            { label: "French", value: "fr" },
+            { label: "German", value: "de" },
+            { label: "Italian", value: "it" },
+            { label: "Russian", value: "ru" },
+            { label: "Japanese", value: "ja" },
+            { label: "Chinese", value: "zh" },
+            { label: "Korean", value: "ko" },
+            { label: "Arabic", value: "ar" },
+            { label: "Hindi", value: "hi" },
+            { label: "Polish", value: "pl" },
+            { label: "Dutch", value: "nl" },
         ],
         default: "tr",
     },

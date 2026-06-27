@@ -1,3 +1,9 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { ApplicationCommandInputType, ApplicationCommandOptionType, ApplicationCommandType, sendBotMessage } from "@api/Commands";
 import { Devs } from "@utils/constants";
 import { getCurrentChannel, sendMessage } from "@utils/discord";

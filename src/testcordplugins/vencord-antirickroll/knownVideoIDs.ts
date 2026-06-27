@@ -60,5 +60,3 @@ export const knownVideoIds = [
     "hvL1339luv0", // A cat sings it
     "N9w1lCZfaWI", // Gamecube version
 ];
-
-

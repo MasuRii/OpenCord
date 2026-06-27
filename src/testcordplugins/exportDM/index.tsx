@@ -1,17 +1,20 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
-import { openModal, ModalRoot, ModalHeader, ModalContent, ModalCloseButton } from "@utils/modal";
-import definePlugin from "@utils/types";
-import { React, useState, useEffect } from "@webpack/common";
-import { Forms } from "@webpack/common";
-import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { t, useTranslation } from "../autoTranslateNightcord";
 import "./styles.css";
+
+import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
+import { TestcordRequestCoordinator } from "@api/index";
+import { ModalCloseButton,ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
+import definePlugin from "@utils/types";
+import { findStoreLazy } from "@webpack";
+import { React, useEffect,useState } from "@webpack/common";
+import { Forms } from "@webpack/common";
+
+import { t } from "../autoTranslateNightcord";
 
 const ChannelStore = findStoreLazy("ChannelStore");
 const UserStore = findStoreLazy("UserStore");
@@ -89,10 +92,18 @@ async function fetchAllMessages(channelId: string, token: string, onProgress: (n
     let count = 0;
 
     while (true) {
-        const url = `https://discord.com/api/v9/channels/${channelId}/messages?limit=100${beforeId ? `&before=${beforeId}` : ""}`;
-        const res = await fetch(url, { headers: { Authorization: token } });
-        if (!res.ok) break;
-        const batch: any[] = await res.json();
+        const batch = await TestcordRequestCoordinator.request<unknown[]>({
+            key: `discord:messages:${channelId}:before:${beforeId ?? ""}:limit:100`,
+            ttlMs: 30_000,
+            run: async () => {
+                const url = `https://discord.com/api/v9/channels/${channelId}/messages?limit=100${beforeId ? `&before=${beforeId}` : ""}`;
+                const res = await fetch(url, { headers: { Authorization: token } });
+                if (!res.ok) return [];
+                const body = await res.json() as unknown;
+                return Array.isArray(body) ? body : [];
+            },
+            cacheable: Array.isArray,
+        });
         if (!batch.length) break;
 
         for (const m of batch) {
@@ -296,12 +307,12 @@ function buildHtml(messages: RichMessage[], channelName: string): string {
             return `<div class="attachment"><a href="${a.url}" target="_blank">${a.filename}</a> <span class="size">${formatSize(a.size)}</span></div>`;
         }).join("");
         const embedHtml = m.embeds.map(e => {
-            let html = `<div class="embed">`;
+            let html = "<div class=\"embed\">";
             if (e.title) html += `<div class="embed-title">${e.title.replace(/</g, "&lt;")}</div>`;
             if (e.description) html += `<div class="embed-desc">${e.description.slice(0, 300).replace(/</g, "&lt;")}</div>`;
             if (e.image) html += `<img src="${e.image}" class="embed-img" loading="lazy">`;
             if (e.url) html += `<a href="${e.url}" target="_blank" class="embed-url">${e.url}</a>`;
-            return html + `</div>`;
+            return html + "</div>";
         }).join("");
         const stickerHtml = m.stickers.map(s => `<span class="sticker">${s.name}</span>`).join("");
         const reactHtml = m.reactions.length
@@ -538,7 +549,7 @@ function ExportButton() {
 export default definePlugin({
     name: "ExportDM",
     description: "Exports your DMs with messages, images, videos, audio, links, embeds, stickers, reactions in TXT/JSON/CSV/MD/HTML.",
-    tags: ["Media", "Utility", "Utility"],
+    tags: ["Media", "Utility", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     dependencies: ["HeaderBarAPI"],
 

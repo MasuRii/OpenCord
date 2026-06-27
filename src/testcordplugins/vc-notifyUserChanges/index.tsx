@@ -7,11 +7,11 @@
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings, Settings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import type { Channel, User } from "@vencord/discord-types";
+import type { Channel, Message, User } from "@vencord/discord-types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { Menu, PresenceStore, React, SelectedChannelStore, Tooltip, UserStore } from "@webpack/common";
+import { ChannelStore, GuildStore, Menu, NavigationRouter, PresenceStore, React, SelectedChannelStore, Tooltip, UserStore } from "@webpack/common";
 import { CSSProperties } from "react";
 
 import { NotificationsOffIcon } from "./components/NotificationsOffIcon";
@@ -185,6 +185,12 @@ export const settings = definePluginSettings({
         restartNeeded: false,
         default: false,
     },
+    notifyMessage: {
+        type: OptionType.BOOLEAN,
+        description: "Notify when a watched user sends a message",
+        restartNeeded: false,
+        default: false,
+    },
     persistNotifications: {
         type: OptionType.BOOLEAN,
         description: "Persist notifications",
@@ -343,12 +349,42 @@ export default definePlugin({
                 }
                 lastStatuses.set(userId, status);
             }
+        },
+        MESSAGE_CREATE({ message, optimistic, type }: { message: Message; optimistic?: boolean; type?: string; }) {
+            if (!settings.store.notifyMessage || !settings.store.userIds) {
+                return;
+            }
+            if (optimistic || (type === "MESSAGE_CREATE" && message.state === "SENDING")) {
+                return;
+            }
+            if (!getUserIdList().includes(message.author.id)) {
+                return;
+            }
+
+            const channel = ChannelStore.getChannel(message.channel_id);
+            const guild = channel?.guild_id ? GuildStore.getGuild(channel.guild_id) : null;
+            const user = UserStore.getUser(message.author.id) ?? message.author;
+            const channelName = channel
+                ? guild
+                    ? `${guild.name} > #${channel.name}`
+                    : `DM > ${channel.name}`
+                : "a channel";
+            const name = user.username;
+
+            showNotification({
+                title: shouldBeNative() ? `${name} sent a message` : "User sent a message",
+                body: `They sent a message in ${channelName}`,
+                noPersist: !settings.store.persistNotifications,
+                richBody: getRichBody(user, `${name} sent a message in ${channelName}:\n${message.content.substring(0, 200) || "(message hidden)"}`),
+                onClick: () => {
+                    if (!channel) return;
+                    const route = channel.guild_id
+                        ? `/channels/${channel.guild_id}/${channel.id}`
+                        : `/channels/@me/${channel.id}`;
+                    NavigationRouter.transitionTo(route);
+                }
+            });
         }
     },
 
 });
-
-
-
-
-

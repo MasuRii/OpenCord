@@ -1,17 +1,19 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import "./styles.css";
+
 import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
-import { openModal, ModalRoot, ModalHeader, ModalContent, ModalCloseButton } from "@utils/modal";
+import { ModalCloseButton,ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { Forms, Menu, ContextMenuApi, showToast, Toasts, Select } from "@webpack/common";
-import { React, useState, useEffect, useMemo, useCallback } from "@webpack/common";
+import { ContextMenuApi, Forms, Menu, Select,showToast, Toasts } from "@webpack/common";
+import { React, useCallback,useEffect, useMemo, useState } from "@webpack/common";
+
 import { t, useTranslation } from "../autoTranslateNightcord";
-import "./styles.css";
 
 const Dispatcher = findByPropsLazy("dispatch", "subscribe", "unsubscribe");
 const UserStore = findStoreLazy("UserStore");
@@ -797,7 +799,7 @@ function subscribeToEvents() {
 export default definePlugin({
     name: "EventLogs",
     description: "Logs: deleted/edited messages, voice, friends, servers.",
-    tags: ["Notifications", "Utility", "Utility"],
+    tags: ["Notifications", "Utility", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     dependencies: ["HeaderBarAPI"],
     start() {

@@ -1,7 +1,10 @@
 /*
- * Nightcord — LeaveAllServers plugin
- * Accessible via right-click on a server → "Leave All Servers"
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
+
+import "./styles.css";
 
 import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
@@ -9,8 +12,6 @@ import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } fro
 import definePlugin, { OptionType } from "@utils/types";
 import { findByProps, findByPropsLazy, findStoreLazy } from "@webpack";
 import { Forms, Menu, React, showToast, Toasts, useEffect, useMemo, useState } from "@webpack/common";
-
-import "./styles.css";
 
 const GuildStore = findStoreLazy("GuildStore");
 const GuildActions = findByPropsLazy("leaveGuild");
@@ -232,7 +233,7 @@ const patchGuildContext: NavContextMenuPatchCallback = (children, { guild }) => 
 export default definePlugin({
     name: "LeaveAllServers",
     description: "Leaves all selected servers. Accessible via right-click on a server.",
-    tags: ["Servers", "Utility"],
+    tags: ["Servers", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     settings,
 

@@ -5,6 +5,7 @@
  */
 
 import { ChatBarButton } from "@api/ChatButtons";
+import { addChannelToolbarButton, addHeaderBarButton, ChannelToolbarButton, HeaderBarButton, removeChannelToolbarButton, removeHeaderBarButton } from "@api/HeaderBar";
 import {
     addMessagePreSendListener,
     MessageSendListener,
@@ -13,6 +14,7 @@ import {
 import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
+import { React } from "@webpack/common";
 
 // Kaomoji arrays for different tones
 const kaomojis: Record<string, string[]> = {
@@ -154,7 +156,39 @@ function applyAutocorrect(content: string): string {
     return corrected;
 }
 
+const ChatGPTWritingIcon = ({ width = 20, height = 20 }: { width?: number; height?: number; }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width={width}
+        height={height}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+        <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+        <path d="M8.5 8.5v.01" />
+        <path d="M16 15.5v.01" />
+        <path d="M12 12v.01" />
+        <path d="M11 17v.01" />
+        <path d="M7 14v.01" />
+    </svg>
+);
+
 const settings = definePluginSettings({
+    location: {
+        type: OptionType.SELECT,
+        description: "Where to show the button",
+        options: [
+            { label: "Chat bar", value: "chatbar", default: true },
+            { label: "Header bar", value: "headerbar" },
+            { label: "Channel toolbar", value: "channeltoolbar" },
+            { label: "Disabled", value: "disabled" },
+        ],
+        restartNeeded: true,
+    },
     enabled: {
         type: OptionType.BOOLEAN,
         description: "Enable ChatGPT Writing plugin",
@@ -212,19 +246,15 @@ export default definePlugin({
     description: "Enhance your messages with kaomoji, emoji, and autocorrect",
     tags: ["Chat", "Utility"],
     authors: [TestcordDevs.x2b],
-    dependencies: ["MessageEventsAPI"],
+    dependencies: ["MessageEventsAPI", "HeaderBarAPI"],
     settings,
 
-    start() {
-        addMessagePreSendListener(getPresend());
-    },
+    _presendListener: null as MessageSendListener | null,
 
-    stop() {
-        removeMessagePreSendListener(getPresend());
-    },
-
-    renderChatBarButton: (({ isMainChat }) => {
-        if (!isMainChat) return null;
+    chatBarButton: {
+        icon: ChatGPTWritingIcon as any,
+        render: (({ isMainChat }) => {
+            if (!isMainChat || settings.store.location !== "chatbar") return null;
 
         return (
             <ChatBarButton
@@ -253,6 +283,38 @@ export default definePlugin({
                 </svg>
             </ChatBarButton>
         );
-    }) as any
-});
+    }) as any,
+    },
 
+    start() {
+        this._presendListener = getPresend();
+        addMessagePreSendListener(this._presendListener);
+        const { location } = settings.store;
+        if (location === "headerbar") {
+            addHeaderBarButton("ChatGPTWriting", () => (
+                <HeaderBarButton
+                    icon={() => <ChatGPTWritingIcon />}
+                    tooltip={settings.store.enabled ? "ChatGPT Writing (ON)" : "ChatGPT Writing (OFF)"}
+                    onClick={() => { settings.store.enabled = !settings.store.enabled; }}
+                />
+            ), 5);
+        } else if (location === "channeltoolbar") {
+            addChannelToolbarButton("ChatGPTWriting", () => (
+                <ChannelToolbarButton
+                    icon={() => <ChatGPTWritingIcon />}
+                    tooltip={settings.store.enabled ? "ChatGPT Writing (ON)" : "ChatGPT Writing (OFF)"}
+                    onClick={() => { settings.store.enabled = !settings.store.enabled; }}
+                />
+            ), 5);
+        }
+    },
+
+    stop() {
+        if (this._presendListener) {
+            removeMessagePreSendListener(this._presendListener);
+            this._presendListener = null;
+        }
+        removeHeaderBarButton("ChatGPTWriting");
+        removeChannelToolbarButton("ChatGPTWriting");
+    },
+});

@@ -86,5 +86,3 @@ export function FriendPruneModal(props) {
         </ModalRoot>
     );
 }
-
-

@@ -137,7 +137,7 @@ export async function setCustomBlocklist(domains: string[]): Promise<void> {
     customBlocklist = new Set(normalized);
 }
 
-// FMHY filterlist 
+// FMHY filterlist
 function parseFmhyFilterlist(text: string): string[] {
     const domains: string[] = [];
     for (const line of text.split("\n")) {

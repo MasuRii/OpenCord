@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings } from "@api/Settings";
 import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
+import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { RestAPI } from "@webpack/common";
 
@@ -59,18 +59,17 @@ async function applyHouse(houseId: number) {
 export default definePlugin({
     name: "HypeSquadSwitcher",
     description: "Easily switch between HypeSquad houses or remove your badge",
-    
+
     authors: [
         {
             name: "Dipraj",
-            id: 1407738161471422495n, 
+            id: 1407738161471422495n,
         },
         {
             name: "Coder",
             id:1099039269391171765n,
         }
-        
-    
+
     ],
     tags: ["Appearance", "Customisation"],
     enabledByDefault: false,

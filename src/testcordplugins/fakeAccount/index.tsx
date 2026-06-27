@@ -1,6 +1,6 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -333,7 +333,7 @@ const ctxPatch: NavContextMenuPatchCallback = (children, { user }) => {
 export default definePlugin({
     name: "FakeSwitcher",
     description: "Right-click → add a user to the switcher. Click in the switcher → your profile takes their appearance locally.",
-    tags: ["Appearance", "Privacy", "Utility"],
+    tags: ["Appearance", "Privacy", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     dependencies: ["HeaderBarAPI"],
 

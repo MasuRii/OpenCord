@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 
@@ -45,7 +45,6 @@ const settings = definePluginSettings({
         restartNeeded: true
     }
 });
-
 
 export default definePlugin({
     name: "NoButtons",
@@ -89,13 +88,7 @@ export default definePlugin({
         if (styleElement) {
             styleElement.remove();
         } else {
-            logger.error("Cannot remove style element: Style element is null");
-            throw new Error("Style element is null");
+            logger.warn("Cannot remove style element: Style element is null");
         }
     },
 });
-
-
-
-
-

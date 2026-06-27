@@ -10,8 +10,8 @@ import {
     sendBotMessage,
 } from "@api/Commands";
 import { DataStore } from "@api/index";
-import definePlugin from "@utils/types";
 import { TestcordDevs } from "@utils/constants";
+import definePlugin from "@utils/types";
 import {
     ChannelStore,
     GuildRoleStore,
@@ -165,7 +165,7 @@ async function restoreServer(
                     url: `/channels/${channelId}`,
                 });
                 deletedChannels++;
-                await new Promise((resolve) => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 300));
             } catch (error) {
                 console.error(
                     `[ServerBackup] Error deleting channel ${channel.name}:`,
@@ -189,7 +189,7 @@ async function restoreServer(
                     url: `/guilds/${targetGuildId}/roles/${role.id}`,
                 });
                 deletedRoles++;
-                await new Promise((resolve) => setTimeout(resolve, 300));
+                await new Promise(resolve => setTimeout(resolve, 300));
             } catch (error) {
                 console.error(
                     `[ServerBackup] Error deleting role ${role.name}:`,
@@ -216,7 +216,7 @@ async function restoreServer(
                 });
                 roleMapping[role.id] = body.id;
                 // Delay to avoid rate limit
-                await new Promise((resolve) => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 500));
             } catch (error) {
                 console.error(
                     `[ServerBackup] Error creating role ${role.name}:`,
@@ -226,8 +226,8 @@ async function restoreServer(
         }
 
         // Create channels (categories first, then others)
-        const categories = backup.channels.filter((c) => c.type === 4);
-        const otherChannels = backup.channels.filter((c) => c.type !== 4);
+        const categories = backup.channels.filter(c => c.type === 4);
+        const otherChannels = backup.channels.filter(c => c.type !== 4);
         const channelMapping: Record<string, string> = {};
 
         // Create categories first
@@ -249,7 +249,7 @@ async function restoreServer(
                     },
                 });
                 channelMapping[channel.id] = body.id;
-                await new Promise((resolve) => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 500));
             } catch (error) {
                 console.error(
                     `[ServerBackup] Error creating category ${channel.name}:`,
@@ -287,7 +287,7 @@ async function restoreServer(
                     body: channelBody,
                 });
                 channelMapping[channel.id] = body.id;
-                await new Promise((resolve) => setTimeout(resolve, 500));
+                await new Promise(resolve => setTimeout(resolve, 500));
             } catch (error) {
                 console.error(
                     `[ServerBackup] Error creating channel ${channel.name}:`,
@@ -296,7 +296,7 @@ async function restoreServer(
             }
         }
 
-        showToast(Toasts.Type.SUCCESS, "✅ Server restored successfully!");
+        showToast("✅ Server restored successfully!", Toasts.Type.SUCCESS);
     } catch (error) {
         console.error("[ServerBackup] Error during restoration:", error);
         throw error;
@@ -391,7 +391,7 @@ export default definePlugin({
 
                     if (subcommandName === "save") {
                         const serverIdOpt = subcommand.options?.find(
-                            (opt) => opt.name === "server_id"
+                            opt => opt.name === "server_id"
                         );
                         const serverId = (serverIdOpt?.value as string) || ctx.guild?.id;
 
@@ -414,10 +414,10 @@ export default definePlugin({
                         });
                     } else if (subcommandName === "restore") {
                         const backupNameOpt = subcommand.options?.find(
-                            (opt) => opt.name === "backup_name"
+                            opt => opt.name === "backup_name"
                         );
                         const targetServerIdOpt = subcommand.options?.find(
-                            (opt) => opt.name === "target_server_id"
+                            opt => opt.name === "target_server_id"
                         );
 
                         const backupName = backupNameOpt?.value as string;
@@ -464,7 +464,7 @@ export default definePlugin({
                             BACKUP_STORE_KEY
                         );
                         const backupList = backupKeys
-                            .map((key) => {
+                            .map(key => {
                                 const backup = backups![key];
                                 const date = new Date(backup.timestamp);
                                 return `**${key}**\n├ Server: ${backup.name}\n├ Roles: ${backup.roles.length
@@ -478,7 +478,7 @@ export default definePlugin({
                         });
                     } else if (subcommandName === "delete") {
                         const backupNameOpt = subcommand.options?.find(
-                            (opt) => opt.name === "backup_name"
+                            opt => opt.name === "backup_name"
                         );
                         const backupName = backupNameOpt?.value as string;
 
@@ -526,7 +526,3 @@ export default definePlugin({
         console.log("[ServerBackup] Plugin stopped");
     },
 });
-
-
-
-

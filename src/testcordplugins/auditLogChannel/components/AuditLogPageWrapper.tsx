@@ -23,5 +23,3 @@ export default function AuditLogPageWrapper(props: any) {
         <Spinner />
     </div> : <AuditLogPage {...props} />;
 }
-
-

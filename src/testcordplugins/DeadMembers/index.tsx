@@ -1,6 +1,26 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+import "./style.css";
+
+import { definePluginSettings } from "@api/Settings";
 import { Devs } from "@utils/constants";
-import definePlugin from "@utils/types";
+import definePlugin, { OptionType } from "@utils/types";
 import { ChannelStore, GuildMemberStore, useStateFromStores } from "@webpack/common";
+
+const settings = definePluginSettings({
+    indicatorStyle: {
+        type: OptionType.SELECT,
+        description: "How to indicate dead members",
+        options: [
+            { label: "Strikethrough", value: "strikethrough", default: true },
+            { label: "Badge", value: "badge" },
+        ],
+    },
+});
 
 export default definePlugin({
     name: "DeadMembers",
@@ -8,13 +28,14 @@ export default definePlugin({
     authors: [Devs.Kyuuhachi],
     tags: ["Servers", "Utility"],
     enabledByDefault: false,
+    settings,
 
     patches: [
         {
-            find: '.BADGES=1]="BADGES"',
+            find: ']="BADGES"',
             replacement: {
-                match: /(\i)=\{className:\i.username,style:.*?onContextMenu:\i,children:.*?\},/,
-                replace: "$&__dummyvar=($1.children=$self.wrapMessageAuthor(arguments[0],$1.children)),"
+                match: /(?<=onContextMenu:\i,children:)(.{0,300}?)(?=,"data-text":)/,
+                replace: "$self.wrapMessageAuthor(arguments[0],$&)"
             }
         },
         {
@@ -26,33 +47,39 @@ export default definePlugin({
         },
     ],
 
-    wrapMessageAuthor({ message }, text) {
+    wrapMessageAuthor({ message }: any, text: any) {
         const channel = ChannelStore.getChannel(message.channel_id);
-        return message.webhookId
-            ? text
-            : <DeadIndicator
+        if (message.webhookId) return text;
+        return (
+            <DeadIndicator
                 channel={channel}
                 userId={message.author.id}
                 text={text}
-            />;
+            />
+        );
     },
 
-    wrapForumAuthor({ channel, user }, text) {
-        return !user
-            ? text
-            : <DeadIndicator
+    wrapForumAuthor({ channel, user }: any, text: any) {
+        if (!user) return text;
+        return (
+            <DeadIndicator
                 channel={channel}
                 userId={user.id}
                 text={text}
-            />;
+            />
+        );
     },
 });
 
-
-function DeadIndicator({ channel, userId, text }) {
+function DeadIndicator({ channel, userId, text }: { channel: any; userId: string; text: any; }) {
     const isMember = useStateFromStores(
         [GuildMemberStore],
         () => GuildMemberStore.isMember(channel?.guild_id, userId),
     );
-    return channel?.guild_id && !isMember ? <s className="c98-author-dead">{text}</s> : text;
+    if (!channel?.guild_id || isMember) return text;
+
+    if (settings.store.indicatorStyle === "badge") {
+        return <span className="c98-author-dead-badge">{text}</span>;
+    }
+    return <s className="c98-author-dead">{text}</s>;
 }

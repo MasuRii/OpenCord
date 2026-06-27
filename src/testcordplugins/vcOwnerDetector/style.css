@@ -1,0 +1,4 @@
+.vc-owner-yellow {
+    color: #fbbf24 !important; /* highlight detected VC owner username */
+    font-weight: bold !important; /* highlight detected VC owner username */
+}

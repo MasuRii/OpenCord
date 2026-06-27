@@ -19,6 +19,10 @@
 import { Card } from "@components/Card";
 import { Flex } from "@components/Flex";
 import { Switch } from "@components/Switch";
+import { ModalSize, openModalLazy } from "@utils/modal";
+import { SelectOption } from "@vencord/discord-types";
+import { Button, Forms, React, Select, Slider, TextInput, useEffect, useState } from "@webpack/common";
+
 import { MicrophoneSettingsModal } from "../../betterMicrophone.desktop/components";
 import { PluginInfo } from "../../betterScreenshare.desktop/constants";
 import { ScreenshareAudioProfile, ScreenshareAudioStore, ScreenshareProfile, ScreenshareStore } from "../../betterScreenshare.desktop/stores";
@@ -36,9 +40,6 @@ import {
     validateTextInputNumber
 } from "../../philsPluginLibrary";
 import { Styles } from "../../philsPluginLibrary/styles";
-import { ModalSize, openModalLazy } from "@utils/modal";
-import { SelectOption } from "@vencord/discord-types";
-import { Button, Forms, React, Select, Slider, TextInput, useEffect, useState } from "@webpack/common";
 
 const simpleResolutions: readonly (SelectOption & { value: types.Resolution; })[] = [
     {
@@ -131,7 +132,6 @@ export const ScreenshareSettingsModal = (props: ScreenshareSettingsModalProps) =
         getCurrentProfile,
         getProfiles
     } = screenshareStore.use();
-
 
     const {
         name,
@@ -422,7 +422,6 @@ export const ScreenshareSettingsModal = (props: ScreenshareSettingsModalProps) =
             <Forms.FormTitle style={{ margin: 0 }} tag="h5">Simple</Forms.FormTitle>
             <Switch checked={simpleMode ?? false} disabled={isSaving} onChange={checked => setSimpleMode(checked)} />
         </Flex>;
-
 
     return (
         <SettingsModal

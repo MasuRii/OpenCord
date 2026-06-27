@@ -168,8 +168,8 @@ function buildCSS(): string {
 
     // ── User panel layout ──
     switch (st.userPanelLayout) {
-        case "grid2":    lines.push(gridCSS(S.panelButtons, 2, gap)); break;
-        case "grid3":    lines.push(gridCSS(S.panelButtons, 3, gap)); break;
+        case "grid2": lines.push(gridCSS(S.panelButtons, 2, gap)); break;
+        case "grid3": lines.push(gridCSS(S.panelButtons, 3, gap)); break;
         case "vertical":
             lines.push(verticalCSS(S.panelButtons, gap, S.audioParent, S.panelButton));
             lines.push(`${S.panelContainer} { flex-wrap: wrap !important; align-items: flex-start !important; padding-bottom: 6px !important; }`);
@@ -216,7 +216,7 @@ function buildCSS(): string {
                 ${S.panelButtons} { display: flex !important; flex-wrap: wrap !important; order: 1 !important; gap: ${gap}px !important; width: 100% !important; }
             `);
             break;
-        case "hidden":   lines.push(`${S.panelButtons} { display: none !important; }`); break;
+        case "hidden": lines.push(`${S.panelButtons} { display: none !important; }`); break;
         default:
             if (gap !== 4) lines.push(`${S.panelButtons} { gap: ${gap}px !important; }`);
             break;
@@ -224,14 +224,14 @@ function buildCSS(): string {
 
     // ── Call controls layout ──
     switch (st.callControlsLayout) {
-        case "grid2":    lines.push(gridCSS(S.callControls, 2, gap)); break;
+        case "grid2": lines.push(gridCSS(S.callControls, 2, gap)); break;
         case "vertical":
             lines.push(`
                 ${S.callControls} { display: flex !important; flex-direction: column !important; gap: ${gap}px !important; height: auto !important; align-items: stretch !important; }
                 ${S.callContainer} { height: auto !important; align-items: flex-start !important; flex-wrap: wrap !important; }
             `);
             break;
-        case "hidden":   lines.push(`${S.callControls} { display: none !important; }`); break;
+        case "hidden": lines.push(`${S.callControls} { display: none !important; }`); break;
         default:
             if (gap !== 4) lines.push(`${S.callControls} { gap: ${gap}px !important; }`);
             break;
@@ -344,12 +344,12 @@ function buildCSS(): string {
     }
 
     // Per-button hide
-    if (st.hideMute)        lines.push(`[aria-label="Mute"] { display: none !important; }`);
-    if (st.hideDeafen)      lines.push(`[aria-label="Deafen"] { display: none !important; }`);
-    if (st.hideSettings)    lines.push(`[aria-label="User Settings"] { display: none !important; }`);
-    if (st.hideCamera)      lines.push(`[aria-label="Turn On Camera"] { display: none !important; }`);
-    if (st.hideScreenShare) lines.push(`[aria-label="Share Your Screen"] { display: none !important; }`);
-    if (st.hideActivity)    lines.push(`[aria-label="Start An Activity"] { display: none !important; }`);
+    if (st.hideMute) lines.push("[aria-label=\"Mute\"] { display: none !important; }");
+    if (st.hideDeafen) lines.push("[aria-label=\"Deafen\"] { display: none !important; }");
+    if (st.hideSettings) lines.push("[aria-label=\"User Settings\"] { display: none !important; }");
+    if (st.hideCamera) lines.push("[aria-label=\"Turn On Camera\"] { display: none !important; }");
+    if (st.hideScreenShare) lines.push("[aria-label=\"Share Your Screen\"] { display: none !important; }");
+    if (st.hideActivity) lines.push("[aria-label=\"Start An Activity\"] { display: none !important; }");
 
     return lines.join("\n");
 }
@@ -368,35 +368,35 @@ function apply() {
 
 const PANEL_LAYOUTS = [
     { value: "default", label: "Default" },
-    { value: "grid2",   label: "2-Column Grid" },
-    { value: "grid3",   label: "3-Column Grid" },
+    { value: "grid2", label: "2-Column Grid" },
+    { value: "grid3", label: "3-Column Grid" },
     { value: "vertical", label: "Vertical Stack" },
     { value: "split_row", label: "Plugins Top (Row)" },
     { value: "split_grid2", label: "Plugins Top (2-Col Grid)" },
     { value: "split_grid3", label: "Plugins Top (3-Col Grid)" },
     { value: "split_grid4", label: "Plugins Top (4-Col Grid)" },
     { value: "all_top", label: "All Buttons Top" },
-    { value: "hidden",  label: "Hidden" },
+    { value: "hidden", label: "Hidden" },
 ];
 const CALL_LAYOUTS = [
-    { value: "default",  label: "Default" },
-    { value: "grid2",    label: "2-Column Grid" },
+    { value: "default", label: "Default" },
+    { value: "grid2", label: "2-Column Grid" },
     { value: "vertical", label: "Vertical Stack" },
-    { value: "hidden",   label: "Hidden" },
+    { value: "hidden", label: "Hidden" },
 ];
 const BUTTON_STYLES = [
-    { value: "default",  label: "Default (None)" },
-    { value: "filled",   label: "Rounded Filled" },
+    { value: "default", label: "Default (None)" },
+    { value: "filled", label: "Rounded Filled" },
     { value: "outlined", label: "Outlined" },
-    { value: "pill",     label: "Pill Shape" },
-    { value: "square",   label: "Square Filled" },
+    { value: "pill", label: "Pill Shape" },
+    { value: "square", label: "Square Filled" },
 ];
 const HOVER_EFFECTS = [
     { value: "default", label: "Default" },
-    { value: "scale",   label: "Scale Up" },
-    { value: "glow",    label: "Color Glow" },
-    { value: "bright",  label: "Brighten" },
-    { value: "none",    label: "None" },
+    { value: "scale", label: "Scale Up" },
+    { value: "glow", label: "Color Glow" },
+    { value: "bright", label: "Brighten" },
+    { value: "none", label: "None" },
 ];
 
 const C = {
@@ -498,10 +498,10 @@ function PanelLayoutModal({ modalProps }: { modalProps: ModalProps; }) {
 
     const tabs: { id: typeof tab; label: string; }[] = [
         { id: "panel", label: "Panel" },
-        { id: "call",  label: "Call Bar" },
+        { id: "call", label: "Call Bar" },
         { id: "style", label: "Style" },
         { id: "colors", label: "Colors" },
-        { id: "hide",  label: "Visibility" },
+        { id: "hide", label: "Visibility" },
     ];
 
     return (
@@ -645,5 +645,5 @@ export default definePlugin({
     userAreaButton: { icon: LayoutIcon, render: PanelLayoutButton },
 
     start() { apply(); },
-    stop()  { document.getElementById(STYLE_ID)?.remove(); }
+    stop() { document.getElementById(STYLE_ID)?.remove(); }
 });

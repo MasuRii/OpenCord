@@ -27,5 +27,3 @@ export async function ToBase64ImageUrl(_, data) {
         return JSON.stringify({ error: "Failed to convert image to Base64" });
     }
 }
-
-

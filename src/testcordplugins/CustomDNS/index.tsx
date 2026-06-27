@@ -16,7 +16,17 @@ const Native = VencordNative.pluginHelpers.CustomDNS as PluginNative<typeof impo
 enum DnsProvider {
     DNS_SB = "dns_sb",
     QUAD9 = "quad9",
+    MULLVAD = "mullvad",
     CUSTOM = "custom"
+}
+
+enum MullvadProfile {
+    DNS = "dns",
+    ADBLOCK = "adblock",
+    BASE = "base",
+    EXTENDED = "extended",
+    FAMILY = "family",
+    ALL = "all"
 }
 
 enum LogLevel {
@@ -63,6 +73,33 @@ const DNS_SERVERS: Record<DnsProvider.DNS_SB | DnsProvider.QUAD9, Record<DnsFami
     [DnsProvider.QUAD9]: {
         4: ["9.9.9.9", "149.112.112.112"],
         6: ["2620:fe::fe", "2620:fe::9"]
+    }
+};
+
+const MULLVAD_DNS_SERVERS: Record<MullvadProfile, Record<DnsFamily, string>> = {
+    [MullvadProfile.DNS]: {
+        4: "194.242.2.2",
+        6: "2a07:e340::2"
+    },
+    [MullvadProfile.ADBLOCK]: {
+        4: "194.242.2.3",
+        6: "2a07:e340::3"
+    },
+    [MullvadProfile.BASE]: {
+        4: "194.242.2.4",
+        6: "2a07:e340::4"
+    },
+    [MullvadProfile.EXTENDED]: {
+        4: "194.242.2.5",
+        6: "2a07:e340::5"
+    },
+    [MullvadProfile.FAMILY]: {
+        4: "194.242.2.6",
+        6: "2a07:e340::6"
+    },
+    [MullvadProfile.ALL]: {
+        4: "194.242.2.9",
+        6: "2a07:e340::9"
     }
 };
 
@@ -142,8 +179,24 @@ const settings = definePluginSettings({
         options: [
             { label: "DNS.SB", value: DnsProvider.DNS_SB, default: true },
             { label: "Quad9", value: DnsProvider.QUAD9 },
+            { label: "Mullvad", value: DnsProvider.MULLVAD },
             { label: "Custom", value: DnsProvider.CUSTOM }
         ]
+    },
+    dnsProfile: {
+        type: OptionType.SELECT,
+        description: "Choose which Mullvad DNS profile to use.",
+        options: [
+            { label: "DNS", value: MullvadProfile.DNS },
+            { label: "Adblock", value: MullvadProfile.ADBLOCK },
+            { label: "Base", value: MullvadProfile.BASE, default: true },
+            { label: "Extended", value: MullvadProfile.EXTENDED },
+            { label: "Family", value: MullvadProfile.FAMILY },
+            { label: "All", value: MullvadProfile.ALL }
+        ],
+        hidden() {
+            return settings.store.dnsProvider !== DnsProvider.MULLVAD;
+        }
     },
     customDNSv4Primary: {
         type: OptionType.STRING,
@@ -324,12 +377,21 @@ function getCustomServers(family: DnsFamily) {
         .filter(Boolean);
 }
 
+function getMullvadServers(family: DnsFamily) {
+    return [MULLVAD_DNS_SERVERS[settings.store.dnsProfile ?? MullvadProfile.BASE][family]];
+}
+
 function getResolverServers(family: DnsFamily) {
     if (settings.store.dnsProvider === DnsProvider.CUSTOM) {
         return getCustomServers(family);
     }
 
-    return DNS_SERVERS[settings.store.dnsProvider][family];
+    if (settings.store.dnsProvider === DnsProvider.MULLVAD) {
+        return getMullvadServers(family);
+    }
+
+    const provider = settings.store.dnsProvider === DnsProvider.QUAD9 ? DnsProvider.QUAD9 : DnsProvider.DNS_SB;
+    return DNS_SERVERS[provider][family];
 }
 
 function getLookupFamilies(): DnsFamily[] {
@@ -343,6 +405,11 @@ function getProviderName() {
         const servers = preferredServers.length ? preferredServers : fallbackServers;
 
         return servers.length ? `Custom (${servers[0]})` : "Custom";
+    }
+
+    if (settings.store.dnsProvider === DnsProvider.MULLVAD) {
+        const profile = settings.store.dnsProfile ?? MullvadProfile.BASE;
+        return `Mullvad (${profile})`;
     }
 
     return settings.store.dnsProvider === DnsProvider.DNS_SB ? "DNS.SB" : "Quad9";

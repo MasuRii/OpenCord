@@ -9,7 +9,6 @@ import { ChannelStore, SelectedChannelStore, UserStore } from "@webpack/common";
 import { CustomStreamPreviewState } from "./state";
 import { StreamKey } from "./types";
 
-
 const ChannelTypesMap = {
     1: "call",
     2: "guild",
@@ -235,4 +234,3 @@ export const imageFileToStreamPreview = (file: File): Promise<string> => {
         reader.readAsDataURL(file);
     });
 };
-

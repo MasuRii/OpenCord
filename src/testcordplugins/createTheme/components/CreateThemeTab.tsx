@@ -19,7 +19,7 @@ function relativeLuminance(hex: string): number {
 import { classNameFactory } from "@utils/css";
 import { Margins } from "@utils/margins";
 import { findByCodeLazy, findStoreLazy } from "@webpack";
-import { Button, ColorPicker, ThemeStore, useStateFromStores } from "@webpack/common";
+import { Button, ThemeStore, useStateFromStores } from "@webpack/common";
 import { React, useEffect, useRef, useState } from "@webpack/common";
 
 const saveClientTheme = findByCodeLazy('type:"UNSYNCED_USER_SETTINGS_UPDATE', '"system"===');
@@ -358,7 +358,7 @@ export function CreateThemeTab() {
                         <input
                             type="color"
                             value={"#" + settings.color}
-                            onChange={(e) => update("color", e.target.value.replace("#", ""))}
+                            onChange={e => update("color", e.target.value.replace("#", ""))}
                             style={{
                                 width: 40,
                                 height: 32,
@@ -372,7 +372,7 @@ export function CreateThemeTab() {
                         <input
                             type="text"
                             value={"#" + settings.color}
-                            onChange={(e) => {
+                            onChange={e => {
                                 const val = e.target.value.replace("#", "");
                                 if (/^[0-9A-Fa-f]{0,6}$/.test(val)) {
                                     if (val.length === 6) update("color", val);

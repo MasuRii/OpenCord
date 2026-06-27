@@ -1,17 +1,21 @@
 /*
- * TestCord, a Discord client mod
- * Copyright (c) 2024 Mixiruri
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings } from "@api/Settings";
 import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
 import { DataStore } from "@api/index";
+import { definePluginSettings } from "@api/Settings";
 import { Link } from "@components/Link";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { showToast, Toasts, Menu } from "@webpack/common";
-import { findByProps } from "@webpack";
+import { findByCodeLazy,findByPropsLazy } from "@webpack";
+import { Menu, SelectedChannelStore,showToast, Toasts } from "@webpack/common";
+
+const TokenStore = findByPropsLazy("getToken");
+const addFavoriteGif = findByCodeLazy("favoriteGifs", "order", "updateAsync");
+const favoriteGifsStore = findByPropsLazy("bW", "getCurrentValue");
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -60,9 +64,7 @@ const settings = definePluginSettings({
 
 let isScanning = false;
 let currentGifsFound = 0;
-    const savePromises: Promise<void>[] = [];
 let stopRequested = false;
-
 
 // ─── HeartGifs Integration ───────────────────────────────────────────────────
 
@@ -89,6 +91,33 @@ async function addToHeartGifs(gif: GifEntry): Promise<boolean> {
     }
 }
 
+async function addToHeartGifsBatch(gifs: GifEntry[]): Promise<number> {
+    if (gifs.length === 0) return 0;
+    try {
+        const items: any[] = (await DataStore.get(HG_DATA_KEY)) ?? [];
+        const existingUrls = new Set(items.map((g: any) => g.url));
+        let added = 0;
+        for (const gif of gifs) {
+            if (existingUrls.has(gif.url)) continue;
+            existingUrls.add(gif.url);
+            items.unshift({
+                id: "nogl-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9),
+                url: gif.url,
+                src: gif.src || gif.url,
+                width: gif.width || 498,
+                height: gif.height || 280,
+                type: "gif",
+                addedAt: Date.now(),
+            });
+            added++;
+        }
+        if (added > 0) await DataStore.set(HG_DATA_KEY, items);
+        return added;
+    } catch {
+        return 0;
+    }
+}
+
 async function isInHeartGifs(url: string): Promise<boolean> {
     try {
         const items: any[] = (await DataStore.get(HG_DATA_KEY)) ?? [];
@@ -106,7 +135,6 @@ function sleep(ms: number): Promise<void> {
 
 function getToken(): string | null {
     try {
-        const TokenStore = findByProps("getToken");
         return TokenStore?.getToken() ?? null;
     } catch {
         return null;
@@ -125,36 +153,15 @@ async function discordFetch(url: string): Promise<any> {
 }
 
 function getAddGifFn(): ((gif: any) => void) | null {
-    const wreq = (window as any).Vencord?.Webpack?.wreq;
-    if (!wreq?.c) return null;
-    for (const key of Object.keys(wreq.c)) {
-        try {
-            const m = wreq.c[key].exports;
-            for (const val of Object.values(m ?? {})) {
-                if (typeof val === "function") {
-                    const src = (val as Function).toString();
-                    if (src.includes("favoriteGifs") && src.includes("order") && src.includes("updateAsync")) {
-                        return val as (gif: any) => void;
-                    }
-                }
-            }
-        } catch { }
-    }
-    return null;
+    return typeof addFavoriteGif === "function" ? addFavoriteGif : null;
 }
 
 function getCurrentFavoriteUrls(): Set<string> {
     try {
-        const wreq = (window as any).Vencord?.Webpack?.wreq;
-        if (!wreq?.c) return new Set();
-        for (const key of Object.keys(wreq.c)) {
-            try {
-                const m = wreq.c[key].exports;
-                if (m?.bW && typeof m.bW === "object" && typeof m.bW.getCurrentValue === "function") {
-                    const gifs = m.bW.getCurrentValue()?.favoriteGifs?.gifs ?? {};
-                    return new Set(Object.keys(gifs));
-                }
-            } catch { }
+        const store = favoriteGifsStore?.bW;
+        if (store && typeof store.getCurrentValue === "function") {
+            const gifs = store.getCurrentValue()?.favoriteGifs?.gifs ?? {};
+            return new Set(Object.keys(gifs));
         }
     } catch { }
     return new Set();
@@ -162,18 +169,7 @@ function getCurrentFavoriteUrls(): Set<string> {
 
 function getCurrentChannelId(): string | null {
     try {
-        const wreq = (window as any).Vencord?.Webpack?.wreq;
-        if (!wreq?.c) return null;
-        for (const key of Object.keys(wreq.c)) {
-            try {
-                const m = wreq.c[key].exports;
-                for (const val of Object.values(m ?? {})) {
-                    if (val && typeof (val as any).getChannelId === "function") {
-                        return (val as any).getChannelId();
-                    }
-                }
-            } catch { }
-        }
+        return SelectedChannelStore?.getChannelId?.() ?? null;
     } catch { }
     return null;
 }
@@ -303,13 +299,14 @@ async function scanUserGifs(userId: string, username: string, guildId: string | 
     const favUrls = !useHeartGifs ? getCurrentFavoriteUrls() : new Set<string>();
     const savedRealtime = new Set<string>();
 
+    const heartGifsPending: GifEntry[] = [];
+
     const onGifFound = (saveMode === "favorites" || saveMode === "both")
         ? (useHeartGifs
             ? (g: GifEntry) => {
-                // Save to HeartGifs (async, fire-and-forget with tracking)
                 if (!savedRealtime.has(g.url)) {
                     savedRealtime.add(g.url);
-                    addToHeartGifs(g).catch(() => { });
+                    heartGifsPending.push(g);
                 }
             }
             : (addGif
@@ -337,10 +334,10 @@ async function scanUserGifs(userId: string, username: string, guildId: string | 
         allGifs.push(...found);
     }
 
-    // Wait for all pending confirmations before reporting
-    if (savePromises.length > 0) {
-        showToast("Verifying saved GIFs...", Toasts.Type.MESSAGE);
-        await Promise.all(savePromises);
+    // Batch-write HeartGifs after scan (single read+write instead of per-GIF)
+    if (heartGifsPending.length > 0) {
+        showToast("Saving HeartGifs...", Toasts.Type.MESSAGE);
+        await addToHeartGifsBatch(heartGifsPending);
     }
 
     isScanning = false;

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { TestcordRequestCoordinator } from "@api/index";
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
 import { LogIcon } from "@components/Icons";
@@ -28,6 +29,13 @@ interface IMessageCreate {
     channelId: string;
     guildId: string;
     message: Message;
+}
+
+interface GiftPrecheckBody {
+    redeemed?: boolean;
+    uses?: number | null;
+    max_uses?: number | null;
+    expires_at?: string | null;
 }
 
 function classifyGift(data: any): RedeemType {
@@ -129,7 +137,11 @@ function isCaptchaError(body: any): boolean {
 // Fire a lightweight request on start to warm up DNS + TLS session for discord.com.
 // Subsequent requests reuse the cached connection, cutting first-request latency.
 function warmupConnection() {
-    RestAPI.get({ url: "/users/@me" }).catch(() => { });
+    TestcordRequestCoordinator.request({
+        key: "discord:warmup:users-me",
+        ttlMs: 10_000,
+        run: () => RestAPI.get({ url: "/users/@me" }),
+    }).catch(() => { });
 }
 
 function notifyPaused(reason: string) {
@@ -143,8 +155,12 @@ function notifyPaused(reason: string) {
 
 async function precheckGift(code: string): Promise<{ ok: boolean; data?: any; reason?: string; }> {
     try {
-        const { body } = await RestAPI.get({
-            url: `/entitlements/gift-codes/${code}?with_application=false&with_subscription_plan=true`,
+        const { body } = await TestcordRequestCoordinator.request<{ body?: GiftPrecheckBody; }>({
+            key: `discord:gift-precheck:${code}`,
+            ttlMs: 60_000,
+            run: () => RestAPI.get({
+                url: `/entitlements/gift-codes/${code}?with_application=false&with_subscription_plan=true`,
+            }) as Promise<{ body?: GiftPrecheckBody; }>,
         });
         if (body?.redeemed) return { ok: false, data: body, reason: "already claimed" };
         if (body?.uses != null && body?.max_uses != null && body.uses >= body.max_uses) {

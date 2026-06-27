@@ -36,4 +36,4 @@ function PanelLayoutButton({ iconForeground, hideTooltips, nameplate }: UserArea
 // Note: PanelLayoutModal needs to be imported or defined elsewhere.
 // For this button to work, the modal component must be available.
 
-export { PanelLayoutButton, LayoutIcon };
+export { LayoutIcon,PanelLayoutButton };

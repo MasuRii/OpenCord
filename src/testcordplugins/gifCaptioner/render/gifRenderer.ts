@@ -5,9 +5,9 @@
  */
 
 import { GIFEncoder, nearestColorIndex, quantize } from "gifenc";
+import type { ParsedFrame, ParsedGif } from "gifuct-js";
 
 import { getSelectedFont } from "../index";
-import type { ParsedFrame, ParsedGif } from "./gifDecoder";
 import type { GifTransform } from "../types";
 import { showError } from "../ui/statusCard";
 import { getLines } from "../utils/canvas";

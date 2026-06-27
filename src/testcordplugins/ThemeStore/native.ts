@@ -1,7 +1,7 @@
 /*
- * ThemeStore — native.ts
- * Runs in the Electron MAIN process (Node.js) — no CORS, no CSP.
- * Exposed via VencordNative.pluginHelpers.ThemeStore.fetchUrl()
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 import { net } from "electron";
@@ -42,7 +42,7 @@ function fetchWithRedirects(url: string, remainingRedirects: number): Promise<st
             const chunks: Buffer[] = [];
 
             request.on("response", (response: any) => {
-                const status   = response.statusCode as number;
+                const status = response.statusCode as number;
                 const location = response.headers?.location as string | undefined;
 
                 // Follow 3xx redirects
@@ -60,8 +60,8 @@ function fetchWithRedirects(url: string, remainingRedirects: number): Promise<st
                     return;
                 }
 
-                response.on("data",  (chunk: Buffer) => chunks.push(chunk));
-                response.on("end",   () => resolve(Buffer.concat(chunks).toString("utf-8")));
+                response.on("data", (chunk: Buffer) => chunks.push(chunk));
+                response.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
                 response.on("error", (err: Error) => reject(err));
             });
 

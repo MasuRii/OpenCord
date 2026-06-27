@@ -17,7 +17,7 @@
 */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 
 const settings = definePluginSettings({
@@ -44,8 +44,3 @@ export default definePlugin({
     ],
     settings,
 });
-
-
-
-
-

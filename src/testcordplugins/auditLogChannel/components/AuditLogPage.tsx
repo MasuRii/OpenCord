@@ -70,5 +70,3 @@ export default function AuditLogPage({ guildId }: { guildId: string; }) {
         />
     </div>;
 }
-
-

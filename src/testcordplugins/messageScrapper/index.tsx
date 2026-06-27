@@ -5,9 +5,10 @@
  */
 
 import { ChatBarButton } from "@api/ChatButtons";
+import { addChannelToolbarButton, addHeaderBarButton, ChannelToolbarButton, HeaderBarButton, removeChannelToolbarButton, removeHeaderBarButton } from "@api/HeaderBar";
+import { TestcordRequestCoordinator } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
 import { Card } from "@components/Card";
-import { IpcEvents } from "@shared/IpcEvents";
 import { TestcordDevs } from "@utils/constants";
 import { closeModal, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import { showItemInFolder } from "@utils/native";
@@ -35,6 +36,17 @@ let shouldStopProcess = false;
 let currentProgressRef: { current: any; } | null = null;
 
 const settings = definePluginSettings({
+    location: {
+        type: OptionType.SELECT,
+        description: "Where to show the button",
+        options: [
+            { label: "Chat bar", value: "chatbar", default: true },
+            { label: "Header bar", value: "headerbar" },
+            { label: "Channel toolbar", value: "channeltoolbar" },
+            { label: "Disabled", value: "disabled" },
+        ],
+        restartNeeded: true,
+    },
     whitelist: {
         type: OptionType.STRING,
         description: "Comma-separated user IDs to keep (whitelist)",
@@ -100,13 +112,21 @@ async function fetchAllMessages(channelId: string, throttleMs = 250, onProgress?
     let before: string | undefined = undefined;
 
     while (true) {
-        const res = await RestAPI.get({
-            url: Constants.Endpoints.MESSAGES(channelId),
-            query: { limit: 100, ...(before ? { before } : {}) },
-            retries: 2
-        }).catch(() => null as any);
+        const batch = await TestcordRequestCoordinator.request<Message[]>({
+            key: `discord:messages:${channelId}:before:${before ?? ""}:limit:100`,
+            ttlMs: 30_000,
+            run: async () => {
+                const res = await RestAPI.get({
+                    url: Constants.Endpoints.MESSAGES(channelId),
+                    query: { limit: 100, ...(before ? { before } : {}) },
+                    retries: 2
+                }).catch(() => null as any);
 
-        const batch = res?.body ?? [];
+                return res?.body ?? [];
+            },
+            cacheable: Array.isArray,
+        });
+
         if (!batch.length) break;
         result.push(...batch);
         before = batch[batch.length - 1].id;
@@ -592,6 +612,7 @@ function WhitelistModal({ modalProps }: { modalProps: ModalProps; }) {
                         await RestAPI.del({
                             url: `${Constants.Endpoints.MESSAGES(ch.id)}/${m.id}`
                         });
+                        TestcordRequestCoordinator.invalidatePrefix(`discord:messages:${ch.id}:`);
                         deletedCount++;
                         processedCount++;
                         progress.incrementDeleted();
@@ -984,16 +1005,44 @@ export default definePlugin({
     description: "Delete your own messages in DMs or servers with a beautiful progress interface. Logs each run to JSON.",
     tags: ["Chat", "Utility"],
     authors: [TestcordDevs.x2b],
+    dependencies: ["HeaderBarAPI"],
     settings,
     start() {
-        // Listen for custom event from separate window
         window.addEventListener("vencord:openMessageScrapper", handleOpenMessageScrapper);
+        const { location } = settings.store;
+        if (location === "headerbar") {
+            addHeaderBarButton("MessagesScrapper", () => (
+                <HeaderBarButton
+                    icon={() => (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2H4V5h4V4a1 1 0 0 1 1-1Zm-3 6h12l-1 11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 9Z" />
+                        </svg>
+                    )}
+                    tooltip="Messages Scrapper"
+                    onClick={openMessageScrapperModal}
+                />
+            ), 5);
+        } else if (location === "channeltoolbar") {
+            addChannelToolbarButton("MessagesScrapper", () => (
+                <ChannelToolbarButton
+                    icon={() => (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+                            <path fill="currentColor" d="M9 3h6a1 1 0 0 1 1 1v1h4v2H4V5h4V4a1 1 0 0 1 1-1Zm-3 6h12l-1 11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 9Z" />
+                        </svg>
+                    )}
+                    tooltip="Messages Scrapper"
+                    onClick={openMessageScrapperModal}
+                />
+            ), 5);
+        }
     },
     stop() {
         window.removeEventListener("vencord:openMessageScrapper", handleOpenMessageScrapper);
+        removeHeaderBarButton("MessagesScrapper");
+        removeChannelToolbarButton("MessagesScrapper");
     },
     renderChatBarButton: (({ isMainChat }) => {
-        if (!isMainChat) return null;
+        if (!isMainChat || settings.store.location !== "chatbar") return null;
         return (
             <ChatBarButton
                 tooltip="Messages Scrapper"

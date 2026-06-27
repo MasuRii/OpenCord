@@ -22,10 +22,8 @@ export const loadKatex = makeLazy(async () => {
 export function useKatex() {
     const [katex, setKatex] = useState(theKatex);
     useEffect(() => {
-        if (katex === undefined)
+        if (theKatex === undefined)
             loadKatex().then(setKatex);
-    });
+    }, []);
     return katex;
 }
-
-

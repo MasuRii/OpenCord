@@ -5,9 +5,9 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { makeRange } from "@utils/types";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType, } from "@utils/types";
+import { makeRange } from "@utils/types";
 
 const settings = definePluginSettings({
     clipLength: {
@@ -40,8 +40,3 @@ export default definePlugin({
 
     }
 });
-
-
-
-
-

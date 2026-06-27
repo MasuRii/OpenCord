@@ -8,7 +8,7 @@ import { LogIcon } from "@components/Icons";
 import { getIntlMessage } from "@utils/discord";
 import { Guild } from "@vencord/discord-types";
 import { findByPropsLazy, findComponentByCodeLazy } from "@webpack";
-import { NavigationRouter, useStateFromStores, PermissionStore, PermissionsBits, GuildStore, UserStore } from "@webpack/common";
+import { GuildStore, NavigationRouter, PermissionsBits, PermissionStore, UserStore,useStateFromStores } from "@webpack/common";
 
 const ChannelRow = findComponentByCodeLazy(".basicChannelRowLink,");
 const Routes = findByPropsLazy("INDEX", "FRIENDS", "ME");
@@ -29,5 +29,3 @@ export default function AuditLogChannelRow(props: { guild: Guild, selected: bool
         }}
     />;
 }
-
-

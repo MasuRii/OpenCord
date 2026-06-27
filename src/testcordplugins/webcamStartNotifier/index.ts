@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { ChannelStore, SelectedChannelStore } from "@webpack/common";
 
@@ -55,7 +55,11 @@ export default definePlugin({
                 }
 
                 voiceStates.forEach(state => {
-                    if (state.channelId !== currentChannelId) return;
+                    if (state.channelId !== currentChannelId) {
+                        // User left the watched channel (or moved elsewhere) — drop stale entry
+                        videoStates.delete(state.userId);
+                        return;
+                    }
 
                     const prevVideoState = videoStates.get(state.userId);
                     if (state.selfVideo !== undefined && prevVideoState !== undefined && prevVideoState !== state.selfVideo) {
@@ -66,9 +70,8 @@ export default definePlugin({
             }
         };
     })(),
+
+    stop() {
+        videoStates.clear();
+    },
 });
-
-
-
-
-

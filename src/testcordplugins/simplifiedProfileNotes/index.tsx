@@ -5,7 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import { getIntlMessage } from "@utils/discord";
 import definePlugin, { OptionType } from "@utils/types";
 import { User } from "@vencord/discord-types";
@@ -115,8 +115,3 @@ export default definePlugin({
     useNoteBox,
     NotesSection
 });
-
-
-
-
-

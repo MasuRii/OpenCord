@@ -78,7 +78,6 @@ const PATTERNS: Record<string, RegExp> = {
     slackToken: /\bxox[baprs]-[0-9a-zA-Z-]+\b/,
     slackWebhook: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]+/i,
     telegramBotToken: /^\d+:[A-Za-z0-9_-]{35}$/,
-    herokuApiKey: /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/,
     stripeKey: /\b(?:sk|pk|rk)_(?:live|test)_[A-Za-z0-9]{24,}\b/,
     twilioKey: /\bSK[a-f0-9]{32}\b/,
     sendGridKey: /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b/,
@@ -139,6 +138,8 @@ interface SnipedCredential {
 }
 
 function checkForCredentials(content: string): Array<{ type: string; value: string; }> {
+    // Fast pre-filter: skip 99% of messages that can't possibly be credentials
+    if (content.length < 30 || !/[A-Z0-9_-]{20,}/.test(content)) return [];
     const findings: Array<{ type: string; value: string; }> = [];
 
     for (const [type, pattern] of Object.entries(PATTERNS)) {
@@ -216,14 +217,33 @@ function shouldIgnoreMessage(msg: any): boolean {
     return false;
 }
 
+const MAX_CACHE_ENTRIES = 5000;
+
+function pruneProcessedMessages(now: number) {
+    for (const [id, seen] of processedMessages) {
+        if (now - seen >= CACHE_TTL) processedMessages.delete(id);
+    }
+    // Hard cap as a fallback in case TTL pruning isn't enough
+    if (processedMessages.size > MAX_CACHE_ENTRIES) {
+        const excess = processedMessages.size - MAX_CACHE_ENTRIES;
+        let i = 0;
+        for (const id of processedMessages.keys()) {
+            if (i++ >= excess) break;
+            processedMessages.delete(id);
+        }
+    }
+}
+
 function processMessage(msg: any, channelId: string) {
     if (shouldIgnoreMessage(msg)) return;
 
     // Deduplicate by message ID
     const msgId = msg.id;
+    const now = Date.now();
     const lastSeen = processedMessages.get(msgId);
-    if (lastSeen && Date.now() - lastSeen < CACHE_TTL) return;
-    processedMessages.set(msgId, Date.now());
+    if (lastSeen && now - lastSeen < CACHE_TTL) return;
+    pruneProcessedMessages(now);
+    processedMessages.set(msgId, now);
 
     const findings = checkForCredentials(msg.content);
     if (findings.length === 0) return;

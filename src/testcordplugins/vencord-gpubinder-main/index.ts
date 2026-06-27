@@ -1,3 +1,9 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { Toasts } from "@webpack/common";
@@ -12,7 +18,7 @@ const settings = definePluginSettings({
             { label: "Power Saving (Integrated GPU)", value: 1 },
             { label: "System Default (Let Windows decide)", value: 0 },
         ],
-        onChange: async (newValue) => {
+        onChange: async newValue => {
             const Native = (window as any).VencordNative?.pluginHelpers?.GpuBinder;
             if (!Native) return;
 
@@ -36,9 +42,9 @@ export default definePlugin({
     description: "Forces Discord to stay bound to a specific GPU even after updates by managing Windows Registry keys.",
     tags: ["Utility", "Developers"],
     authors: [{ name: "unclide", id: 395504896817758210n }],
-    
+
     // Safety check: registry access is only possible on Desktop
-    desktopOnly: true, 
+    desktopOnly: true,
     settings,
 
     async start() {

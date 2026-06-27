@@ -1,12 +1,11 @@
 /*
- * Nightcord — LiveWallpaper
- * Global wallpaper for the entire Discord interface (image, gif, video).
- * Works alongside ChannelWallpaper (which remains priority per channel).
- * Everything is configured in the plugin settings.
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings } from "@api/Settings";
 import { DataStore } from "@api/index";
+import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType } from "@utils/types";
 import { Button, Forms, React, showToast, Toasts } from "@webpack/common";
 
@@ -65,7 +64,7 @@ function SettingsComponent() {
     return (
         <div className="live-wallpaper-settings">
             <Forms.FormTitle tag="h3">File (Image / Gif / Video)</Forms.FormTitle>
-            
+
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                 {/* File Picker */}
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -122,7 +121,7 @@ function SettingsComponent() {
                             cursor: isDataUrl ? "not-allowed" : "text",
                             opacity: isDataUrl ? 0.6 : 1
                         }}
-                        onChange={async (e) => {
+                        onChange={async e => {
                             const val = e.target.value.trim();
                             setInputValue(val);
                             await DataStore.set(LOCAL_DATA_KEY, "");
@@ -136,13 +135,13 @@ function SettingsComponent() {
 
             {hasFile && (
                 <div style={{ marginTop: "10px", fontSize: "12px", color: "var(--text-muted)", fontStyle: "italic" }}>
-                    {isDataUrl 
-                        ? `✅ Local file: ${Math.round(currentUrl.length / 1024)} KB` 
+                    {isDataUrl
+                        ? `✅ Local file: ${Math.round(currentUrl.length / 1024)} KB`
                         : `✅ URL: ${currentUrl.slice(0, 50)}${currentUrl.length > 50 ? "..." : ""}`
                     }
                 </div>
             )}
-            
+
             <div style={{ margin: "20px 0", borderBottom: "1px solid var(--background-modifier-accent)" }} />
         </div>
     );
@@ -278,16 +277,25 @@ async function applyWallpaper() {
 export default definePlugin({
     name: "LiveWallpaper",
     description: "Global wallpaper for the entire Discord interface (image, gif, video). Compatible with ChannelWallpaper.",
-    tags: ["Appearance", "Utility"],
+    tags: ["Appearance", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     settings,
 
+    _startTimer: null as ReturnType<typeof setTimeout> | null,
+
     start() {
         // Small delay to let the DOM be ready
-        setTimeout(applyWallpaper, 300);
+        this._startTimer = setTimeout(() => {
+            this._startTimer = null;
+            applyWallpaper();
+        }, 300);
     },
 
     stop() {
+        if (this._startTimer) {
+            clearTimeout(this._startTimer);
+            this._startTimer = null;
+        }
         removeWallpaperElements();
     },
 });

@@ -612,7 +612,7 @@ function ServerConfigManager() {
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                         {configs.map((config: any, index: number) => (
-                            <div key={index} style={{
+                            <div key={config.serverId ?? index} style={{
                                 backgroundColor: "var(--background-primary)",
                                 padding: "12px",
                                 borderRadius: "6px",
@@ -757,9 +757,11 @@ function MenuItem(id: string) {
                                     }
                                 });
 
-                                setTimeout(() => {
+                                const t = setTimeout(() => {
+                                    pendingBanTimeouts.delete(t);
                                     sendBanCommand(id, serverConfig.channelId, serverConfig.voiceCommand, " (added to list while in VC)");
                                 }, 200);
+                                pendingBanTimeouts.add(t);
                                 return;
                             }
                         }
@@ -970,8 +972,13 @@ export default definePlugin({
     stop() {
         FluxDispatcher.unsubscribe("VOICE_STATE_UPDATES", voiceStateCallback);
         document.removeEventListener("keydown", handleKeyDown);
+        for (const id of pendingBanTimeouts) clearTimeout(id);
+        pendingBanTimeouts.clear();
     }
 });
+
+// Deferred ban/check timers — tracked so stop() can cancel any still pending after teardown
+const pendingBanTimeouts = new Set<ReturnType<typeof setTimeout>>();
 
 const voiceStateCallback = async (e: any) => {
     const state = e.voiceStates[0];
@@ -983,9 +990,11 @@ const voiceStateCallback = async (e: any) => {
     // Check if current user just joined a voice channel
     if (state.userId === currentUserId && state?.channelId !== state?.oldChannelId && state?.channelId) {
         // Small delay to ensure voice state is fully updated
-        setTimeout(() => {
+        const t = setTimeout(() => {
+            pendingBanTimeouts.delete(t);
             checkExistingUsersInVC(state.channelId);
         }, 500);
+        pendingBanTimeouts.add(t);
         return;
     }
 
@@ -1030,8 +1039,10 @@ const voiceStateCallback = async (e: any) => {
         });
 
         // Send ban command with working logic from original
-        setTimeout(() => {
+        const t = setTimeout(() => {
+            pendingBanTimeouts.delete(t);
             sendBanCommand(state.userId, serverConfig.channelId, serverConfig.voiceCommand, " (joined voice channel)");
         }, 100);
+        pendingBanTimeouts.add(t);
     }
 };

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
 
@@ -35,11 +35,6 @@ export default definePlugin({
         document.body.addEventListener("pointerup", this.pointerUpEventHandler);
     },
     stop() {
-        document.body.addEventListener("pointerup", this.pointerUpEventHandler);
+        document.body.removeEventListener("pointerup", this.pointerUpEventHandler);
     }
 });
-
-
-
-
-

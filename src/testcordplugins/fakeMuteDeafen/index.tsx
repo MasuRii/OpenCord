@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
 import { definePluginSettings } from "@api/Settings";
 import { UserAreaButton } from "@api/UserArea";
 import { TestcordDevs } from "@utils/constants";
@@ -25,6 +26,16 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Show options in audio device context menu",
         default: true
+    },
+    slashCommands: {
+        type: OptionType.BOOLEAN,
+        description: "Enable slash commands to toggle fake mute and deafen.",
+        default: false
+    },
+    combinedContextItem: {
+        type: OptionType.BOOLEAN,
+        description: "Show a combined Fake Mute & Deafen toggle in the audio device context menu.",
+        default: false
     },
     autoMute: {
         type: OptionType.BOOLEAN,
@@ -260,6 +271,8 @@ export default definePlugin({
     description: "Fake mute and deafen yourself. You can continue speaking and being heard during this time. Toggle via user area button, context menu, or keybinds.",
     tags: ["Voice", "Privacy"],
     authors: [TestcordDevs.x2b, TestcordDevs.dot, TestcordDevs.sirphantom89, TestcordDevs.hyyven],
+    dependencies: ["CommandsAPI"],
+    enabledByDefault: true,
     settings,
 
 start() {
@@ -307,9 +320,75 @@ start() {
         }
     },
 
-contextMenus: {
+commands: [
+        {
+            inputType: ApplicationCommandInputType.BUILT_IN,
+            name: "fakemute",
+            description: "Toggle fake mute",
+            execute: (_, ctx) => {
+                if (!settings.store.slashCommands) {
+                    sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
+                    return;
+                }
+                fakeVoiceState.selfMute = !fakeVoiceState.selfMute;
+                refreshVoiceState();
+                sendBotMessage(ctx.channel.id, { content: `🎤 Fake mute is now ${fakeVoiceState.selfMute ? "enabled" : "disabled"}.` });
+            }
+        },
+        {
+            inputType: ApplicationCommandInputType.BUILT_IN,
+            name: "fakedeafen",
+            description: "Toggle fake deafen",
+            execute: (_, ctx) => {
+                if (!settings.store.slashCommands) {
+                    sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
+                    return;
+                }
+                fakeVoiceState.selfDeaf = !fakeVoiceState.selfDeaf;
+                if (settings.store.autoMute) fakeVoiceState.selfMute = fakeVoiceState.selfDeaf;
+                refreshVoiceState();
+                const muteNote = (fakeVoiceState.selfDeaf && settings.store.autoMute) ? " (+ fake mute)" : "";
+                sendBotMessage(ctx.channel.id, { content: `🔇 Fake deafen is now ${fakeVoiceState.selfDeaf ? "enabled" : "disabled"}${muteNote}.` });
+            }
+        },
+        {
+            inputType: ApplicationCommandInputType.BUILT_IN,
+            name: "fakedeafen_mute",
+            description: "Toggle fake deafen and fake mute together",
+            execute: (_, ctx) => {
+                if (!settings.store.slashCommands) {
+                    sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
+                    return;
+                }
+                const next = !(fakeVoiceState.selfMute && fakeVoiceState.selfDeaf);
+                fakeVoiceState.selfMute = next;
+                fakeVoiceState.selfDeaf = next;
+                refreshVoiceState();
+                sendBotMessage(ctx.channel.id, { content: `👻 Fake mute and deafen are now ${next ? "enabled" : "disabled"}.` });
+            }
+        }
+    ],
+
+    contextMenus: {
         "audio-device-context"(children: any[], d: any) {
             if (!settings.store.contextMenu) return;
+
+            if (settings.store.combinedContextItem) {
+                children.push(
+                    <Menu.MenuSeparator />,
+                    <Menu.MenuCheckboxItem
+                        id="fake-mute-deafen-both"
+                        label="Fake Mute & Deafen"
+                        checked={fakeVoiceState.selfMute && fakeVoiceState.selfDeaf}
+                        action={() => {
+                            const next = !(fakeVoiceState.selfMute && fakeVoiceState.selfDeaf);
+                            fakeVoiceState.selfMute = next;
+                            fakeVoiceState.selfDeaf = next;
+                            refreshVoiceState();
+                        }}
+                    />
+                );
+            }
 
             if (d.renderInputDevices) {
                 children.push(
@@ -360,5 +439,5 @@ contextMenus: {
                 />
             );
         }
-    } 
+    }
 });

@@ -17,15 +17,15 @@
 */
 
 import { definePluginSettings } from "@api/Settings";
+import definePlugin, { OptionType } from "@utils/types";
+import { findComponentByCodeLazy } from "@webpack";
+
 import { PluginInfo } from "../betterScreenshare.desktop/constants";
 import { openScreenshareModal } from "../betterScreenshare.desktop/modals";
 import { ScreenshareAudioPatcher, ScreensharePatcher } from "../betterScreenshare.desktop/patchers";
 import { GoLivePanelWrapper, replacedSubmitFunction } from "../betterScreenshare.desktop/patches";
 import { initScreenshareAudioStore, initScreenshareStore } from "../betterScreenshare.desktop/stores";
 import { Emitter, ScreenshareSettingsIcon } from "../philsPluginLibrary";
-import { Devs } from "@utils/constants";
-import definePlugin, { OptionType } from "@utils/types";
-import { findComponentByCodeLazy } from "@webpack";
 
 const Button = findComponentByCodeLazy(".NONE,disabled:", ".PANEL_BUTTON");
 

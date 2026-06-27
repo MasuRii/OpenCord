@@ -44,9 +44,9 @@ const MAX_RESPONSE_SIZE = 1 * 1024 * 1024;
 
 // Nitro upload limits (used to decide whether to use Discord's native upload)
 const NITRO_LIMITS: Record<string, number> = {
-    none: 10 * 1024 * 1024,     // 10MB for no Nitro
-    basic: 50 * 1024 * 1024,    // 50MB for Nitro Basic
-    full: 500 * 1024 * 1024,    // 500MB for full Nitro
+    none: 10 * 1024 * 1024, // 10MB for no Nitro
+    basic: 50 * 1024 * 1024, // 50MB for Nitro Basic
+    full: 500 * 1024 * 1024, // 500MB for full Nitro
 };
 
 function isExeFile(fileName: string): boolean {
@@ -312,7 +312,7 @@ function extractUrlFromResponse(responseText: string, responseType: string, urlP
                 return resolveUrl(parsed, baseUrl);
             }
 
-            throw new Error(`Could not find URL in JSON response. Try specifying a URL path.`);
+            throw new Error("Could not find URL in JSON response. Try specifying a URL path.");
         } catch (e) {
             if (responseType === "JSON") {
                 throw e;
@@ -1910,7 +1910,6 @@ export async function uploadFileToBuzzheavierNative(event: Electron.IpcMainInvok
     }
 }
 
-
 /**
  * file.io upload - streams from disk (path or temp file)
  * Max size: 4 GB (free tier), retention: ~14 days or after first download
@@ -2087,7 +2086,7 @@ export async function uploadFileCustomNative(
             );
         } else {
             // Multipart form data upload (default)
-            nativeLog.info(`[BigFileUpload] Custom uploader using POST with multipart form data`);
+            nativeLog.info("[BigFileUpload] Custom uploader using POST with multipart form data");
 
             // Filter out empty keys
             const fields: Record<string, string> = {};

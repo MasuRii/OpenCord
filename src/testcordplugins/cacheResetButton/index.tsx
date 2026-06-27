@@ -5,7 +5,7 @@
  */
 
 import { ChannelToolbarButton } from "@api/HeaderBar";
-import { resetCacheLimits } from "@testcordplugins/_shared/cacheLimits";
+import { resetCacheLimits } from "@utils/cacheLimits";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { findAll } from "@webpack";
@@ -245,7 +245,7 @@ function CacheResetButton() {
 export default definePlugin({
     name: "CacheResetButton",
     description: "Performance boost button: clears caches and applies runtime optimizations (CSS containment, passive listeners, spring skip, lazy images, backdrop blur removal, animation kill).",
-    tags: ["Utility", "Utility"],
+    tags: ["Utility", "Performance"],
     authors: [TestcordDevs.x2b],
     dependencies: ["HeaderBarAPI"],
 

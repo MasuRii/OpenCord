@@ -106,6 +106,7 @@ const settings = definePluginSettings({
 // ── Internal state ──────────────────────────────────────────────────────────────
 
 const lastReplied = new Map<string, number>();
+const pendingReplies = new Set<ReturnType<typeof setTimeout>>();
 let sequentialIndex = 0;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -237,7 +238,7 @@ export default definePlugin({
     name: "AutoReply",
     description: "Automatically replies to received messages. Button in the text bar (next to VoiceDictation).",
     authors: [{ name: "User", id: 0n }],
-    dependencies: ["ChatInputButtonAPI"],
+    dependencies: ["ChatInputButtonAPI", "HeaderBarAPI"],
     settings,
 
     chatBarButton: {
@@ -257,7 +258,11 @@ export default definePlugin({
                 const minDelay = settings.store.minDelayMs ?? 300;
                 const maxDelay = Math.max(settings.store.maxDelayMs ?? 1500, minDelay);
                 const delay = minDelay + Math.random() * (maxDelay - minDelay);
-                setTimeout(() => sendAutoReply(message), delay);
+                const timeout = setTimeout(() => {
+                    pendingReplies.delete(timeout);
+                    sendAutoReply(message);
+                }, delay);
+                pendingReplies.add(timeout);
             }
         },
     },
@@ -284,6 +289,9 @@ export default definePlugin({
     },
 
     stop() {
+        for (const timeout of pendingReplies) clearTimeout(timeout);
+        pendingReplies.clear();
+        lastReplied.clear();
         removeHeaderBarButton("AutoReply");
         removeChannelToolbarButton("AutoReply");
     },

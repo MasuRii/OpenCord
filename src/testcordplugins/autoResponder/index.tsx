@@ -106,6 +106,7 @@ const DS_STYLE_KEY = "auto-responder-global-style";
 
 let lastMessageId = "";
 const cachedGlobalStyle = "";
+const pendingResponses = new Set<ReturnType<typeof setTimeout>>();
 
 async function handleMessage(message: any) {
     if (!settings.store.isActive) return;
@@ -204,12 +205,15 @@ Reply naturally. ONLY RETURN THE TEXT OF YOUR REPLY.`;
                 TypingActions.startTyping(message.channel_id);
             } catch { }
 
-            setTimeout(async () => {
+            const timeout = setTimeout(async () => {
+                pendingResponses.delete(timeout);
+                if (!settings.store.isActive) return;
                 await RestAPI.post({
                     url: `/channels/${message.channel_id}/messages`,
                     body: { content: reply }
                 });
             }, totalDelay);
+            pendingResponses.add(timeout);
         }
     } catch (err) {
         console.error("[AutoResponder] Error:", err);
@@ -256,7 +260,6 @@ function forceRerender() {
 }
 
 const AutoResponderButton = () => {
-    if (settings.store.location !== "chatbar") return null;
     const [, setTick] = React.useState(0);
     const isEnabled = settings.store.isActive;
 
@@ -265,6 +268,7 @@ const AutoResponderButton = () => {
         return () => { _forceUpdate = () => { }; };
     }, []);
 
+    if (settings.store.location !== "chatbar") return null;
     const toggle = async () => {
         const newState = !settings.store.isActive;
 
@@ -301,8 +305,9 @@ const AutoResponderButton = () => {
 export default definePlugin({
     name: "AutoResponder",
     description: "Automatically reply to DMs using AI to match your writing style.",
-    tags: ["Chat", "Utility"],
+    tags: ["Chat", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
+    dependencies: ["HeaderBarAPI"],
     settings,
     chatBarButton: {
         icon: KeyboardIcon,
@@ -340,6 +345,8 @@ export default definePlugin({
     },
 
     stop() {
+        for (const timeout of pendingResponses) clearTimeout(timeout);
+        pendingResponses.clear();
         removeHeaderBarButton("AutoResponder");
         removeChannelToolbarButton("AutoResponder");
     }

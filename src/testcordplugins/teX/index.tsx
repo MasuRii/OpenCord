@@ -6,7 +6,7 @@
 
 import "./style.css";
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import { classes } from "@utils/misc";
 import definePlugin from "@utils/types";
 import { React, Tooltip, useMemo } from "@webpack/common";
@@ -92,8 +92,3 @@ function LatexPlaceholder({ className, delim, children, ...props }) {
         </code>
     );
 }
-
-
-
-
-

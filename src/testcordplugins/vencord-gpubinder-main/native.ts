@@ -1,7 +1,13 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 // src/userplugins/gpuBinder/native.ts
-import { promisify } from "util";
 import { exec as childExec } from "child_process";
 import { IpcMainInvokeEvent } from "electron";
+import { promisify } from "util";
 
 const exec = promisify(childExec);
 
@@ -41,12 +47,12 @@ export async function applyGpuPreference(_event: IpcMainInvokeEvent, preference:
         }
 
         // 3. Stale Entries Cleanup
-        // This removes old registry properties containing 'Discord.exe' that point to 
+        // This removes old registry properties containing 'Discord.exe' that point to
         // non-existent previous version folders (e.g., app-1.0.9001), keeping the registry clean.
         const cleanupCmd = `powershell -NoProfile -Command "$p = '${regPathEsc}'; if (Test-Path $p) { $props = Get-ItemProperty -Path $p; $props.PSObject.Properties | Where-Object { $_.Name -like '*Discord.exe*' -and $_.Name -ne '${nameEsc}' } | ForEach-Object { Remove-ItemProperty -Path $p -Name $_.Name -ErrorAction SilentlyContinue } }"`;
-        
+
         await exec(cleanupCmd);
-        
+
         return changed;
     } catch (error) {
         console.error("[GpuBinder Native] Registry operation failed:", error);

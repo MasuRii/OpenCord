@@ -118,4 +118,3 @@ export function extractImages(messages: any[], channelId: string, opts: { includ
 
     return items;
 }
-

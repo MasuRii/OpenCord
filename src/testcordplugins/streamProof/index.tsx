@@ -194,7 +194,7 @@ export default definePlugin({
     name: "StreamProof",
     description: "Hides messages, links, images, DMs, but not the screen share/voice grid. Toggle via chat bar button.",
     authors: [EquicordDevs.TheArmagan],
-    dependencies: ["ChatInputButtonAPI"],
+    dependencies: ["ChatInputButtonAPI", "HeaderBarAPI"],
     settings,
 
     chatBarButton: {

@@ -13,6 +13,9 @@ import definePlugin from "@utils/types";
 import { Channel, Guild, User } from "@vencord/discord-types";
 import { Menu, React } from "@webpack/common";
 
+import { HotkeyReferenceButton } from "./components/HotkeyReferenceButton";
+import { WorkspaceHost } from "./components/WorkspaceHost";
+import { WorkspaceSwitcherButton } from "./components/WorkspaceSwitcherButton";
 import {
     attachKeyListener,
     buildRouteTargetFromRouteProps,
@@ -28,13 +31,10 @@ import {
     toggleAutoLayoutMode,
     toggleScratchpadById,
 } from "./controller";
-import { HotkeyReferenceButton } from "./components/HotkeyReferenceButton";
 import { settings } from "./settings";
 import { HyprTilesStore, initializeHyprTilesStore } from "./store";
 import managedStyle from "./styles.css?managed";
 import { RouteRenderPropsLike } from "./types";
-import { WorkspaceHost } from "./components/WorkspaceHost";
-import { WorkspaceSwitcherButton } from "./components/WorkspaceSwitcherButton";
 
 type ContextMenuChildren = Array<React.ReactElement<object> | null | undefined>;
 const cl = classNameFactory("vc-hyprtiles-");
@@ -253,16 +253,74 @@ export default definePlugin({
         return wrapped;
     },
 
+    _borderScanQueued: false,
+    _borderObserver: null as MutationObserver | null,
+    _startupTimer: null as ReturnType<typeof setTimeout> | null,
+
     start() {
         initializeHyprTilesStore();
         setHyprTilesRunning(true);
         attachKeyListener();
         addHeaderBarButton("HyprTiles-hotkeys", () => <HotkeyReferenceButton />, 6);
+
+        this._startupTimer = setTimeout(() => {
+            this._startupTimer = null;
+            this.applyBorders();
+        }, 1000);
+
+        const observer = new MutationObserver(() => {
+            if (this._borderScanQueued) return;
+            this._borderScanQueued = true;
+            requestAnimationFrame(() => {
+                this._borderScanQueued = false;
+                this.applyBorders();
+            });
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        this._borderObserver = observer;
     },
 
     stop() {
         detachKeyListener();
         setHyprTilesRunning(false);
         removeHeaderBarButton("HyprTiles-hotkeys");
+        this.removeBorders();
+
+        if (this._startupTimer !== null) {
+            clearTimeout(this._startupTimer);
+            this._startupTimer = null;
+        }
+        this._borderScanQueued = false;
+        if (this._borderObserver) {
+            this._borderObserver.disconnect();
+            this._borderObserver = null;
+        }
+    },
+
+    applyBorders() {
+        const s = settings.store;
+        const root = document.documentElement;
+        if (!s.enableBorders) { this.removeBorders(); return; }
+
+        root.style.setProperty("--hyprtiles-border-width", `${s.borderWidth}px`);
+        root.style.setProperty("--hyprtiles-border-color", s.borderColor);
+        root.style.setProperty("--hyprtiles-border-color-end", s.borderColorEnd);
+        root.style.setProperty("--hyprtiles-animation-speed", `${11 - s.animationSpeed}s`);
+
+        const body = document.body.classList;
+        body.add("vc-hyprtiles-premium-borders");
+        body.toggle("vc-hyprtiles-premium-gradient", s.enableGradients);
+        body.toggle("vc-hyprtiles-premium-animated", s.enableGradients && s.animatedBorder);
+        body.toggle("vc-hyprtiles-premium-hide-channel-name", !s.showChannelName);
+    },
+
+    removeBorders() {
+        const body = document.body.classList;
+        body.remove(
+            "vc-hyprtiles-premium-borders",
+            "vc-hyprtiles-premium-gradient",
+            "vc-hyprtiles-premium-animated",
+            "vc-hyprtiles-premium-hide-channel-name"
+        );
     }
 });

@@ -6,8 +6,8 @@
 
 import { React, useEffect,useRef, useState } from "@webpack/common";
 
-import type { OnSubmit } from "../types";
 import { renderSpeechbubble } from "../render/speechbubble";
+import type { OnSubmit } from "../types";
 
 export default function SpeechBubbler({ width, height, element, onSubmit }:
 	{ width: number, height: number, element: HTMLElement, onSubmit: OnSubmit }) {

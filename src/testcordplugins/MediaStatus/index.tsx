@@ -6,7 +6,7 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { Link } from "@components/Link";
-import {TestcordDevs} from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
@@ -413,8 +413,3 @@ export default definePlugin({
         }
     }
 });
-
-
-
-
-

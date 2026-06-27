@@ -4,13 +4,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings } from "@api/Settings";
 import { showNotification } from "@api/Notifications";
-import { findByPropsLazy } from "@webpack";
-import { React, FluxDispatcher, Forms, Slider } from "@webpack/common";
-import definePlugin, { OptionType } from "@utils/types";
-
+import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
+import definePlugin, { OptionType } from "@utils/types";
+import { findByPropsLazy } from "@webpack";
+import { FluxDispatcher, Forms, React, Slider } from "@webpack/common";
 
 const configModule = findByPropsLazy("getOutputVolume");
 
@@ -57,7 +56,7 @@ const settings = definePluginSettings({
 });
 
 // Global limiter state
-let limiterState = {
+const limiterState = {
   isActive: false,
   audioContext: null as AudioContext | null,
   gainNode: null as GainNode | null,
@@ -122,7 +121,7 @@ function checkAndLimitVolume() {
   if (!settings.store.enableVolumeLimiting) return;
 
   const currentVolume = getCurrentVolume();
-  const maxVolume = settings.store.maxVolume;
+  const { maxVolume } = settings.store;
 
   if (currentVolume > maxVolume) {
     setVolume(maxVolume);
@@ -513,8 +512,3 @@ export default definePlugin({
     },
   ],
 });
-
-
-
-
-

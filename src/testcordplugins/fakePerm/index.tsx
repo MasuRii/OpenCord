@@ -1,6 +1,6 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -8,7 +8,7 @@ import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatc
 import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByProps } from "@webpack";
-import { Button, ChannelStore, GuildChannelStore, GuildMemberStore, GuildRoleStore, GuildStore, Menu, React, Select, TextArea } from "@webpack/common";
+import { Button, GuildChannelStore, GuildMemberStore, GuildRoleStore, GuildStore, Menu, React, Select, TextArea } from "@webpack/common";
 
 // ─── Global State ──────────────────────────────────────────────────────────────
 // isEnabled is the SINGLE source of truth — read from DataStore at start()
@@ -438,7 +438,7 @@ const userContextPatch: NavContextMenuPatchCallback = (children, { user }: any) 
                 children[i] = React.cloneElement(group, { children: filtered });
             }
         }
-        const username = user.username;
+        const { username } = user;
         const allRoles = getGuildRoles(guildId);
         const memberRoleIds = getMemberRoleIds(guildId, user.id);
 
@@ -506,7 +506,7 @@ export default definePlugin({
     name: "FakePerm",
     enabledByDefault: false,
     description: "Visually simulates moderation options in the right-click menu. No real action.",
-    tags: ["Roles", "Utility"],
+    tags: ["Roles", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     dependencies: ["ContextMenuAPI"],
     requiresRestart: false,
@@ -593,6 +593,7 @@ export default definePlugin({
     },
 
     _domObserver: null as MutationObserver | null,
+    _domTimer: null as ReturnType<typeof setTimeout> | null,
 
     applyDomOverrides() {
         if (!isEnabled) return;
@@ -637,12 +638,11 @@ export default definePlugin({
         document.head.appendChild(style);
 
         // MutationObserver for DOM overrides
-        let _domTimer: ReturnType<typeof setTimeout> | null = null;
         this._domObserver = new MutationObserver(() => {
             if (!isEnabled) return;
             if (fakeNicks.size === 0 && disconnectedUsers.size === 0 && kickedUsers.size === 0) return;
-            if (_domTimer) return;
-            _domTimer = setTimeout(() => { _domTimer = null; if (isEnabled) this.applyDomOverrides(); }, 150);
+            if (this._domTimer) return;
+            this._domTimer = setTimeout(() => { this._domTimer = null; if (isEnabled) this.applyDomOverrides(); }, 150);
         });
         this._domObserver.observe(document.body, { childList: true, subtree: true });
     },
@@ -650,6 +650,7 @@ export default definePlugin({
     stop() {
         this._domObserver?.disconnect();
         this._domObserver = null;
+        if (this._domTimer) { clearTimeout(this._domTimer); this._domTimer = null; }
         removeHideStyle();
         removeContextMenuPatch("user-context", userContextPatch);
         removeContextMenuPatch("message", messageContextPatch);

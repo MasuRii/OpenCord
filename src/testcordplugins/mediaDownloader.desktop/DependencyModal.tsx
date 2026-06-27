@@ -113,5 +113,3 @@ export function DependencyModal({ props, options: { key, checkytdlp, checkffmpeg
         </ModalRoot>
     );
 }
-
-

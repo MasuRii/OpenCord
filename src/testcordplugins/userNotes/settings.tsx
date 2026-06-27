@@ -98,5 +98,3 @@ export default definePluginSettings({
             </Button>
     },
 });
-
-

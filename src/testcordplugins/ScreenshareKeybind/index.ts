@@ -4,8 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
+import { findByCodeLazy, findByPropsLazy } from "@webpack";
+import { ChannelStore, SelectedChannelStore } from "@webpack/common";
+
+const getMediaEngine = findByPropsLazy("getMediaEngine");
+const getDesktopSources = findByCodeLazy("desktop sources");
+const startStream = findByCodeLazy('dispatch({type:"STREAM_START"');
 
 export default definePlugin({
     name: "ScreenshareKeybind",
@@ -29,11 +35,11 @@ export default definePlugin({
         }
     ],
     async trigger() {
-        var selected = Vencord.Webpack.Common.SelectedChannelStore.getVoiceChannelId();
+        var selected = SelectedChannelStore.getVoiceChannelId();
         if (!selected) return;
-        var channel = Vencord.Webpack.Common.ChannelStore.getChannel(selected);
-        var source = await Vencord.Webpack.findByCode("desktop sources")(Vencord.Webpack.findByProps("getMediaEngine").getMediaEngine(), ["screen"], null);
-        Vencord.Webpack.findByCode('dispatch({type:"STREAM_START"')(channel.guild_id, selected, {
+        var channel = ChannelStore.getChannel(selected);
+        var source = await getDesktopSources(getMediaEngine.getMediaEngine(), ["screen"], null);
+        startStream(channel.guild_id, selected, {
             "pid": null,
             "sourceId": source.id,
             "sourceName": source.name,
@@ -43,8 +49,3 @@ export default definePlugin({
         });
     }
 });
-
-
-
-
-

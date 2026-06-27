@@ -64,11 +64,15 @@ export default definePlugin({
     authors: [Devs.nin0dev],
     settings,
     interval: -1,
+    restartTimeout: -1,
+    running: false,
     start() {
+        this.running = true;
         (0, eval)(smd5);
         settings.store.isLoggedIn && this.initRPC();
     },
     stop() {
+        this.running = false;
         delete window.SparkMD5;
         FluxDispatcher.dispatch({
             type: "LOCAL_ACTIVITY_UPDATE",
@@ -76,11 +80,14 @@ export default definePlugin({
             socket: "NavidromeRPC"
         });
         clearInterval(this.interval);
+        clearTimeout(this.restartTimeout);
     },
     req,
     getNowPlayingTrack,
     initRPC() {
+        if (!this.running) return;
         const fn = async () => {
+            if (!this.running) return;
             try {
                 await this.setRichPresence(await getNowPlayingTrack());
             } catch (e) {
@@ -91,7 +98,8 @@ export default definePlugin({
                     socket: "NavidromeRPC"
                 });
                 clearInterval(this.interval);
-                setTimeout(() => {
+                this.restartTimeout = window.setTimeout(() => {
+                    if (!this.running) return;
                     // @ts-expect-error
                     this.interval = setInterval(fn, settings.store.delay);
                 }, 5000);

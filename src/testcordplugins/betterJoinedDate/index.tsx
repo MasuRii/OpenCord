@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { Tooltip } from "@webpack/common";
 
@@ -58,8 +58,3 @@ export default definePlugin({
         return addTooltip(str, timestamp);
     }
 });
-
-
-
-
-

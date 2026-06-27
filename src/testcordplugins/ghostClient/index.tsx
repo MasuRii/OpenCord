@@ -1,17 +1,16 @@
 /*
- * Equicord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 import "./styles.css";
 
 import { DataStore } from "@api/index";
-import definePlugin, { PluginNative } from "@utils/types";
 import { UserAreaButton, UserAreaButtonFactory, UserAreaRenderProps } from "@api/UserArea";
-import { findByProps, findByPropsLazy, findStoreLazy } from "@webpack";
-import { React, ReactDOM, Toasts, useState, useEffect, useRef } from "@webpack/common";
-
+import definePlugin, { PluginNative } from "@utils/types";
+import { findByPropsLazy, findStoreLazy } from "@webpack";
+import { React, ReactDOM, Toasts, useEffect, useRef,useState } from "@webpack/common";
 
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
 const ChannelStore = findStoreLazy("ChannelStore");
@@ -50,6 +49,7 @@ interface GhostState { active: boolean; connecting: boolean; error: string | nul
 
 const ghostStates = new Map<string, GhostState>();
 let ghostListeners: Array<() => void> = [];
+let ipcHandlerRegistered = false;
 function notify() { ghostListeners.forEach(f => f()); }
 
 function useGhostStates() {
@@ -277,7 +277,7 @@ function Dropdown({ icon, label, value, options, onChange }: {
     return (
         <div className="gc-dropdown-wrap">
             <div className="gc-dropdown-label">{icon}<span>{label}</span></div>
-            <button ref={btnRef} className={`gc-dropdown-btn ${open ? "gc-dropdown-btn--open" : ""}`} onClick={(e) => openDropdown(e)}>
+            <button ref={btnRef} className={`gc-dropdown-btn ${open ? "gc-dropdown-btn--open" : ""}`} onClick={e => openDropdown(e)}>
                 <div className="gc-dropdown-selected">
                     {selected?.avatar !== undefined && (selected.avatar
                         ? <img src={avatarUrl(selected.userId!, selected.avatar)} className="gc-dropdown-avatar" alt="" />
@@ -382,7 +382,7 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
         if (!anchorRect) return { position: "fixed", bottom: 80, left: 8, zIndex: 2147483647 };
         const PW = 320, PH = 560;
         const margin = 8;
-        let left = anchorRect.left;
+        let { left } = anchorRect;
         let top = anchorRect.top - PH - 8;
         if (top < margin) top = anchorRect.bottom + 8;
         if (top + PH > window.innerHeight - margin) top = window.innerHeight - PH - margin;
@@ -392,7 +392,7 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
     }, [anchorRect]);
 
     useEffect(() => {
-        getAllSavedAccounts().then((v) => { setAccounts(v); savedAccounts = v; });
+        getAllSavedAccounts().then(v => { setAccounts(v); savedAccounts = v; });
 
         // Auto-follow enabled by default (true if no value yet in DataStore)
         DataStore.get(DS_KEY_AUTO_FOLLOW).then((v: boolean | null) => {
@@ -704,7 +704,7 @@ const GhostUserAreaButton: UserAreaButtonFactory = ({ iconForeground, hideToolti
             }
             notify();
             // Parallel connection
-            await Promise.all(targets.map(async (acc) => {
+            await Promise.all(targets.map(async acc => {
                 ghostStates.set(acc.userId, { active: false, connecting: true, error: null });
                 notify();
                 try {
@@ -748,7 +748,7 @@ const GhostUserAreaButton: UserAreaButtonFactory = ({ iconForeground, hideToolti
 export default definePlugin({
     name: "GhostClient",
     description: "Discord ghost accounts — left-click to enable/disable, right-click to configure.",
-    tags: ["Privacy", "Voice", "Utility"],
+    tags: ["Privacy", "Voice", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
     userAreaButton: { icon: GhostIcon, render: GhostUserAreaButton, priority: 1 },
 
@@ -760,7 +760,8 @@ export default definePlugin({
         const allAccs = await getAllSavedAccounts();
         if (allAccs.length > 0) savedAccounts = allAccs;
 
-        setTimeout(() => {
+        this._preConnectTimer = setTimeout(() => {
+            this._preConnectTimer = null;
             Native.init().catch(() => { });
 
             (async () => {
@@ -775,9 +776,15 @@ export default definePlugin({
             })();
         }, 10000);
 
+        // Register the IPC disconnect listener only once for the lifetime of the
+        // module. VencordNative.ipc does not currently exist in this build, so the
+        // guard keeps this future-proof: if a build ever exposes ipc.on, the
+        // handler still cannot stack across enable/disable cycles.
         try {
-            if (typeof (VencordNative as any)?.ipc?.on === "function") {
-                (VencordNative as any).ipc.on("ghost-client-disconnected", (_: any, userId: string, code: number, reason: string) => {
+            const ipc = (VencordNative as any)?.ipc;
+            if (!ipcHandlerRegistered && typeof ipc?.on === "function") {
+                ipcHandlerRegistered = true;
+                ipc.on("ghost-client-disconnected", (_: any, userId: string, code: number, reason: string) => {
                     console.error(`[GhostClient] ${userId} forcefully disconnected (code=${code} reason=${reason})`);
                     ghostStates.set(userId, { active: false, connecting: false, error: `Disconnected (${code})` });
                     notify();
@@ -788,5 +795,14 @@ export default definePlugin({
         }
     },
 
-    stop() { ghostDeactivateAll(); stopFollowing(); },
+    _preConnectTimer: null as ReturnType<typeof setTimeout> | null,
+
+    stop() {
+        if (this._preConnectTimer) {
+            clearTimeout(this._preConnectTimer);
+            this._preConnectTimer = null;
+        }
+        ghostDeactivateAll();
+        stopFollowing();
+    },
 });

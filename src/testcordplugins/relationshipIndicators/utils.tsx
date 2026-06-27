@@ -50,5 +50,3 @@ export function getBadges({ userId }: BadgeUserArgs): ProfileBadge[] {
         key: `vc-${RelationshipStore.isFriend(userId)?"friend":"blocked"}-indicator`,
     }] as any;
 }
-
-

@@ -6,7 +6,6 @@
 
 import { Button } from "@components/Button";
 import { Divider } from "@components/Divider";
-import { FormSwitch } from "@components/FormSwitch";
 import { HeadingPrimary, HeadingSecondary } from "@components/Heading";
 import { Margins } from "@utils/margins";
 import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot } from "@utils/modal";
