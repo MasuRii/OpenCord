@@ -239,6 +239,7 @@ jobs:
               run: pnpm buildStandalone
 
             - name: Generate plugin lists
+              continue-on-error: true
               run: |
                   pnpm generatePluginJson dist/plugins.json
                   pnpm generateEquicordPluginJson dist/equicordplugins.json
