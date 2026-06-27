@@ -13,17 +13,26 @@
 
 import "./styles.css";
 
-import { EsharqDevs } from "@utils/constants";
-import { t } from "@esharqplugins/_esharqI18n";
+import { EquicordDevs } from "@utils/constants";
+import { t } from "@utils/esharqI18n";
 import definePlugin from "@utils/types";
 import { i18n } from "@webpack/common";
 
-import { collectMissing } from "./collector";
+import { collectMissing as rawCollect } from "./collector";
+import { startDomFallback, stopDomFallback } from "./domFallback";
 import { settings } from "./settings";
 import { translations as AR } from "./translations";
 
-// دوال intl النصّية البسيطة (مطابقة مباشرة). "format" و"formatToParts" لهما منطق خاصّ.
-const STRING_METHODS = ["string", "formatToPlainString", "formatToMarkdownString"];
+// نوع معالجة كل دالة intl: نصّ بسيط (مطابقة مباشرة)، أو format، أو formatToParts،
+// أو withFormatters (تُرجِع كائناً مُشتقّاً نلفّ دواله بدوره).
+const METHOD_KINDS: Record<string, "string" | "format" | "parts" | "withFormatters"> = {
+    string: "string",
+    formatToPlainString: "string",
+    formatToMarkdownString: "string",
+    format: "format",
+    formatToParts: "parts",
+    withFormatters: "withFormatters"
+};
 
 // علامات خاصّة (Private Use Area) لاستعادة القوالب الديناميكية — لا تظهر في نصوص حقيقية.
 const PH_OPEN = String.fromCharCode(0xE000);
@@ -31,7 +40,12 @@ const PH_CLOSE = String.fromCharCode(0xE001);
 const PH_RE = new RegExp(PH_OPEN + "([^" + PH_CLOSE + "]+)" + PH_CLOSE, "g");
 
 type StrFn = (msg: any, values?: any) => any;
-const originals = new Map<string, StrFn>();
+
+// سجلّ ما لُفّ: لكل (مالك، اسم) نحفظ الأصل لاستعادته بدقّة عند الإيقاف.
+interface PatchedEntry { owner: any; name: string; orig: (...a: any[]) => any; }
+const patchedEntries: PatchedEntry[] = [];
+// خريطة هوية (مالك → أسماء مَلفوفة): تمنع اللفّ المزدوج/التكرار عند مشاركة prototype.
+let patchedByOwner = new WeakMap<object, Set<string>>();
 let active = false;
 
 // تطبيع: ديسكورد يستخدم فواصل/علامات اقتباس منحنية (’ ‘ “ ”) — نوحّدها بالمستقيمة
@@ -56,11 +70,85 @@ function diag(ok: boolean, text: string): string {
     return settings.store.diagnosticMode ? (ok ? "🟢" : "🔴") + text : text;
 }
 
+// جمع النصوص غير المترجَمة للحصاد — لا يعمل تلقائياً (طلب المالك: لا تخزين خلفي صامت).
+// يبدأ الجمع فقط عند تشغيل «الوضع التشخيصي». مكان واحد يُقيّد كل مواضع النداء أدناه.
+function collect(text: string): void {
+    if (settings.store.diagnosticMode) rawCollect(text);
+}
+
 /** استبدال المتغيّرات في قالب عربي: "لديك {count} رسالة" + { count: 3 } → "لديك 3 رسالة". */
 export function formatMessage(template: string, values?: Record<string, any>): string {
     if (values == null) return template;
     return template.replace(/\{(\w+)\}/g, (m, name) =>
         Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : m);
+}
+
+// أسماء أيام الأسبوع (للطوابع الزمنية «Monday at 9:00am»).
+const WEEKDAYS_AR: Record<string, string> = {
+    Sunday: "الأحد", Monday: "الاثنين", Tuesday: "الثلاثاء", Wednesday: "الأربعاء",
+    Thursday: "الخميس", Friday: "الجمعة", Saturday: "السبت"
+};
+
+// قوالب رقمية «مخبوزة»: ديسكورد يُدمج العدد عبر صيغ الجمع ICU فيخرج النصّ جاهزاً
+// ("12 Mutual Friends") — فلا يستعيده recoverTemplate ولا يُطابِق القاموس. نطابقه بنمط
+// مضبوط ونُعيد صياغته بالعربية. قائمة قصيرة جداً ومُقيّدة بـ ^…$ لتفادي أي مطابقة خاطئة.
+// نُبقي الاسم العَلَم (قناة/رتبة/مستخدم) بالإنجليزية ونُعرّب التسمية المحيطة فقط.
+const NUMERIC_PATTERNS: { re: RegExp; ar: (m: RegExpMatchArray) => string }[] = [
+    { re: /^(\d+) Mutual Friends$/, ar: m => `${m[1]} صديق مشترك` },
+    { re: /^(\d+) Mutual Servers$/, ar: m => `${m[1]} خادم مشترك` },
+    { re: /^(\d+) Boosts?$/, ar: m => `${m[1]} تعزيز` },
+    { re: /^(\d+)\+ Boosts?$/, ar: m => `${m[1]}+ تعزيز` },
+    { re: /^(\d+) of (\d+) users$/, ar: m => `${m[1]} من ${m[2]} مستخدم` },
+    // مدد زمنية مخبوزة (وقت تشغيل البثّ، مدّة المكالمة…) — صيغة مبسّطة مقبولة
+    { re: /^(\d+) hours?$/, ar: m => `${m[1]} ساعة` },
+    { re: /^(\d+) minutes?$/, ar: m => `${m[1]} دقيقة` },
+    { re: /^(\d+) seconds?$/, ar: m => `${m[1]} ثانية` },
+    { re: /^(\d+) days?$/, ar: m => `${m[1]} يوم` },
+    // وقت نسبيّ مختصر ("25m ago")
+    { re: /^(\d+)s ago$/, ar: m => `قبل ${m[1]} ثانية` },
+    { re: /^(\d+)m ago$/, ar: m => `قبل ${m[1]} دقيقة` },
+    { re: /^(\d+)h ago$/, ar: m => `قبل ${m[1]} ساعة` },
+    { re: /^(\d+)d ago$/, ar: m => `قبل ${m[1]} يوم` },
+    { re: /^(\d+)w ago$/, ar: m => `قبل ${m[1]} أسبوع` },
+    { re: /^(\d+)y ago$/, ar: m => `قبل ${m[1]} سنة` },
+    // عدّاد أسئلة الإعداد ("Questions (1/5)")
+    { re: /^Questions \((\d+)\/(\d+)\)$/, ar: m => `أسئلة (${m[1]}/${m[2]})` },
+    // تقدّم المهمة ("Quest progress: 0%".."99%"؛ الـ100% مفتاح في القاموس)
+    { re: /^Quest progress: (\d+)%$/, ar: m => `تقدّم المهمة: ${m[1]}%` },
+    // رصيد سيُطبَّق في تاريخ مخبوز ("Credit will be applied on Jun 22, 2026.") — نُبقي التاريخ كصيغة ديسكورد
+    { re: /^Credit will be applied on (.+)\.$/, ar: m => `سيُطبَّق الرصيد في ${m[1]}.` },
+    // ── الإعداد التمهيدي / دليل الخادم / الأذونات ──
+    { re: /^Question (\d+)$/, ar: m => `السؤال ${m[1]}` },
+    { re: /^Available Answers — (\d+) of (\d+)$/, ar: m => `الإجابات المتاحة — ${m[1]} من ${m[2]}` },
+    { re: /^@everyone currently has (\d+) risky permissions? enabled$/, ar: m => `يملك @everyone حالياً ${m[1]} صلاحية خطرة مفعّلة` },
+    { re: /^\((\d+) words?, (\d+) regexe?s?\)$/, ar: m => `(${m[1]} كلمة، ${m[2]} نمط)` },
+    { re: /^\((\d+) words?\)$/, ar: m => `(${m[1]} كلمة)` },
+    // ── رسائل بداية القناة / الترحيب (يبقى اسم القناة كما هو) ──
+    { re: /^This is the start of the #(.+) channel\.$/, ar: m => `هذه بداية قناة #${m[1]}.` },
+    { re: /^Welcome to #(.+)!$/, ar: m => `مرحباً بك في #${m[1]}!` },
+    { re: /^in #(.+)$/, ar: m => `في #${m[1]}` },
+    // ── ترويسات الرتب في قائمة الأعضاء (يبقى اسم الرتبة كما هو) ──
+    { re: /^(.+), (\d+) members?$/, ar: m => `${m[1]}، ${m[2]} عضو` },
+    // ── الملفات الشخصية / المتفرّجون (يبقى الاسم كما هو) ──
+    { re: /^(.+?)['’]s profile$/, ar: m => `الملف الشخصي لـ${m[1]}` },
+    { re: /^Spectators - (\d+)$/, ar: m => `المتفرّجون - ${m[1]}` },
+    { re: /^Created on (.+) by (.+)$/, ar: m => `أُنشئ في ${m[1]} بواسطة ${m[2]}` },
+    // ── مدد / أوقات نسبية مخبوزة ──
+    { re: /^For (\d+) Hours?$/, ar: m => `لمدّة ${m[1]} ساعة` },
+    { re: /^in (\d+)h$/, ar: m => `خلال ${m[1]} ساعة` },
+    { re: /^in (\d+)m$/, ar: m => `خلال ${m[1]} دقيقة` },
+    // ── طوابع زمنية مطلقة ("Today at 9:00am" / "Monday at 9:00am") ──
+    { re: /^Today at (.+)$/, ar: m => `اليوم في ${m[1]}` },
+    { re: /^Yesterday at (.+)$/, ar: m => `أمس في ${m[1]}` },
+    { re: /^(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday) at (.+)$/, ar: m => `${WEEKDAYS_AR[m[1]]} في ${m[2]}` }
+];
+
+function numericTemplate(text: string): string | null {
+    for (const { re, ar } of NUMERIC_PATTERNS) {
+        const m = text.match(re);
+        if (m != null) return ar(m);
+    }
+    return null;
 }
 
 /** يكشف كل الدوال المتاحة على كائن intl (own + prototype) لنعرف ماذا نلفّ بلا تخمين. */
@@ -137,12 +225,16 @@ function translateString(orig: StrFn, msg: any, values: any, methodName: string)
         if (tmpl != null && tmpl !== out) {
             const arTmpl = lookup(tmpl);
             if (arTmpl != null) return diag(true, formatMessage(arTmpl, values));
-            collectMissing(tmpl);
+            collect(tmpl);
             return diag(false, out);
         }
     }
 
-    collectMissing(out);
+    // قوالب رقمية مخبوزة (Mutual Friends/Servers، Boosts، عدد المستخدمين) — تُطابَق بنمط.
+    const num = numericTemplate(out);
+    if (num != null) return diag(true, num);
+
+    collect(out);
     if (settings.store.logMissingKeys) {
         console.log(`[DiscordArabicizer DEBUG] ${methodName} (غير مترجَم):`, JSON.stringify(out));
     }
@@ -159,7 +251,7 @@ function translatePartsArray(parts: any[]): any {
         const joined = parts.join("");
         const ar = lookup(joined);
         if (ar != null) return [diag(true, ar)];
-        collectMissing(joined);
+        collect(joined);
         return settings.store.diagnosticMode ? [diag(false, joined)] : parts;
     }
 
@@ -184,12 +276,12 @@ function translatePartsArray(parts: any[]): any {
         if (core.length < 2) return p;
         const t = lookup(core);
         if (t != null) { changed = true; return lead + t + trail; }
-        collectMissing(core); // اجمع الجملة المفقودة نفسها (أنفع للحصاد من جمع القالب)
+        collect(core); // اجمع الجملة المفقودة نفسها (أنفع للحصاد من جمع القالب)
         return p;
     });
     if (changed) return perPart;
 
-    collectMissing(template);
+    collect(template);
     return settings.store.diagnosticMode ? ["🔴", ...parts] : parts;
 }
 
@@ -210,11 +302,16 @@ function translateFormat(orig: StrFn, msg: any, values: any): any {
         if (tmpl != null && tmpl !== out) {
             const arTmpl = lookup(tmpl);
             if (arTmpl != null) return diag(true, formatMessage(arTmpl, values));
-            collectMissing(tmpl);
+            collect(tmpl);
             return diag(false, out);
         }
     }
-    collectMissing(out);
+
+    // قوالب رقمية مخبوزة (تظهر أيضاً عبر دالة format لا string فقط) — تُطابَق بنمط.
+    const num = numericTemplate(out);
+    if (num != null) return diag(true, num);
+
+    collect(out);
     return diag(false, out);
 }
 
@@ -225,66 +322,106 @@ function translateParts(orig: StrFn, msg: any, values: any): any {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// لفّ دوال intl الأساسي
+// لفّ دوال intl على «مالكها» الفعلي (الكائن نفسه أو الـprototype). لفّ الـprototype
+// يُترجِم رجعياً كل الكائنات المشتركة فيه — بما فيها المُنسِّقات المُخزَّنة التي أنشأتها
+// وحدات ديسكورد عبر withFormatters قبل التفعيل (سبب رجوع بعض النصوص للإنجليزية).
+// كل نداء داخل try/catch → أي خطأ يُرجِع الأصل فوراً (لا شاشة بيضاء، لا تعطّل).
 // ─────────────────────────────────────────────────────────────────────────────
 
-function wrapMethod(intl: any, name: string) {
-    if (typeof intl[name] !== "function" || originals.has(name)) return;
-    const orig = intl[name].bind(intl) as StrFn;
-    originals.set(name, orig);
-    intl[name] = (msg: any, values?: any) => translateString(orig, msg, values, name);
+// يجد الكائن الذي يملك الدالة فعلياً (الكائن نفسه أو أحد آبائه في سلسلة prototype).
+function findOwner(obj: any, name: string): any | null {
+    for (let o = obj, depth = 0; o != null && depth < 8; o = Object.getPrototypeOf(o), depth++) {
+        if (Object.prototype.hasOwnProperty.call(o, name) && typeof o[name] === "function") return o;
+    }
+    return null;
 }
 
-function wrapFormat(intl: any) {
-    if (typeof intl.format !== "function" || originals.has("format")) return;
-    const orig = intl.format.bind(intl) as StrFn;
-    originals.set("format", orig);
-    intl.format = (msg: any, values?: any) => translateFormat(orig, msg, values);
+function isPatched(owner: object, name: string): boolean {
+    return patchedByOwner.get(owner)?.has(name) === true;
 }
 
-function wrapFormatToParts(intl: any) {
-    if (typeof intl.formatToParts !== "function" || originals.has("formatToParts")) return;
-    const orig = intl.formatToParts.bind(intl) as StrFn;
-    originals.set("formatToParts", orig);
-    intl.formatToParts = (msg: any, values?: any) => translateParts(orig, msg, values);
+function markPatched(owner: object, name: string) {
+    let names = patchedByOwner.get(owner);
+    if (names == null) { names = new Set(); patchedByOwner.set(owner, names); }
+    names.add(name);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// لفّ withFormatters: ديسكورد يستدعيها لرسم النصوص الغنيّة (الأوصاف ذات الروابط).
-// تُرجِع كائن intl جديداً — نُغلّفه بـProxy فتمرّ كل دواله عبر الترجمة نفسها.
-// ─────────────────────────────────────────────────────────────────────────────
+// علامة على ملفوفاتنا — تمنع اللفّ المزدوج وتُتيح التشخيص عبر intl.string.__arabicizerPatched.
+const PATCH_MARK = "__arabicizerPatched";
 
-function wrapIntlLikeProxy(obj: any): any {
-    return new Proxy(obj, {
-        get(target, prop) {
-            const v = (target as any)[prop];
-            if (typeof v !== "function" || typeof prop === "symbol") return v;
-            const name = prop as string;
-            const bound = v.bind(target) as StrFn;
-            if (name === "string" || name === "formatToPlainString" || name === "formatToMarkdownString")
-                return (msg: any, values?: any) => translateString(bound, msg, values, name);
-            if (name === "format")
-                return (msg: any, values?: any) => translateFormat(bound, msg, values);
-            if (name === "formatToParts")
-                return (msg: any, values?: any) => translateParts(bound, msg, values);
-            if (name === "withFormatters")
-                return (...a: any[]) => {
-                    const r = (bound as any)(...a);
-                    return (r != null && typeof r === "object") ? wrapIntlLikeProxy(r) : r;
-                };
-            return bound;
-        }
-    });
+// يبني ملفوفاً this-aware محميّاً بـtry/catch حول الدالة الأصلية المُعطاة، موسوماً بعلامتنا.
+function makeWrapper(origRaw: (...a: any[]) => any, name: string, kind: "string" | "format" | "parts" | "withFormatters"): (...a: any[]) => any {
+    let wrapper: (...a: any[]) => any;
+    if (kind === "withFormatters") {
+        wrapper = function (this: any, ...args: any[]) {
+            const result = origRaw.apply(this, args); // الأصل أولاً (سلوك مطابق)
+            // الكائن الناتج: نلفّ دواله بالآلية نفسها (dedup يمنع التكرار/اللفّ المزدوج).
+            if (result != null && typeof result === "object") {
+                try { patchIntlObject(result); }
+                catch (e) { if (settings.store.logErrors) console.debug("[DiscordArabicizer] withFormatters patch error:", e); }
+            }
+            return result;
+        };
+    } else {
+        wrapper = function (this: any, msg: any, values?: any) {
+            const boundOrig: StrFn = (m, v) => origRaw.call(this, m, v); // this الفعلي (يدعم المشتقّات)
+            try {
+                // خطّاف تشخيص اختياري: يعمل فقط أثناء تسجيل EsharqDiagnostics (الخطّاف العام
+                // موجود)، وإلا فالمسار مطابق تماماً للأصل عدا قراءة خاصّية واحدة — صفر تكلفة فعلياً.
+                const prof = (globalThis as any).__esharqProf;
+                if (prof) {
+                    const t0 = performance.now();
+                    const r = kind === "string" ? translateString(boundOrig, msg, values, name)
+                        : kind === "format" ? translateFormat(boundOrig, msg, values)
+                            : translateParts(boundOrig, msg, values);
+                    prof.hit("DiscordArabicizer.intl." + name, performance.now() - t0);
+                    return r;
+                }
+                if (kind === "string") return translateString(boundOrig, msg, values, name);
+                if (kind === "format") return translateFormat(boundOrig, msg, values);
+                return translateParts(boundOrig, msg, values); // "parts"
+            } catch (e) {
+                if (settings.store.logErrors) console.debug(`[DiscordArabicizer] translate error in ${name}:`, e);
+                return origRaw.call(this, msg, values); // أمان مطلق: أي خطأ → الأصل
+            }
+        };
+    }
+    (wrapper as any)[PATCH_MARK] = true;
+    return wrapper;
 }
 
-function wrapWithFormatters(intl: any) {
-    if (typeof intl.withFormatters !== "function" || originals.has("withFormatters")) return;
-    const orig = intl.withFormatters.bind(intl) as StrFn;
-    originals.set("withFormatters", orig);
-    intl.withFormatters = (...args: any[]) => {
-        const result = (orig as any)(...args);
-        return (result != null && typeof result === "object") ? wrapIntlLikeProxy(result) : result;
-    };
+// ترقيع «لاصق»: نلفّ الدالة على مالكها عبر defineProperty (get/set). لو أعاد ديسكورد
+// إسناد الدالة لاحقاً (سبب ارتداد بعض النصوص للإنجليزية بعد فترة) يلتقطها الـsetter
+// ويلفّ الجديدة فوراً — فيبقى التعريب ثابتاً مع الوقت.
+function patchMethod(intlLike: any, name: string) {
+    const kind = METHOD_KINDS[name];
+    if (kind == null) return;
+    const owner = findOwner(intlLike, name);
+    if (owner == null || isPatched(owner, name)) return;
+
+    const origRaw = owner[name] as (...a: any[]) => any;
+    let wrapped = makeWrapper(origRaw, name, kind);
+
+    try {
+        Object.defineProperty(owner, name, {
+            configurable: true,
+            enumerable: true,
+            get() { return wrapped; },
+            set(v) {
+                // إن كان المُسنَد ملفوفنا أصلاً نُبقيه؛ وإلا نلفّ الجديد (يصمد أمام إعادة الإسناد).
+                wrapped = (typeof v === "function" && (v as any)[PATCH_MARK]) ? v : makeWrapper(v, name, kind);
+            }
+        });
+    } catch (e) {
+        if (settings.store.logErrors) console.debug(`[DiscordArabicizer] defineProperty failed for ${name}:`, e);
+        return; // غير قابل لإعادة التعريف (مجمّد) — نتركه دون لفّ (لا ضرر)
+    }
+    patchedEntries.push({ owner, name, orig: origRaw });
+    markPatched(owner, name);
+}
+
+function patchIntlObject(intlLike: any) {
+    for (const name of Object.keys(METHOD_KINDS)) patchMethod(intlLike, name);
 }
 
 function applyPatch() {
@@ -296,32 +433,45 @@ function applyPatch() {
     }
 
     console.log("[DiscordArabicizer] دوال intl المتاحة:", discoverMethods(intl).join(", "));
+    patchIntlObject(intl);
 
-    for (const name of STRING_METHODS) wrapMethod(intl, name);
-    wrapFormat(intl);
-    wrapFormatToParts(intl);
-    wrapWithFormatters(intl);
+    // تشخيص: أين لُفّت كل دالة (own = على الكائن نفسه، proto = على النموذج الأولي).
+    console.log("[DiscordArabicizer] i18n.intl patched (prototype-aware). لُفّت:",
+        patchedEntries.map(e => `${e.name}[${e.owner === intl ? "own" : "proto"}]`).join(", "));
 
-    console.log("[DiscordArabicizer] i18n.intl patched. (لُفّت:",
-        [...originals.keys()].join(", "), ")");
+    // طبقة احتياطية للنصوص التي تتجاوز intl (تُفعَّل بالخيار، تُفصَل عند الإيقاف).
+    if (settings.store.domFallback) startDomFallback();
     active = true;
 }
 
 function removePatch() {
     if (!active) return;
-    const intl = (i18n as any).intl;
-    if (intl != null) {
-        for (const [name, orig] of originals) intl[name] = orig;
+    stopDomFallback();
+    // استعادة عكسية (الأحدث أولاً): نُعيد كل خاصية إلى «قيمة بيانات» عادية بأصلها بالضبط.
+    // (الإسناد العادي owner[name]=orig سيستدعي الـsetter لا يستعيد — لذا defineProperty.)
+    for (let i = patchedEntries.length - 1; i >= 0; i--) {
+        const { owner, name, orig } = patchedEntries[i];
+        try {
+            Object.defineProperty(owner, name, { value: orig, writable: true, configurable: true, enumerable: true });
+        } catch { /* تجاهل */ }
     }
-    originals.clear();
+    patchedEntries.length = 0;
+    patchedByOwner = new WeakMap(); // إفراغ خريطة الهوية
     active = false;
 }
 
 export default definePlugin({
     name: "DiscordArabicizer",
-    description: "Comprehensive Arabic localization of Discord's UI — by Esharq.",
-    authors: [EsharqDevs.LOSTSTR],
+    description: t(
+        "تعريب شامل لواجهة ديسكورد إلى العربية — من تطوير اشراق.",
+        "Comprehensive Arabic localization of Discord's UI — by Esharq."
+    ),
+    authors: [EquicordDevs.LOSTSTR],
     settings,
+    // الترقيع يلفّ دوال i18n.intl؛ يجب أن يكون حاضراً من بداية الجلسة قبل أن تلتقط وحدات
+    // ديسكورد مراجع تلك الدوال أو ترسم نصوصها — وإلا بقيت بعض النصوص إنجليزية. لذا نطلب
+    // إعادة التشغيل عند تبديل الإضافة فلا تُطبَّق وسط الجلسة (تطبيقاً جزئياً غير ثابت).
+    restartNeeded: true,
 
     start() {
         console.log("[DiscordArabicizer] Plugin loaded.");

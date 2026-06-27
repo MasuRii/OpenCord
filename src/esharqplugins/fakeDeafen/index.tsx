@@ -5,19 +5,23 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { addSettingsPanelButton, DeafenIcon, removeSettingsPanelButton } from "@esharqplugins/philsPluginLibrary";
-import { EsharqDevs } from "@utils/constants";
-import { t } from "@esharqplugins/_esharqI18n";
+import { addSettingsPanelButton, DeafenIcon, removeSettingsPanelButton } from "@plugins/philsPluginLibrary";
+import { EquicordDevs } from "@utils/constants";
+import { t } from "@utils/esharqI18n";
 import definePlugin, { OptionType } from "@utils/types";
+import { MediaEngineStore, VoiceActions } from "@webpack/common";
 
 export let fakeD = false;
 
 function mute() {
-    (document.querySelector('[aria-label="Mute"]') as HTMLElement)?.click();
+    // اكتم فقط إن لم تكن مكتوماً — مطابق لسلوك زر «Mute» الأصلي، لكن عبر دالة
+    // ديسكورد مباشرةً بدل النقر على DOM بالنص فيعمل أياً كانت لغة الواجهة.
+    if (!MediaEngineStore.isSelfMute()) VoiceActions.toggleSelfMute();
 }
 
 function deafen() {
-    (document.querySelector('[aria-label="Deafen"]') as HTMLElement)?.click();
+    // أصمِت فقط إن لم تكن مُصمَتاً (مستقلّ عن اللغة)
+    if (!MediaEngineStore.isSelfDeaf()) VoiceActions.toggleSelfDeaf();
 }
 
 const settings = definePluginSettings({
@@ -109,12 +113,11 @@ function toggleFakeDeafen() {
     console.log("[FakeDeafen] Toggle state:", fakeD ? "ON" : "OFF");
 
 
-    const deafenBtn = document.querySelector('[aria-label="Deafen"]') as HTMLElement;
-    if (deafenBtn) {
-        deafenBtn.click();
-
-        setTimeout(() => deafenBtn.click(), 250);
-    }
+    // تبديل الإصمات مرّتين (تشغيل ثم إيقاف) عبر دالة ديسكورد مباشرةً بدل النقر على
+    // DOM بالنص — يعمل أياً كانت لغة الواجهة. كل تبديل يُطلق voiceStateUpdate الذي
+    // تعترضه الرقعة فيُبقي الآخرين يرونك مُصمَتاً بينما تسمع أنت.
+    VoiceActions.toggleSelfDeaf();
+    setTimeout(() => VoiceActions.toggleSelfDeaf(), 250);
 
 
     if (fakeD && settings.store.muteUponFakeDeafen) {
@@ -165,7 +168,7 @@ export default definePlugin({
     name: "FakeDeafen",
     description: "Appear as deafened to others while still being able to hear.",
     dependencies: ["PhilsPluginLibrary"],
-    authors: [EsharqDevs.LOSTSTR],
+    authors: [EquicordDevs.LOSTSTR],
 
     patches: [
         {

@@ -16,12 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { t } from "@esharqplugins/_esharqI18n";
+import { t } from "@utils/esharqI18n";
 import { Flex } from "@components/Flex";
-import { PluginSettings, ProfilableStore } from "@esharqplugins/philsPluginLibrary";
-import { CopyButton, DeleteButton, NewButton, SaveButton } from "@esharqplugins/philsPluginLibrary/components/buttons";
-import { SettingsModalCard } from "@esharqplugins/philsPluginLibrary/components/settingsModal/SettingsModalCard";
-import { SettingsModalCardItem } from "@esharqplugins/philsPluginLibrary/components/settingsModal/SettingsModalCardItem";
+import { PluginSettings, ProfilableStore } from "@plugins/philsPluginLibrary";
+import { CopyButton, DeleteButton, NewButton, SaveButton } from "@plugins/philsPluginLibrary/components/buttons";
+import { SettingsModalCard } from "@plugins/philsPluginLibrary/components/settingsModal/SettingsModalCard";
+import { SettingsModalCardItem } from "@plugins/philsPluginLibrary/components/settingsModal/SettingsModalCardItem";
 import { Select, TextInput, useEffect, useState } from "@webpack/common";
 
 export interface SettingsModalProfilesCardProps<T extends PluginSettings = {}> extends React.ComponentProps<typeof SettingsModalCard> {

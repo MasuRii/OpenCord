@@ -16,7 +16,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import { panelClasses } from "@esharqplugins/philsPluginLibrary/discordModules";
+import { panelClasses } from "@plugins/philsPluginLibrary/discordModules";
 import { React } from "@webpack/common";
 
 

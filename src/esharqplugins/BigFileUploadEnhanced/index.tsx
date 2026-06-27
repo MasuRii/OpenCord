@@ -6,11 +6,11 @@
 
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings, useSettings } from "@api/Settings";
-import { t } from "@esharqplugins/_esharqI18n";
+import { t } from "@utils/esharqI18n";
 import { Divider } from "@components/Divider";
 import { FormSwitch } from "@components/FormSwitch";
 import { OpenExternalIcon } from "@components/Icons";
-import { EquicordDevs, EsharqDevs } from "@utils/constants";
+import { EquicordDevs } from "@utils/constants";
 import { copyWithToast, insertTextIntoChatInputBox, openImageModal, sendMessage } from "@utils/discord";
 import { Margins } from "@utils/margins";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
@@ -955,7 +955,7 @@ export default definePlugin({
     name: "BigFileUploadEnhanced",
     description: "Bypass Discord's upload limit by uploading files to an external server and sharing the link in chat — this version is faster and does not use DOM manipulation.",
     tags: ["Utility", "Chat"],
-    authors: [EquicordDevs.benjii, EsharqDevs.x2b],
+    authors: [EquicordDevs.benjii, { name: "x2b", id: 0n }],
     settings,
 
     contextMenus: {
