@@ -68,10 +68,12 @@ jobs:
                   BRANCH=$(jq -r --arg name "$NAME" '.sources[] | select(.name == $name) | .branch' "$CONFIG_FILE")
                   LOCAL_DIR=$(jq -r --arg name "$NAME" '.sources[] | select(.name == $name) | .local_dir' "$CONFIG_FILE")
                   UPSTREAM_DIRS_JSON=$(jq -c --arg name "$NAME" '.sources[] | select(.name == $name) | .upstream_dirs' "$CONFIG_FILE")
+                  EXCLUDE_JSON=$(jq -c --arg name "$NAME" '.sources[] | select(.name == $name) | .exclude // []' "$CONFIG_FILE")
                   echo "repo=$REPO" >> $GITHUB_OUTPUT
                   echo "branch=$BRANCH" >> $GITHUB_OUTPUT
                   echo "local_dir=$LOCAL_DIR" >> $GITHUB_OUTPUT
                   echo "upstream_dirs_json=$UPSTREAM_DIRS_JSON" >> $GITHUB_OUTPUT
+                  echo "exclude_json=$EXCLUDE_JSON" >> $GITHUB_OUTPUT
 
             - name: Read local sync state
               id: local_state
@@ -153,6 +155,7 @@ jobs:
               if: steps.detect.outputs.has_changes == 'true'
               env:
                   UPSTREAM_DIRS_JSON: ${{ steps.config.outputs.upstream_dirs_json }}
+                  EXCLUDE_JSON: ${{ steps.config.outputs.exclude_json }}
                   LOCAL_DIR: ${{ steps.config.outputs.local_dir }}
               run: |
                   LOCAL="$LOCAL_DIR"
@@ -161,9 +164,19 @@ jobs:
                   declare -A UPSTREAM_MAP
                   shopt -s nullglob
 
+                  # Build the exclude set from the source config.
+                  declare -A EXCLUDE_MAP
+                  while IFS= read -r excluded; do
+                      [ -n "$excluded" ] && EXCLUDE_MAP["$excluded"]=1
+                  done < <(echo "$EXCLUDE_JSON" | jq -r '.[]')
+
                   sync_plugin() {
                       local plugin_dir="$1"
                       local plugin_name="$2"
+                      if [ -n "${EXCLUDE_MAP[$plugin_name]+x}" ]; then
+                          echo "Skipping excluded plugin: $plugin_name"
+                          return
+                      fi
                       UPSTREAM_MAP["$plugin_name"]=1
                       dest="$LOCAL/$plugin_name"
                       if [ -d "$dest" ]; then

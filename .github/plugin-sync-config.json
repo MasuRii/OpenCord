@@ -5,7 +5,8 @@
             "repo": "ImHisako/Illegalcord",
             "branch": "main",
             "upstream_dirs": ["src/userplugins"],
-            "local_dir": "src/illegalcordplugins"
+            "local_dir": "src/illegalcordplugins",
+            "exclude": ["IllegalcordTutorial"]
         },
         {
             "name": "testcord",
