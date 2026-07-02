@@ -6,12 +6,15 @@
 
 import "./styles.css";
 
+import * as DataStore from "@api/DataStore";
 import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
+import { definePluginSettings } from "@api/Settings";
+import { TestcordDevs } from "@utils/constants";
+import { Logger } from "@utils/Logger";
 import { ModalCloseButton,ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
-import definePlugin from "@utils/types";
+import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { ContextMenuApi, Forms, Menu, Select,showToast, Toasts } from "@webpack/common";
-import { React, useCallback,useEffect, useMemo, useState } from "@webpack/common";
+import { ContextMenuApi, Forms, Menu, React, Select, showToast, Toasts, useCallback, useEffect, useMemo, useState } from "@webpack/common";
 
 import { t, useTranslation } from "../autoTranslateNightcord";
 
@@ -68,36 +71,82 @@ interface LogEntry {
     isMyVoice?: boolean;
 }
 
-const MAX_LOGS = 10000;
+const DEFAULT_MAX_LOGS = 10000;
 const PAGE_SIZE = 40;
+const MAX_VOICE_STATES = 2000;
+const STORE_KEY = "EventLogs_logs";
+const logger = new Logger("EventLogs");
 let logs: LogEntry[] = [];
+
+const settings = definePluginSettings({
+    maxLogs: {
+        type: OptionType.NUMBER,
+        description: "Maximum logs to keep. Set to 0 for infinite.",
+        default: DEFAULT_MAX_LOGS,
+        isValid: (value: unknown) => typeof value === "number" && Number.isInteger(value) && value >= 0,
+        onChange: () => {
+            pruneLogs();
+            savePersistLogs();
+            globalVersion++;
+            for (const fn of updateListeners) {
+                try { fn(); } catch { }
+            }
+        }
+    }
+});
 
 // Track the user's current voice channel ID for "My Voice" filter
 let myVoiceChannelId: string | null = null;
 let logCount = 0;
 
-const PERSISTENT_TYPES = new Set(["ping", "message_delete", "message_edit", "friend_add", "friend_remove", "friend_request", "friend_request_cancel", "block"]);
 const NOTIF_TYPES = new Set(["ping", "friend_add", "friend_remove", "friend_request", "friend_request_cancel", "block"]);
 const unreadLogEntries = new Set<LogEntry>();
 
-function loadPersistLogs() {
-    try {
-        const s = localStorage.getItem("nightcord_logs");
-        if (s) {
-            const parsed = JSON.parse(s);
-            if (Array.isArray(parsed)) {
-                logs = parsed.concat(logs).sort((a, b) => b.timestamp - a.timestamp);
-                logCount = logs.length;
-            }
+function getMaxLogs() {
+    const { maxLogs } = settings.store;
+    return Number.isInteger(maxLogs) && maxLogs >= 0 ? maxLogs : DEFAULT_MAX_LOGS;
+}
+
+function pruneLogs() {
+    const maxLogs = getMaxLogs();
+    if (maxLogs === 0) return;
+
+    while (logs.length > maxLogs) {
+        const removed = logs.pop();
+        if (removed) unreadLogEntries.delete(removed);
+    }
+}
+
+async function loadPersistLogs() {
+    const savedLogs = await DataStore.get<LogEntry[]>(STORE_KEY).catch(() => undefined);
+    let persistedLogs = savedLogs;
+
+    if (!Array.isArray(persistedLogs)) {
+        try {
+            const oldLogs = localStorage.getItem("nightcord_logs");
+            const parsed = oldLogs ? JSON.parse(oldLogs) as unknown : undefined;
+            if (Array.isArray(parsed)) persistedLogs = parsed as LogEntry[];
+        } catch (error) {
+            logger.error("Failed to migrate event logs:", error);
         }
-    } catch { }
+    }
+
+    if (!Array.isArray(persistedLogs)) return;
+
+    logs = persistedLogs.concat(logs).sort((a, b) => b.timestamp - a.timestamp);
+    pruneLogs();
+    logCount = logs.length;
+
+    if (persistedLogs !== savedLogs) {
+        savePersistLogs();
+        try { localStorage.removeItem("nightcord_logs"); } catch { }
+    }
 }
 
 function savePersistLogs() {
-    try {
-        const toSave = logs.filter(l => PERSISTENT_TYPES.has(l.type));
-        localStorage.setItem("nightcord_logs", JSON.stringify(toSave));
-    } catch { }
+    const maxLogs = getMaxLogs();
+    const toSave = logs.slice(0, maxLogs === 0 ? undefined : maxLogs);
+    void DataStore.set(STORE_KEY, toSave).catch(error => logger.error("Failed to save event logs:", error));
 }
 
 // Single version counter — no snapshot, no copy
@@ -133,9 +182,9 @@ function fmtNow(): string {
 
 function pushLog(entry: Omit<LogEntry, "id" | "timestamp" | "timeStr">) {
     const now = Date.now();
-    if (logs.length >= MAX_LOGS) logs.pop();
     const newLog: LogEntry = { id: `${now}_${logCount++}`, timestamp: now, timeStr: fmtNow(), ...(entry as any) };
     logs.unshift(newLog);
+    pruneLogs();
     if (NOTIF_TYPES.has(newLog.type)) {
         unreadLogEntries.add(newLog);
     }
@@ -184,6 +233,22 @@ function cacheMsg(msg: any) {
     }
     const a = authorFrom(msg);
     msgCache.set(msg.id, { content: msg.content ?? "", authorId: a.authorId ?? "", authorName: a.authorName, authorAvatar: a.authorAvatar });
+}
+
+function purgeMsgCache() {
+    while (msgCache.size > MSG_CACHE_MAX - MSG_CACHE_PURGE) {
+        const oldest = msgCache.keys().next().value;
+        if (!oldest) break;
+        msgCache.delete(oldest);
+    }
+}
+
+function prunePrevVS() {
+    while (prevVS.size > MAX_VOICE_STATES) {
+        const oldest = prevVS.keys().next().value;
+        if (!oldest) break;
+        prevVS.delete(oldest);
+    }
 }
 
 const CFG: Record<LogType, { label: string; color: string; }> = {
@@ -469,8 +534,12 @@ function LogsModal({ rootProps }: { rootProps: any; }) {
     const clearLogs = useCallback(() => {
         if (filter === "all" && selectedGuild === "all") {
             logs = [];
+            unreadLogEntries.clear();
         } else {
             const matchesFilter = (l: LogEntry) => applyFilter([l], filter, "", selectedGuild).length > 0;
+            for (const l of unreadLogEntries) {
+                if (matchesFilter(l)) unreadLogEntries.delete(l);
+            }
             logs = logs.filter(l => !matchesFilter(l));
         }
         globalVersion++; setVersion(globalVersion);
@@ -661,19 +730,13 @@ function subscribeToEvents() {
                 isLoadingMessages = true;
                 try { for (const m of msgs) cacheMsg(m); } finally { isLoadingMessages = false; }
                 // Deferred purge if the cache exceeds the limit
-                if (msgCache.size >= MSG_CACHE_MAX) {
-                    const keys = Array.from(msgCache.keys());
-                    for (let i = 0; i < MSG_CACHE_PURGE; i++) msgCache.delete(keys[i]);
-                }
+                if (msgCache.size >= MSG_CACHE_MAX) purgeMsgCache();
             }, { timeout: 3000 });
         } else {
             setTimeout(() => {
                 isLoadingMessages = true;
                 try { for (const m of msgs) cacheMsg(m); } finally { isLoadingMessages = false; }
-                if (msgCache.size >= MSG_CACHE_MAX) {
-                    const keys = Array.from(msgCache.keys());
-                    for (let i = 0; i < MSG_CACHE_PURGE; i++) msgCache.delete(keys[i]);
-                }
+                if (msgCache.size >= MSG_CACHE_MAX) purgeMsgCache();
             }, 100);
         }
     });
@@ -744,6 +807,7 @@ function subscribeToEvents() {
                 if (s.selfStream !== p.selfStream) pushLog({ type: "voice_stream", content: s.selfStream ? t("Stream started") : t("Stream stopped"), ...b });
             }
             prevVS.set(userId, s);
+            prunePrevVS();
         }
     });
     const relUser = (data: any) => {
@@ -800,15 +864,16 @@ export default definePlugin({
     name: "EventLogs",
     description: "Logs: deleted/edited messages, voice, friends, servers.",
     tags: ["Notifications", "Utility", "Nightcord"],
-    authors: [{ name: "Nightcord", id: 0n }],
+    authors: [{ name: "Nightcord", id: 0n }, TestcordDevs.x2b],
     dependencies: ["HeaderBarAPI"],
-    start() {
+    settings,
+    async start() {
         // Initialize current voice channel on start
         try {
             const vcId = (SelectedChannelStore as any)?.getVoiceChannelId?.();
             if (vcId) myVoiceChannelId = vcId;
         } catch { }
-        loadPersistLogs();
+        await loadPersistLogs();
         addHeaderBarButton("nightcord-event-logs", () => <LogsButton />, 7);
         subscribeToEvents();
     },
@@ -816,7 +881,8 @@ export default definePlugin({
         removeHeaderBarButton("nightcord-event-logs");
         unsubs.forEach(fn => fn()); unsubs = [];
         if (flushTimer !== null) { clearTimeout(flushTimer); flushTimer = null; }
-        logs = []; msgCache.clear(); prevVS.clear(); updateListeners.clear();
+        savePersistLogs();
+        logs = []; msgCache.clear(); prevVS.clear(); unreadLogEntries.clear(); updateListeners.clear();
         isLoadingMessages = false;
         myVoiceChannelId = null;
     },

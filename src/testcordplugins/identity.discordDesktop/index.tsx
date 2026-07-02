@@ -13,7 +13,7 @@ import { findComponentByCodeLazy } from "@webpack";
 import { Alerts, Button, FluxDispatcher, Toasts, UserProfileStore, UserStore } from "@webpack/common";
 const native = VencordNative.pluginHelpers.Identity as PluginNative<typeof import("./native")>;
 
-const CustomizationSection = findComponentByCodeLazy(".customizationSectionBackground");
+const CustomizationSection = findComponentByCodeLazy(".DESCRIPTION", "hasBackground:");
 
 async function SetNewData() {
     const PersonData = JSON.parse(await native.RequestRandomUser());

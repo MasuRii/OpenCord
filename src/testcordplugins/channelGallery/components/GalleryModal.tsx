@@ -29,10 +29,34 @@ type GalleryCache = {
 };
 
 const cacheByChannel = new Map<string, GalleryCache>();
+const MAX_CHANNEL_CACHES = 25;
+const MAX_CACHE_ITEMS = 1000;
+
+function pruneChannelCaches() {
+    while (cacheByChannel.size > MAX_CHANNEL_CACHES) {
+        const oldest = cacheByChannel.keys().next().value;
+        if (!oldest) break;
+        cacheByChannel.delete(oldest);
+    }
+}
+
+function pushCacheItem(cache: GalleryCache, item: GalleryItem) {
+    if (cache.items.length >= MAX_CACHE_ITEMS) {
+        const removed = cache.items.shift();
+        if (removed) cache.keys.delete(removed.key);
+    }
+
+    cache.keys.add(item.key);
+    cache.items.push(item);
+}
 
 function getOrCreateCache(channelId: string): GalleryCache {
     const existing = cacheByChannel.get(channelId);
-    if (existing) return existing;
+    if (existing) {
+        cacheByChannel.delete(channelId);
+        cacheByChannel.set(channelId, existing);
+        return existing;
+    }
     const created: GalleryCache = {
         items: [],
         keys: new Set(),
@@ -40,6 +64,7 @@ function getOrCreateCache(channelId: string): GalleryCache {
         hasMore: true
     };
     cacheByChannel.set(channelId, created);
+    pruneChannelCaches();
     return created;
 }
 
@@ -101,8 +126,7 @@ export function GalleryModal(props: ModalProps & { channelId: string; settings: 
 
                 for (const it of extracted) {
                     if (cache.keys.has(it.key)) continue;
-                    cache.keys.add(it.key);
-                    cache.items.push(it);
+                    pushCacheItem(cache, it);
                 }
             }
 
@@ -122,7 +146,6 @@ export function GalleryModal(props: ModalProps & { channelId: string; settings: 
     useEffect(() => {
         if (cache.items.length) return;
         void loadNextPages(Math.max(1, Math.floor(settings.preloadPages)));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [channelId]);
 
     const onCloseAll = () => {

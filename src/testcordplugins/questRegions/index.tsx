@@ -256,7 +256,29 @@ const knownQuestIds = new Set<string>();
 const activeQuestStarts = new Map<string, Promise<string>>();
 let proxyDiscoveryPromise: Promise<InferredRegionRestriction[]> | null = null;
 let proxyDiscoveryTimer: ReturnType<typeof setInterval> | null = null;
+let regionAbortController: AbortController | null = null;
+let pluginActive = false;
+let pluginGeneration = 0;
+const sleepTimers = new Map<ReturnType<typeof setTimeout>, () => void>();
 let lastForegroundProxyCheckAt = 0;
+
+function questSleep(ms: number): Promise<void> {
+    return new Promise(resolve => {
+        const timeout = setTimeout(() => {
+            sleepTimers.delete(timeout);
+            resolve();
+        }, ms);
+        sleepTimers.set(timeout, resolve);
+    });
+}
+
+function clearQuestSleeps() {
+    for (const [timeout, resolve] of sleepTimers) {
+        clearTimeout(timeout);
+        resolve();
+    }
+    sleepTimers.clear();
+}
 
 // Per-country proxy cache: country code → ProxyEntry[]
 // Populated lazily when a country is first needed.
@@ -303,6 +325,10 @@ function normalizeRegion(region: string): string {
 
 function getAuthoritativeRegions(questId: string, regions: string[]): string[] {
     return regions.map(normalizeRegion);
+}
+
+function getRegionList(regions: unknown): string[] {
+    return Array.isArray(regions) ? regions.filter((region): region is string => typeof region === "string") : [];
 }
 
 function getRegionFromName(name: string): CommandRegion | null {
@@ -1641,8 +1667,9 @@ async function loadQuestRegions(signal: AbortSignal): Promise<QuestRegionCard[]>
         if (existing) {
             if (restriction.show_age_gate !== undefined) existing.show_age_gate = restriction.show_age_gate;
             if (restriction.is_global !== undefined) existing.is_global = restriction.is_global;
-            if (Array.isArray(restriction.regions) && restriction.regions.length > 0) {
-                existing.regions = Array.from(new Set([...existing.regions, ...restriction.regions])).sort();
+            const regions = getRegionList(restriction.regions);
+            if (regions.length > 0) {
+                existing.regions = Array.from(new Set([...getRegionList(existing.regions), ...regions])).sort();
             }
         } else {
             restrictionsById.set(restriction.id, restriction);
@@ -1652,8 +1679,9 @@ async function loadQuestRegions(signal: AbortSignal): Promise<QuestRegionCard[]>
     for (const restriction of storedDiscoveredRestrictions) {
         const existing = restrictionsById.get(restriction.id);
         if (existing) {
-            if (Array.isArray(restriction.regions) && restriction.regions.length > 0) {
-                existing.regions = Array.from(new Set([...(existing.regions ?? []), ...restriction.regions])).sort();
+            const regions = getRegionList(restriction.regions);
+            if (regions.length > 0) {
+                existing.regions = Array.from(new Set([...getRegionList(existing.regions), ...regions])).sort();
             }
         } else {
             restrictionsById.set(restriction.id, restriction);
@@ -1669,9 +1697,10 @@ async function loadQuestRegions(signal: AbortSignal): Promise<QuestRegionCard[]>
         for (const [id, restriction] of inferred) {
             const existing = restrictionsById.get(id);
             if (!existing) continue;
-            if (!Array.isArray(restriction.regions) || restriction.regions.length === 0) continue;
-            const baseRegions = Array.isArray(existing.regions) ? existing.regions : [];
-            const merged = Array.from(new Set([...baseRegions, ...restriction.regions])).sort();
+            const regions = getRegionList(restriction.regions);
+            if (regions.length === 0) continue;
+            const baseRegions = getRegionList(existing.regions);
+            const merged = Array.from(new Set([...baseRegions, ...regions])).sort();
             if (merged.length === baseRegions.length) continue;
             restrictionsById.set(id, { ...existing, regions: merged });
             changed = true;
@@ -1746,24 +1775,33 @@ async function getQuestRegions(force = false): Promise<QuestRegionCard[]> {
 
     if (!regionPromise) {
         console.debug("[QuestRegions] getQuestRegions: starting fresh fetch…");
+        regionAbortController?.abort();
         const controller = new AbortController();
+        regionAbortController = controller;
         regionPromise = loadQuestRegions(controller.signal)
             .then(data => {
                 regionCache = { at: Date.now(), data };
                 console.debug(`[QuestRegions] getQuestRegions: cached ${data.length} region cards`);
                 return data;
             })
-            .finally(() => { regionPromise = null; });
+            .finally(() => {
+                if (regionAbortController === controller) {
+                    regionPromise = null;
+                    regionAbortController = null;
+                }
+            });
     }
 
     return await regionPromise;
 }
 
 function scheduleProxyQuestDiscovery(force = false): void {
-    if (!settings.store.discoverQuestsViaProxies) return;
+    if (!pluginActive || !settings.store.discoverQuestsViaProxies) return;
+    const generation = pluginGeneration;
 
     void discoverQuestRegionsViaProxies(force)
         .then(async discoveries => {
+            if (!pluginActive || generation !== pluginGeneration) return;
             if (discoveries.length > 0) await getQuestRegions(true);
         })
         .catch(error => logger.error("Failed to discover region quests via proxies", error));
@@ -2261,10 +2299,14 @@ export default definePlugin({
     settings,
 
     start() {
+        pluginActive = true;
+        pluginGeneration++;
+        const generation = pluginGeneration;
         knownQuestIds.clear();
         countryProxyCache.clear();
         void getQuestRegions()
             .then(cards => {
+                if (!pluginActive || generation !== pluginGeneration) return;
                 for (const card of cards) for (const quest of card.quests) knownQuestIds.add(quest.id);
                 console.debug(`[QuestRegions] start: seeded ${knownQuestIds.size} known quest IDs`);
             })
@@ -2272,6 +2314,8 @@ export default definePlugin({
     },
 
     stop() {
+        pluginActive = false;
+        pluginGeneration++;
         knownQuestIds.clear();
         discoveredQuestCache.clear();
         questCardRegions.clear();
@@ -2282,6 +2326,10 @@ export default definePlugin({
         warmedProxyCache.clear();
         proxyWarmupPromises.clear();
         lastForegroundProxyCheckAt = 0;
+        regionAbortController?.abort();
+        regionAbortController = null;
+        regionPromise = null;
+        clearQuestSleeps();
         stopProxyDiscoveryTimer();
     },
 
@@ -2628,7 +2676,9 @@ export default definePlugin({
                         if (i > 0) {
                             const delayMs = getRandomAutoStartDelayMs();
                             console.debug(`[QuestRegions] auto-start: waiting ${delayMs}ms before quest=${questId}`);
-                            await new Promise<void>(res => setTimeout(res, delayMs));
+                            const generation = pluginGeneration;
+                            await questSleep(delayMs);
+                            if (!pluginActive || generation !== pluginGeneration) return;
                         }
 
                         sendBotMessage(ctx.channel.id, {

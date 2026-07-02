@@ -6,8 +6,7 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
-import definePlugin, { OptionType, } from "@utils/types";
-import { makeRange } from "@utils/types";
+import definePlugin, { makeRange, OptionType, } from "@utils/types";
 
 const settings = definePluginSettings({
     clipLength: {

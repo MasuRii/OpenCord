@@ -294,7 +294,7 @@
         },
 
         removeCustomRecord: hostname => {
-            if (MULLVAD_DNS_RECORDS.hasOwnProperty(hostname)) {
+            if (Object.prototype.hasOwnProperty.call(MULLVAD_DNS_RECORDS, hostname)) {
                 delete MULLVAD_DNS_RECORDS[hostname];
                 dnsCache.delete(hostname);
                 Logger.info(`➖ Removed DNS record: ${hostname}`);

@@ -6,9 +6,7 @@
 
 import { Settings } from "@api/Settings";
 import definePlugin from "@utils/types";
-import { React } from "@webpack/common";
-import { Toasts } from "@webpack/common";
-import { Forms } from "@webpack/common";
+import { Forms, React, Toasts } from "@webpack/common";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

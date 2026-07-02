@@ -13,6 +13,8 @@ type GofileServersResponse = {
     };
 };
 
+const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+
 function formatFetchError(err: unknown) {
     if (err instanceof Error) {
         const { cause } = (err as any);
@@ -25,16 +27,21 @@ function formatFetchError(err: unknown) {
 }
 
 async function safeFetch(url: string, init?: RequestInit): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+    const requestInit = { ...init, signal: controller.signal };
     try {
         // Prefer Electron's network stack (proxy / cert store etc.)
-        return await net.fetch(url, init);
+        return await net.fetch(url, requestInit);
     } catch (errNet) {
         try {
             // Fallback to Node's fetch if net.fetch fails for some reason.
-            return await fetch(url, init);
+            return await fetch(url, requestInit);
         } catch (errNode) {
             throw new Error(`fetch failed for ${url}: ${formatFetchError(errNet)} | ${formatFetchError(errNode)}`);
         }
+    } finally {
+        clearTimeout(timeout);
     }
 }
 
@@ -66,8 +73,7 @@ async function pickGofileServer(): Promise<string> {
 
 function buildFileFormData(fileBuffer: ArrayBuffer, fileName: string, fileType: string) {
     const formData = new FormData();
-    const file = new Blob([fileBuffer], { type: fileType || "application/octet-stream" });
-    formData.append("file", new File([file], fileName));
+    formData.append("file", new File([fileBuffer], fileName, { type: fileType || "application/octet-stream" }));
     return formData;
 }
 
@@ -106,8 +112,7 @@ export async function uploadFileToCatboxNative(_, fileBuffer: ArrayBuffer, fileN
 
     const formData = new FormData();
     formData.append("reqtype", "fileupload");
-    const file = new Blob([fileBuffer], { type: fileType || "application/octet-stream" });
-    formData.append("fileToUpload", new File([file], fileName));
+    formData.append("fileToUpload", new File([fileBuffer], fileName, { type: fileType || "application/octet-stream" }));
     if (userHash) formData.append("userhash", userHash);
 
     const response = await safeFetch(url, { method: "POST", body: formData });
@@ -123,8 +128,7 @@ export async function uploadFileToLitterboxNative(_, fileBuffer: ArrayBuffer, fi
 
     const formData = new FormData();
     formData.append("reqtype", "fileupload");
-    const file = new Blob([fileBuffer], { type: fileType || "application/octet-stream" });
-    formData.append("fileToUpload", new File([file], fileName));
+    formData.append("fileToUpload", new File([fileBuffer], fileName, { type: fileType || "application/octet-stream" }));
     formData.append("time", time);
 
     const response = await safeFetch(url, { method: "POST", body: formData });
@@ -139,8 +143,7 @@ export async function uploadFileToFilefastNative(_, fileBuffer: ArrayBuffer, fil
     const url = "https://file.fast/api/v1/upload";
 
     const formData = new FormData();
-    const file = new Blob([fileBuffer], { type: fileType || "application/octet-stream" });
-    formData.append("files[]", new File([file], fileName));
+    formData.append("files[]", new File([fileBuffer], fileName, { type: fileType || "application/octet-stream" }));
     if (token) formData.append("token", token);
 
     const response = await safeFetch(url, { method: "POST", body: formData });
@@ -180,8 +183,7 @@ export async function uploadFileCustomNative(
     if (!fileFormName?.trim()) throw new Error("Custom: invalid file form name");
 
     const formData = new FormData();
-    const file = new Blob([fileBuffer], { type: fileType || "application/octet-stream" });
-    formData.append(fileFormName, new File([file], fileName));
+    formData.append(fileFormName, new File([fileBuffer], fileName, { type: fileType || "application/octet-stream" }));
 
     for (const [key, value] of Object.entries(customArgs ?? {})) {
         if (!key) continue;

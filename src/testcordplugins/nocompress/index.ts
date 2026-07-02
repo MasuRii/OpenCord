@@ -16,7 +16,7 @@ export default definePlugin({
         {
             find: "tryConvertToWebP",
             replacement: {
-                match: /static\s+async\s+tryConvertToWebP\([^\)]*\)\s*\{/,
+                match: /static\s+async\s+tryConvertToWebP\([^)]*\)\s*\{/,
                 replace: "static async tryConvertToWebP() { return;"
             }
         }

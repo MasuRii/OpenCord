@@ -15,6 +15,9 @@ const DISCORD_MEDIA_SUFFIXES = [
     "discordapp.net",
 ];
 
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 15000;
+
 type NativeGifCaptioner = PluginNative<typeof import("../native")>;
 
 interface NativeFetchResult {
@@ -32,9 +35,8 @@ function withProxy(base: string, url: string) {
 }
 
 function normalizeBuffer(data: Uint8Array): ArrayBuffer {
-    const copy = new Uint8Array(data.byteLength);
-    copy.set(data);
-    return copy.buffer;
+    if (data.byteOffset === 0 && data.byteLength === data.buffer.byteLength) return data.buffer as ArrayBuffer;
+    return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
 }
 
 function normalizeUrl(url: string) {
@@ -59,12 +61,17 @@ function getNativeModule(value: unknown): NativeGifCaptioner | null {
 }
 
 async function tryFetch(url: string): Promise<FetchResult | null> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) return null;
+        const length = Number(response.headers.get("content-length"));
+        if (length > MAX_MEDIA_BYTES) return null;
 
         const buffer = await response.arrayBuffer();
         if (!buffer.byteLength) return null;
+        if (buffer.byteLength > MAX_MEDIA_BYTES) return null;
 
         return {
             buffer,
@@ -72,6 +79,8 @@ async function tryFetch(url: string): Promise<FetchResult | null> {
         };
     } catch {
         return null;
+    } finally {
+        clearTimeout(timeout);
     }
 }
 

@@ -10,11 +10,7 @@ import { sleep } from "@utils/misc";
 import { ModalContent, ModalFooter, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { React, Text } from "@webpack/common";
-import { FluxDispatcher, useEffect, UserStore, useState } from "@webpack/common";
-import { Constants, RestAPI } from "@webpack/common";
-import { Button } from "@webpack/common";
-import { TextInput } from "@webpack/common";
+import { Button, Constants, FluxDispatcher, React, RestAPI, Text, TextInput, useEffect, UserStore, useState } from "@webpack/common";
 
 const SYNC_CONFIG = {
     JSONBIN_API_KEY: "$2a$10$CiRPWHghiI/2K14rvki.t.Vg5nbOBW3AqzN4/Q2wfL8Ltc55LDhwu",

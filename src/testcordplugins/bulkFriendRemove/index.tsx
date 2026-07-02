@@ -10,8 +10,7 @@ import { HeaderBarButton } from "@api/HeaderBar";
 import { ModalCloseButton,ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
-import { Forms } from "@webpack/common";
-import { React, useEffect, useMemo,useState } from "@webpack/common";
+import { Forms, React, useEffect, useMemo,useState } from "@webpack/common";
 
 import { t, useTranslation } from "../autoTranslateNightcord";
 

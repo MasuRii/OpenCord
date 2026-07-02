@@ -5,13 +5,13 @@
  */
 
 import { HeaderBarButton } from "@api/HeaderBar";
-import { definePluginSettings, Settings } from "@api/Settings";
+import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { TestcordDevs } from "@utils/constants";
 import { Logger } from "@utils/Logger";
 import definePlugin, { IconProps, OptionType } from "@utils/types";
 
-import { groqChat, groqFetch } from "../nightcordAI/groqManager";
+import { HOMELANDER_MODEL_OPTIONS, LOCAL_PROVIDER_OPTIONS, SURF_MODEL_OPTIONS, SWISHAI_MODEL_OPTIONS, testcordChat } from "../TestcordAI/aiProvider";
 
 const logger = new Logger("TsundereTalk");
 const TOGGLE_KEYS: Array<"rewriteEnabled"> = ["rewriteEnabled"];
@@ -37,6 +37,39 @@ const settings = definePluginSettings({
         description: "Add a tilde when it fits the message.",
         default: true,
     },
+    provider: {
+        type: OptionType.SELECT,
+        description: "AI provider",
+        options: LOCAL_PROVIDER_OPTIONS,
+        default: "testcord",
+    },
+    groqModel: {
+        type: OptionType.STRING,
+        description: "Groq model override",
+        default: "llama-3.1-8b-instant",
+        hidden: () => settings.store.provider !== "groq",
+    },
+    homelanderModel: {
+        type: OptionType.SELECT,
+        description: "Homelander model",
+        options: HOMELANDER_MODEL_OPTIONS,
+        default: "openai/gpt-5.5",
+        hidden: () => settings.store.provider !== "homelander",
+    },
+    swishAiModel: {
+        type: OptionType.SELECT,
+        description: "SwishAI model",
+        options: SWISHAI_MODEL_OPTIONS,
+        default: "gpt-5.5",
+        hidden: () => settings.store.provider !== "swishai",
+    },
+    surfModel: {
+        type: OptionType.SELECT,
+        description: "Unlimited Surf model",
+        options: SURF_MODEL_OPTIONS,
+        default: "gateway-claude-opus-4-7",
+        hidden: () => settings.store.provider !== "unlimited-surf",
+    },
 });
 
 const INTENSITY_PROMPTS: Record<string, string> = {
@@ -44,18 +77,6 @@ const INTENSITY_PROMPTS: Record<string, string> = {
     normal: "Make it clearly tsundere with cute denial, mild teasing, and a caring undertone.",
     extra: "Make it very tsundere with dramatic denial, teasing, and cute flustered wording while staying friendly.",
 };
-
-interface OpenAIChatResponse {
-    choices?: Array<{
-        message?: {
-            content?: string;
-        };
-    }>;
-}
-
-interface TestcordAISettings {
-    provider?: string;
-}
 
 function cleanResponse(text: string) {
     return text
@@ -66,41 +87,13 @@ function cleanResponse(text: string) {
         .trim();
 }
 
-async function proxyChat(baseUrl: string, model: string, apiKey: string, systemPrompt: string, text: string) {
-    const res = await groqFetch(`${baseUrl}/v1/chat/completions`, "POST", {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-    }, JSON.stringify({
-        model,
-        max_tokens: 300,
-        temperature: 0.85,
-        messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: text },
-        ],
-    }));
-
-    if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`${baseUrl} ${res.status}: ${body.slice(0, 200)}`);
-    }
-
-    const data = await res.json() as OpenAIChatResponse;
-    return data.choices?.[0]?.message?.content?.trim() ?? "";
-}
-
 async function rewriteMessage(systemPrompt: string, text: string) {
-    const aiSettings = Settings.plugins.TestcordAI as TestcordAISettings | undefined;
-
-    if (aiSettings?.provider === "gpt55-proxy") {
-        return proxyChat("https://theproxy-production-e112.up.railway.app", "gpt-5.5", "admin", systemPrompt, text);
-    }
-
-    if (aiSettings?.provider === "collins") {
-        return proxyChat("https://collins-proxy.pages.dev", "claude-opus-4-8", "unused", systemPrompt, text);
-    }
-
-    return groqChat({
+    return testcordChat({
+        provider: settings.store.provider,
+        groqModel: settings.store.groqModel,
+        homelanderModel: settings.store.homelanderModel,
+        swishAiModel: settings.store.swishAiModel,
+        surfModel: settings.store.surfModel,
         messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: text },

@@ -12,8 +12,19 @@ import { settings } from "../../settings";
 import { AnalysisValue, safeToast } from "../../utils";
 
 const Native = VencordNative.pluginHelpers.vAnalyzer as PluginNative<typeof import("./native")>;
+const PROFILE_CACHE_MAX = 500;
 const profileCache = new Map<string, any>();
 const inFlightLookups = new Map<string, Promise<any | null>>();
+
+function setProfileCache(userId: string, data: any) {
+    profileCache.delete(userId);
+    profileCache.set(userId, data);
+    while (profileCache.size > PROFILE_CACHE_MAX) {
+        const oldest = profileCache.keys().next().value;
+        if (!oldest) break;
+        profileCache.delete(oldest);
+    }
+}
 
 function buildDetails(data: any): AnalysisValue["details"] {
     const details: AnalysisValue["details"] = [];
@@ -84,7 +95,7 @@ export async function lookDangeCord(user: User, silent = false): Promise<Analysi
             return null;
         }
 
-        profileCache.set(memberId, dcProfile.data);
+        setProfileCache(memberId, dcProfile.data);
         return dcProfile.data;
     })();
 

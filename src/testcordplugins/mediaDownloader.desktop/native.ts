@@ -30,6 +30,10 @@ let ffmpegAvailable = false;
 let ytdlpProcess: ChildProcessWithoutNullStreams | null = null;
 let ffmpegProcess: ChildProcessWithoutNullStreams | null = null;
 
+const MAX_DOWNLOAD_DURATION_SECONDS = 30 * 60;
+const MAX_GIF_DURATION_SECONDS = 30;
+const MAX_RETURN_BYTES = 500 * 1024 * 1024;
+
 const getdir = () => workdir ?? process.cwd();
 const p = (file: string) => path.join(getdir(), file);
 const cleanVideoFiles = () => {
@@ -42,6 +46,11 @@ const appendOut = (data: string) => ( // Makes carriage return (\r) work
     (stdout_global += data), (stdout_global = stdout_global.replace(/^.*\r([^\n])/gm, "$1")));
 const log = (...data: string[]) => (console.log(`[Plugin:MediaDownloader] ${data.join(" ")}`), logs_global += `[Plugin:MediaDownloader] ${data.join(" ")}\n`);
 const error = (...data: string[]) => console.error(`[Plugin:MediaDownloader] [ERROR] ${data.join(" ")}`);
+
+function killActiveProcesses() {
+    ytdlpProcess?.kill();
+    ffmpegProcess?.kill();
+}
 
 function ytdlp(args: string[]): Promise<string> {
     log(`Executing yt-dlp with args: ["${args.map(a => a.replace('"', '\\"')).join('", "')}"]`);
@@ -95,6 +104,7 @@ export async function start(_: IpcMainInvokeEvent, _workdir: string | undefined)
     return workdir;
 }
 export async function stop(_: IpcMainInvokeEvent) {
+    killActiveProcesses();
     if (workdir) {
         log("Cleaning up workdir");
         fs.rmSync(workdir, { recursive: true });
@@ -109,6 +119,9 @@ async function metadata(options: DownloadOptions) {
         const metadata = JSON.parse(output);
 
         if (metadata.is_live) throw new Error("Live streams are not supported.");
+        if (typeof metadata.duration === "number" && metadata.duration > MAX_DOWNLOAD_DURATION_SECONDS) {
+            throw new Error("Media is too long to download safely.");
+        }
 
         stdout_global = "";
         return { videoTitle: `${metadata.title || "video"} (${metadata.id})` };
@@ -202,6 +215,7 @@ async function remux({ file, videoTitle }: { file: string; videoTitle: string; }
 
     const duration = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", p(file)]).toString());
     if (isNaN(duration)) throw "Failed to get video duration.";
+    if (format === "gif" && duration > MAX_GIF_DURATION_SECONDS) throw "Media is too long to convert to GIF safely.";
     // ffmpeg tends to go above the target size, so I'm setting it to 7/8
     const targetBits = maxFileSize ? (maxFileSize * 7) / duration : 9999999;
     const kilobits = ~~(targetBits / 1024);
@@ -251,8 +265,12 @@ async function remux({ file, videoTitle }: { file: string; videoTitle: string; }
     await ffmpeg([...baseArgs, ...customArgs, `remux.${ext}`]);
     return { file: `remux.${ext}`, videoTitle, extension: ext };
 }
-function upload({ file, videoTitle, extension }: { file: string; videoTitle: string; extension: string | undefined; }) {
+function upload({ file, videoTitle, extension }: { file: string; videoTitle: string; extension: string | undefined; }, maxFileSize?: number) {
     if (!extension) throw "Invalid extension.";
+    const fileSize = fs.statSync(p(file)).size;
+    const sizeLimit = maxFileSize ?? MAX_RETURN_BYTES;
+    if (fileSize > sizeLimit) throw "Downloaded file is too large to return safely.";
+
     const buffer = fs.readFileSync(p(file));
     return { buffer, title: `${videoTitle}.${extension}` };
 }
@@ -273,7 +291,7 @@ export async function execute(
         const videoFormat = genFormat(videoMetadata, opt);
         const videoDownload = await download(videoFormat, opt);
         const videoRemux = await remux(videoDownload, opt);
-        const videoUpload = upload(videoRemux);
+        const videoUpload = upload(videoRemux, opt.maxFileSize);
         return { logs: logs_global, ...videoUpload };
     } catch (e: any) {
         return { error: e.toString(), logs: logs_global };
@@ -304,8 +322,7 @@ export async function checkytdlp(_?: IpcMainInvokeEvent) {
 
 export async function interrupt(_: IpcMainInvokeEvent) {
     log("Interrupting...");
-    ytdlpProcess?.kill();
-    ffmpegProcess?.kill();
+    killActiveProcesses();
     cleanVideoFiles();
 }
 

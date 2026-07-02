@@ -37,6 +37,9 @@ let ffmpegProcess: ChildProcessWithoutNullStreams | null = null;
 
 let lastStdout = "";
 
+const MAX_DOWNLOAD_DURATION_SECONDS = 30 * 60;
+const MAX_RETURN_BYTES = 500 * 1024 * 1024;
+
 const getdir = () => workdir ?? process.cwd();
 const p = (file: string) => path.join(getdir(), file);
 const cleanVideoFiles = () => {
@@ -55,6 +58,11 @@ const log = (ctx: RunContext, ...data: string[]) => {
     ctx.logs += `[Plugin:YTdownloader] ${data.join(" ")}\n`;
 };
 const error = (...data: string[]) => console.error(`[Plugin:YTdownloader] [ERROR] ${data.join(" ")}`);
+
+function killActiveProcesses() {
+    ytdlpProcess?.kill();
+    ffmpegProcess?.kill();
+}
 
 function ytdlp(ctx: RunContext, args: string[]): Promise<string> {
     log(ctx, `Executing yt-dlp with args: ["${args.map(a => a.replace('"', '\\"')).join('", "')}"]`);
@@ -124,6 +132,7 @@ export async function start(_: IpcMainInvokeEvent, _workdir: string | undefined)
 }
 
 export async function stop(_: IpcMainInvokeEvent) {
+    killActiveProcesses();
     if (workdir) {
         console.log("[Plugin:YTdownloader] Cleaning up workdir");
         fs.rmSync(workdir, { recursive: true });
@@ -137,6 +146,9 @@ async function metadata(ctx: RunContext, options: DownloadOptions) {
     const metadata = JSON.parse(output);
 
     if (metadata.is_live) throw new Error("Live streams are not supported.");
+    if (typeof metadata.duration === "number" && metadata.duration > MAX_DOWNLOAD_DURATION_SECONDS) {
+        throw new Error("Media is too long to download safely.");
+    }
 
     ctx.stdout = "";
     return { videoTitle: metadata.title || "video" };
@@ -232,8 +244,12 @@ async function remux(ctx: RunContext, { file, videoTitle }: { file: string; vide
     return { file, videoTitle, extension: sourceExtension };
 }
 
-function upload({ file, videoTitle, extension }: { file: string; videoTitle: string; extension: string | undefined; }) {
+function upload({ file, videoTitle, extension }: { file: string; videoTitle: string; extension: string | undefined; }, maxFileSize?: number) {
     if (!extension) throw new Error("Invalid extension.");
+    const fileSize = fs.statSync(p(file)).size;
+    const sizeLimit = maxFileSize ?? MAX_RETURN_BYTES;
+    if (fileSize > sizeLimit) throw new Error("Downloaded file is too large to return safely.");
+
     const buffer = fs.readFileSync(p(file));
     return { buffer, title: `${videoTitle}.${extension}` };
 }
@@ -255,7 +271,7 @@ export async function execute(
         const videoFormat = genFormat(ctx, videoMetadata, opt);
         const videoDownload = await download(ctx, videoFormat, opt);
         const videoRemux = await remux(ctx, videoDownload, opt);
-        const videoUpload = upload(videoRemux);
+        const videoUpload = upload(videoRemux, opt.maxFileSize);
         return { logs: ctx.logs, ...videoUpload };
     } catch (e: unknown) {
         const message = e instanceof Error ? e.message : String(e);
@@ -299,8 +315,7 @@ export async function checkdeno(_?: IpcMainInvokeEvent) {
 
 export async function interrupt(_: IpcMainInvokeEvent) {
     console.log("[Plugin:YTdownloader] Interrupting...");
-    ytdlpProcess?.kill();
-    ffmpegProcess?.kill();
+    killActiveProcesses();
     cleanVideoFiles();
 }
 

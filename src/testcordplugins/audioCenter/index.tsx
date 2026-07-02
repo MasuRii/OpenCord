@@ -112,6 +112,16 @@ let virtualOutputDevice = {
     destination: null as MediaStreamAudioDestinationNode | null,
     gainNode: null as GainNode | null,
 };
+let virtualAudioElement: HTMLAudioElement | null = null;
+
+function clearVirtualAudioElement() {
+    if (!virtualAudioElement) return;
+    virtualAudioElement.pause();
+    virtualAudioElement.srcObject = null;
+    virtualAudioElement.removeAttribute("src");
+    virtualAudioElement.load();
+    virtualAudioElement = null;
+}
 
 // Function to inject virtual device into Discord
 function injectVirtualDevice() {
@@ -414,7 +424,9 @@ function setVirtualDeviceAsOutput() {
         const virtualStream = virtualOutputDevice.destination.stream;
         console.log("AudioCenter: Virtual stream obtained:", virtualStream);
 
+        clearVirtualAudioElement();
         const audioElement = new Audio();
+        virtualAudioElement = audioElement;
         audioElement.srcObject = virtualStream;
         console.log("AudioCenter: Audio element created with virtual stream");
 
@@ -673,6 +685,7 @@ function stopAudioMixing() {
 // Function to stop virtual device
 function stopVirtualOutputDevice() {
     try {
+        clearVirtualAudioElement();
         if (virtualOutputDevice.audioContext) {
             virtualOutputDevice.audioContext.close();
         }

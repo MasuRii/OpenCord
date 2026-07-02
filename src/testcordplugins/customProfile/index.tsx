@@ -614,6 +614,7 @@ function getFakeDateVariants(isoDate: string): string[] {
 let _cachedMyId: string | null = null;
 let _realUsername = "";
 let _realGlobalName = "";
+let customProfileGeneration = 0;
 
 function updateCachedRealData() {
     try { const myId = AuthenticationStore?.getId?.(); if (myId) _cachedMyId = myId; } catch { }
@@ -621,6 +622,8 @@ function updateCachedRealData() {
 
 let _domQueued = false;
 let _domMutations: MutationRecord[] = [];
+let _domBatchTimeout: ReturnType<typeof setTimeout> | null = null;
+let _domBatchFrame: number | null = null;
 
 function scanTextNode(node: Text) {
     if (!isEnabled || !node.nodeValue) return;
@@ -668,13 +671,26 @@ function startDomObserver() {
         if (!isEnabled || !mutations.length) return;
         _domMutations.push(...mutations);
         if (_domMutations.length > 5000) _domMutations = _domMutations.slice(-5000);
-        if (!_domQueued) { _domQueued = true; setTimeout(() => requestAnimationFrame(processDomBatch), 10); }
+        if (!_domQueued) {
+            _domQueued = true;
+            _domBatchTimeout = setTimeout(() => {
+                _domBatchTimeout = null;
+                _domBatchFrame = requestAnimationFrame(() => {
+                    _domBatchFrame = null;
+                    processDomBatch();
+                });
+            }, 10);
+        }
     });
     domObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 function stopDomObserver() {
     domObserver?.disconnect(); domObserver = null;
+    if (_domBatchTimeout !== null) { clearTimeout(_domBatchTimeout); _domBatchTimeout = null; }
+    if (_domBatchFrame !== null) { cancelAnimationFrame(_domBatchFrame); _domBatchFrame = null; }
+    _domMutations = [];
+    _domQueued = false;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let n: Node | null;
     while ((n = walker.nextNode())) { if ((n as any).__cp_orig !== undefined) { n.nodeValue = (n as any).__cp_orig; delete (n as any).__cp_orig; } }
@@ -1462,6 +1478,7 @@ export default definePlugin({
     _forceNative: false, // Tool variable for local reset
 
     async start() {
+        const generation = ++customProfileGeneration;
         applyAvatarPatchEarly();
         patchPresence();
         addHeaderBarButton("custom-profile-btn", () => <CustomProfileButton />, 10);
@@ -1607,6 +1624,7 @@ export default definePlugin({
         } catch { }
 
         loadData().then(() => {
+            if (generation !== customProfileGeneration) return;
             updateCachedRealData();
             applyAvatarPatchEarly();
             if (isEnabled) {
@@ -1820,6 +1838,7 @@ export default definePlugin({
     ] as ProfileBadge[],
 
     stop() {
+        customProfileGeneration++;
         unpatchPresence();
         removeHeaderBarButton("custom-profile-btn");
         removeContextMenuPatch("user-context", userContextMenuPatch);

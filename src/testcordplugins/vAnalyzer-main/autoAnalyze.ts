@@ -20,13 +20,15 @@ import { analyzeWithWhereGoes } from "./analyzers/WhereGoes";
 import { getModulesSync, ModularScanModule } from "./modularScanStore";
 import { settings } from "./settings";
 import { getBlocklistReason, isBlocklisted, isWhitelisted } from "./urlFilter";
-import { analyzerLimiter, extractCdnFileUrls, pruneMap } from "./utils";
+import { type AnalysisValue, analyzerLimiter, extractCdnFileUrls, pruneMap } from "./utils";
 
 const URL_REGEX = /\b(?:https?:\/\/|www\.)[^\s<>"')\]]+|\b[a-z0-9][a-z0-9-]*\.[a-z]{2,}(?:\/[^\s<>"')\]]*)?\b/gi;
 const MARKDOWN_LINK_REGEX = /\[[^\]]+\]\((?:<)?([^\s)<>]+)(?:>)?\)/gi;
 const EPHEMERAL_MESSAGE_FLAG = 1 << 6;
 const ANALYZED_MESSAGE_TTL_MS = 6 * 60 * 60 * 1000;
 const MAX_ANALYZED_MESSAGES = 1000;
+const MAX_URLS_PER_MESSAGE = 25;
+const MAX_ATTACHMENTS_PER_MESSAGE = 10;
 const AUTO_ANALYZED_MESSAGE_IDS = new Map<string, number>();
 const NON_SCANNABLE_ATTACHMENT_EXTENSIONS = new Set([
     "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "ico", "tif", "tiff",
@@ -52,7 +54,12 @@ export function extractUrls(content: string): string[] {
         .filter(u => u.length > 0);
 }
 
-function runScan(messageId: string, url: string, task: () => Promise<any>, label: string) {
+export function clearAutoAnalyzeState() {
+    AUTO_ANALYZED_MESSAGE_IDS.clear();
+    analyzerLimiter.clear();
+}
+
+function runScan(messageId: string, url: string, task: () => Promise<AnalysisValue | null | undefined>, label: string) {
     analyzerLimiter.run(task)
         .then(r => r && handleAnalysis(messageId, r, url))
         .catch(error => console.error(`[vAnalyzer] ${label}:`, error));
@@ -172,7 +179,7 @@ export function extractUrlsFromMessage(message: Message): string[] {
         walkMessageValue(component, urls, new WeakSet<object>());
     }
 
-    return [...urls];
+    return [...urls].slice(0, MAX_URLS_PER_MESSAGE);
 }
 
 export function extractUrlsFromEmbeds(message: Message): string[] {
@@ -185,7 +192,7 @@ export function extractUrlsFromEmbeds(message: Message): string[] {
         walkMessageValue(embed, urls, new WeakSet<object>());
     }
 
-    return [...urls];
+    return [...urls].slice(0, MAX_URLS_PER_MESSAGE);
 }
 
 function analyzeUrlsAndInvites(
@@ -386,7 +393,7 @@ export function autoAnalyzeMessage(message: Message) {
 
     const urls = ephemeralMessage ? extractUrlsFromEmbeds(message) : extractUrlsFromMessage(message);
     const canScanFiles = !ephemeralMessage;
-    const scannableAttachments = (message.attachments ?? []).filter(isScannableAttachment);
+    const scannableAttachments = (message.attachments ?? []).filter(isScannableAttachment).slice(0, MAX_ATTACHMENTS_PER_MESSAGE);
     if (urls.length === 0 && (!canScanFiles || scannableAttachments.length === 0)) return;
 
     const normalUrls = analyzeUrlsAndInvites(message, urls, {

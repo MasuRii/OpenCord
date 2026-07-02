@@ -7,7 +7,7 @@
 import { DataStore, TestcordRequestCoordinator } from "@api/index";
 import { classNameFactory } from "@utils/css";
 import type { Channel, Message, User } from "@vencord/discord-types";
-import { Avatar, ChannelStore, RestAPI, useMemo,UserStore } from "@webpack/common";
+import { Avatar, ChannelStore, RestAPI, useMemo, UserStore } from "@webpack/common";
 
 const DiscordAPI = RestAPI;
 
@@ -157,7 +157,7 @@ export function getMediaUrls(message: Message | any): Array<{ url: string; type:
 }
 
 // Function to load all media with API pagination (no limit)
-export async function loadAllMediaFromAPI(channelId: string, apiRequestDelay: number): Promise<any[]> {
+export async function loadAllMediaFromAPI(channelId: string, apiRequestDelay: number, signal?: AbortSignal): Promise<any[]> {
     const allMessages: any[] = [];
     let before: string | null = null;
     const limit = 100;
@@ -181,6 +181,7 @@ export async function loadAllMediaFromAPI(channelId: string, apiRequestDelay: nu
     const maxPages = 50; // Safety limit
 
     while (page <= maxPages) {
+        if (signal?.aborted) break;
         try {
             // Delay between requests to avoid rate limits
             if (page > 1) {
@@ -203,6 +204,7 @@ export async function loadAllMediaFromAPI(channelId: string, apiRequestDelay: nu
             if (!response?.body || !Array.isArray(response.body) || response.body.length === 0) {
                 break;
             }
+            if (signal?.aborted) break;
 
             // Filter only messages with media
             const mediaMessages = response.body.filter((msg: any) => {
@@ -237,7 +239,8 @@ export async function searchMediaMessages(
     channelId: string,
     query: string,
     cacheOnly: boolean,
-    apiRequestDelay: number
+    apiRequestDelay: number,
+    signal?: AbortSignal
 ): Promise<SearchResult[]> {
     console.log(`[Ultra Advanced Search] searchMediaMessages called for ${channelId}, query: "${query}"`);
     const results: SearchResult[] = [];
@@ -273,7 +276,8 @@ export async function searchMediaMessages(
     if (!cacheOnly && (!cached || !cached.messages || cached.messages.length === 0)) {
         // Load from the API with pagination
         console.log(`[Ultra Advanced Search] Loading media from API for ${channelId}`);
-        const apiMessages = await loadAllMediaFromAPI(channelId, apiRequestDelay);
+        const apiMessages = await loadAllMediaFromAPI(channelId, apiRequestDelay, signal);
+        if (signal?.aborted) return results;
 
         // Merge with existing cache (avoid duplicates)
         if (apiMessages.length > 0) {
@@ -319,6 +323,7 @@ export async function searchMediaMessages(
     }> = [];
 
     for (const msg of allMediaMessages) {
+        if (signal?.aborted) return results;
         const hasMedia = msg.attachments?.length > 0 ||
             msg.embeds?.length > 0 ||
             msg.sticker_items?.length > 0 ||

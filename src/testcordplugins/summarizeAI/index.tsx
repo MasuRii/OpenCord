@@ -11,47 +11,56 @@ import definePlugin, { OptionType } from "@utils/types";
 import type { Message } from "@vencord/discord-types";
 import { ChannelStore, Constants, RestAPI, SnowflakeUtils, UserStore } from "@webpack/common";
 
-import { getGroqKey } from "../nightcordAI/groqManager";
+import { HOMELANDER_MODEL_OPTIONS, LOCAL_PROVIDER_OPTIONS, SURF_MODEL_OPTIONS, SWISHAI_MODEL_OPTIONS, testcordChat } from "../TestcordAI/aiProvider";
 
 const settings = definePluginSettings({
     provider: {
         type: OptionType.SELECT,
         description: "AI provider to use for summarization",
         options: [
-            { label: "Groq", value: "groq", default: true },
+            ...LOCAL_PROVIDER_OPTIONS,
             { label: "Nvidia NIM", value: "nvidia" },
-            { label: "UnlimitedSurf", value: "unlimitedsurf" },
         ],
-    },
-    groqApiKey: {
-        type: OptionType.STRING,
-        description: "Groq API Key (uses NightcordAI key if empty)",
-        default: "",
+        default: "testcord",
     },
     groqModel: {
         type: OptionType.STRING,
-        description: "Groq model (empty = default llama-3.3-70b-versatile)",
-        default: "",
+        description: "Groq model override",
+        default: "llama-3.3-70b-versatile",
+        hidden: () => settings.store.provider !== "groq",
+    },
+    homelanderModel: {
+        type: OptionType.SELECT,
+        description: "Homelander model",
+        options: HOMELANDER_MODEL_OPTIONS,
+        default: "openai/gpt-5.5",
+        hidden: () => settings.store.provider !== "homelander",
+    },
+    swishAiModel: {
+        type: OptionType.SELECT,
+        description: "SwishAI model",
+        options: SWISHAI_MODEL_OPTIONS,
+        default: "gpt-5.5",
+        hidden: () => settings.store.provider !== "swishai",
+    },
+    surfModel: {
+        type: OptionType.SELECT,
+        description: "Unlimited Surf model",
+        options: SURF_MODEL_OPTIONS,
+        default: "gateway-claude-opus-4-7",
+        hidden: () => settings.store.provider !== "unlimited-surf",
     },
     nvidiaApiKey: {
         type: OptionType.STRING,
         description: "Nvidia NIM API Key",
         default: "",
+        hidden: () => settings.store.provider !== "nvidia",
     },
     nvidiaModel: {
         type: OptionType.STRING,
         description: "Nvidia model",
         default: "meta/llama-3.3-70b-instruct",
-    },
-    unlimitedSurfApiKey: {
-        type: OptionType.STRING,
-        description: "UnlimitedSurf API Key (Bearer token)",
-        default: "",
-    },
-    unlimitedSurfModel: {
-        type: OptionType.STRING,
-        description: "UnlimitedSurf model",
-        default: "gateway-gpt-5-5",
+        hidden: () => settings.store.provider !== "nvidia",
     },
     temperature: {
         type: OptionType.SLIDER,
@@ -124,36 +133,6 @@ interface ChatMessage {
     content: string;
 }
 
-async function callGroq(messages: ChatMessage[]): Promise<string> {
-    let apiKey = settings.store.groqApiKey;
-    if (!apiKey) apiKey = await getGroqKey();
-    if (!apiKey) throw new Error("Groq API key not configured. Set it in plugin settings or NightcordAI.");
-
-    const model = settings.store.groqModel || "llama-3.3-70b-versatile";
-
-    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            model,
-            temperature: settings.store.temperature,
-            max_tokens: settings.store.maxTokens,
-            messages,
-        }),
-    });
-
-    if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`Groq API ${res.status}: ${body.slice(0, 200)}`);
-    }
-
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content?.trim() ?? "(empty response)";
-}
-
 async function callNvidia(messages: ChatMessage[]): Promise<string> {
     const apiKey = settings.store.nvidiaApiKey;
     if (!apiKey) throw new Error("Nvidia NIM API key not configured in plugin settings.");
@@ -183,53 +162,20 @@ async function callNvidia(messages: ChatMessage[]): Promise<string> {
     return data.choices?.[0]?.message?.content?.trim() ?? "(empty response)";
 }
 
-async function callUnlimitedSurf(messages: ChatMessage[]): Promise<string> {
-    const apiKey = settings.store.unlimitedSurfApiKey;
-    if (!apiKey) throw new Error("UnlimitedSurf API key not configured in plugin settings.");
-
-    const model = settings.store.unlimitedSurfModel || "gateway-gpt-5";
-    const lastMsg = messages[messages.length - 1]?.content || "";
-
-    const res = await fetch("https://unlimited.surf/api/chat", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            message: lastMsg,
-            model,
-            effort: settings.store.temperature < 0.3 ? "high" : settings.store.temperature < 0.7 ? "medium" : "low",
-        }),
-    });
-
-    if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`UnlimitedSurf API ${res.status}: ${body.slice(0, 200)}`);
-    }
-
-    const text = await res.text();
-    const deltas: string[] = [];
-    for (const line of text.split("\n")) {
-        if (!line.startsWith("data: ")) continue;
-        try {
-            const json = JSON.parse(line.slice(6));
-            if (json.delta) deltas.push(json.delta);
-            if (json.done) break;
-        } catch { }
-    }
-
-    return deltas.join("") || "(empty response)";
-}
-
 async function summarize(messages: ChatMessage[]): Promise<string> {
     const { provider } = settings.store;
-    switch (provider) {
-        case "groq": return callGroq(messages);
-        case "nvidia": return callNvidia(messages);
-        case "unlimitedsurf": return callUnlimitedSurf(messages);
-        default: throw new Error(`Unknown provider: ${provider}`);
-    }
+    if (provider === "nvidia") return callNvidia(messages);
+
+    return testcordChat({
+        provider,
+        groqModel: settings.store.groqModel,
+        homelanderModel: settings.store.homelanderModel,
+        swishAiModel: settings.store.swishAiModel,
+        surfModel: settings.store.surfModel,
+        messages,
+        temperature: settings.store.temperature,
+        maxTokens: settings.store.maxTokens,
+    });
 }
 
 function buildSummaryPrompt(

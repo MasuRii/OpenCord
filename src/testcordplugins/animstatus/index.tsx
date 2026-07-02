@@ -14,8 +14,7 @@ import { Switch } from "@components/Switch";
 import { classNameFactory } from "@utils/css";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, Forms, TabBar, Text, TextInput, Toasts, useEffect, useMemo, useRef, useState } from "@webpack/common";
-import { UserStore } from "@webpack/common";
+import { Button, Forms, TabBar, Text, TextInput, Toasts, useEffect, useMemo, useRef, UserStore, useState } from "@webpack/common";
 
 const cl = classNameFactory("vc-as-");
 const MIN_INTERVAL = 5, MAX_INTERVAL = 300, DEFAULT_INTERVAL = 10, START_DELAY = 3000;

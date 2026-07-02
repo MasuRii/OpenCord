@@ -86,16 +86,31 @@ export default definePlugin({
     dependencies: ["MessageEventsAPI"],
     settings,
     _presendListener: null as MessageSendListener | null,
+    _abortController: null as AbortController | null,
+    _generation: 0,
     async start() {
-        let dictionary = await fetch(
-            "https://raw.githubusercontent.com/wont-stream/dictionary/6b9d2f06a1d89103fb7249f41de4db6811e3d374/index.min.json",
-        );
-        dictionary = await dictionary.json();
+        const generation = ++this._generation;
+        const abortController = new AbortController();
+        this._abortController = abortController;
 
-        this._presendListener = getPresend(dictionary);
-        addMessagePreSendListener(this._presendListener);
+        try {
+            const response = await fetch(
+                "https://raw.githubusercontent.com/wont-stream/dictionary/6b9d2f06a1d89103fb7249f41de4db6811e3d374/index.min.json",
+                { signal: abortController.signal }
+            );
+            const dictionary = await response.json();
+            if (abortController.signal.aborted || generation !== this._generation) return;
+
+            this._presendListener = getPresend(dictionary);
+            addMessagePreSendListener(this._presendListener);
+        } catch (e) {
+            if (!abortController.signal.aborted) throw e;
+        }
     },
     stop() {
+        this._generation++;
+        this._abortController?.abort();
+        this._abortController = null;
         if (this._presendListener) {
             removeMessagePreSendListener(this._presendListener);
             this._presendListener = null;

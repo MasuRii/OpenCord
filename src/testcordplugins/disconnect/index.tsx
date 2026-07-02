@@ -241,6 +241,8 @@ export default definePlugin({
                 <HeaderBarIcon
                     tooltip={`Disconnect user: ${current?.username ?? disconnectUserId} (right-click to disable)`}
                     icon={UnfollowIcon}
+                    className="vc-plugin-icon-button"
+                    iconClassName="vc-plugin-icon-button"
                     onClick={() => { }}
                     onContextMenu={e => {
                         e.preventDefault();

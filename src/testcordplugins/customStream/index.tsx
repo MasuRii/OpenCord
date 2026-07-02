@@ -24,8 +24,7 @@ import { ImageIcon } from "@components/Icons";
 import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { findComponentByCodeLazy } from "@webpack";
-import { Alerts } from "@webpack/common";
-import { Button, Menu, React, showToast, Text, Toasts, useEffect, useRef, UserStore, useState } from "@webpack/common";
+import { Alerts, Button, Menu, React, showToast, Text, Toasts, useEffect, useRef, UserStore, useState } from "@webpack/common";
 
 // Panel button component
 const PanelButton = findComponentByCodeLazy(".GREEN,positionKeyStemOverride:");

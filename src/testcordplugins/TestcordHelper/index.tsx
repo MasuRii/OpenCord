@@ -7,6 +7,7 @@
 import { isPluginEnabled, isPluginRequired } from "@api/PluginManager";
 import { definePluginSettings, useSettings } from "@api/Settings";
 import { getUserSettingLazy } from "@api/UserSettings";
+import { BaseText } from "@components/BaseText";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { WarningIcon } from "@components/Icons";
 import { AddonCard } from "@components/settings";
@@ -14,17 +15,24 @@ import { ExcludedReasons, PluginDependencyList } from "@components/settings/tabs
 import { PluginCard } from "@components/settings/tabs/plugins/PluginCard";
 import { TooltipContainer } from "@components/TooltipContainer";
 import { gitHashShort } from "@shared/vencordUserAgent";
+import { fetchUserProfile, openUserProfile } from "@utils/discord";
 import { Logger } from "@utils/Logger";
 import { tryOrElse } from "@utils/misc";
 import { makeCodeblock } from "@utils/text";
 import definePlugin, { OptionType } from "@utils/types";
-import { Message } from "@vencord/discord-types";
-import { ChannelStore, MessageActions, SelectedChannelStore, showToast, Toasts, Tooltip, useMemo, UserStore } from "@webpack/common";
+import { Message, User } from "@vencord/discord-types";
+import { Avatar, Button, ChannelStore, ColorPicker, MessageActions, SelectedChannelStore, showToast, TextInput, Toasts, Tooltip, useEffect, useMemo, UserProfileStore, UserStore, useStateFromStores } from "@webpack/common";
 import { JSX } from "react";
 
 import plugins, { ExcludedPlugins, PluginMeta } from "~plugins";
 
+import { hexToInt, ICON_COLOR_FALLBACK, IconColorSettingKey, IconColorSettings, intToHex, isIconColorInputValid } from "./iconColors";
+
 const logger = new Logger("TestcordHelper");
+
+interface ProfileTheme {
+    themeColors?: number[] | null;
+}
 
 const ShowCurrentGame = getUserSettingLazy<boolean>("status", "showCurrentGame")!;
 const RenderEmbeds = getUserSettingLazy<boolean>("textAndImages", "renderEmbeds")!;
@@ -38,6 +46,52 @@ const PLUGIN_LINK_PATTERN = /\[([^\]]+)]\(<?https:\/\/github\.com\/TestcordDev\/
 const PLUGIN_CARD_MARKER_PATTERN = /(?:testcordplugin|tcp):|github\.com\/TestcordDev\/Testcord\/tree\/main\/src\/(?:plugins|equicordplugins|testcordplugins)\//i;
 const PLUGIN_RESOLVE_CACHE_LIMIT = 500;
 const pluginResolveCache = new Map<string, string | null>();
+const USER_PATTERN = /dcp:([^\s,;\n]+)/gi;
+const USER_MATCH_PATTERN = /dcp:([^\s,;\n]+)/i;
+const USER_LINK_PATTERN = /\[[^\]]+]\(<?https:\/\/discord\.com\/users\/(\d{17,20})>?\)/gi;
+const USER_CARD_MARKER_PATTERN = /dcp:|discord\.com\/users\/\d{17,20}/i;
+const USER_MENTION_PATTERN = /^<@!?(\d{17,20})>$/;
+const USER_ID_PATTERN = /^\d{17,20}$/;
+const USER_RESOLVE_CACHE_LIMIT = 500;
+const userResolveCache = new Map<string, string | null>();
+
+function IconColorRow({ settingKey }: { settingKey: IconColorSettingKey; }) {
+    const { label, description } = IconColorSettings[settingKey];
+    const value = settings.store[settingKey] ?? "";
+
+    return (
+        <div style={{ display: "grid", gap: 8 }}>
+            <BaseText size="md" weight="medium">{label}</BaseText>
+            <BaseText size="sm">{description}</BaseText>
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 12, alignItems: "center" }}>
+                <TextInput
+                    value={value}
+                    placeholder="Theme default"
+                    onChange={newValue => settings.store[settingKey] = newValue}
+                />
+                <ColorPicker
+                    color={hexToInt(value) ?? hexToInt(ICON_COLOR_FALLBACK) ?? 0xb5bac1}
+                    onChange={color => {
+                        if (color != null) settings.store[settingKey] = intToHex(color);
+                    }}
+                    showEyeDropper={true}
+                />
+            </div>
+        </div>
+    );
+}
+
+function IconColorSettingsComponent() {
+    return (
+        <div style={{ display: "grid", gap: 16 }}>
+            <BaseText size="lg" weight="bold">Default Plugin Icon Colors</BaseText>
+            <BaseText size="sm">Leave a field empty to use Discord's theme color.</BaseText>
+            {(Object.keys(IconColorSettings) as IconColorSettingKey[]).map(settingKey => (
+                <IconColorRow key={settingKey} settingKey={settingKey} />
+            ))}
+        </div>
+    );
+}
 
 interface PluginSearchEntry {
     name: string;
@@ -70,6 +124,38 @@ const settings = definePluginSettings({
         description: "Dedupe and briefly cache repeated Testcord plugin network requests.",
         default: false,
     },
+    iconColorSettings: {
+        type: OptionType.COMPONENT,
+        component: IconColorSettingsComponent
+    },
+    userAreaButtonIconColor: {
+        type: OptionType.STRING,
+        description: "Default icon color for buttons next to mute, deafen, and settings.",
+        default: "",
+        hidden: true,
+        isValid: isIconColorInputValid
+    },
+    chatBoxButtonIconColor: {
+        type: OptionType.STRING,
+        description: "Default icon color for plugin buttons in the chat input.",
+        default: "",
+        hidden: true,
+        isValid: isIconColorInputValid
+    },
+    topBarButtonIconColor: {
+        type: OptionType.STRING,
+        description: "Default icon color for plugin buttons in Discord's top title bar.",
+        default: "",
+        hidden: true,
+        isValid: isIconColorInputValid
+    },
+    headerBarButtonIconColor: {
+        type: OptionType.STRING,
+        description: "Default icon color for plugin buttons in channel headers.",
+        default: "",
+        hidden: true,
+        isValid: isIconColorInputValid
+    },
     performanceMode: {
         type: OptionType.BOOLEAN,
         description: "Show optional performance features. Nothing here is enabled unless its own toggle is on.",
@@ -96,9 +182,29 @@ const settings = definePluginSettings({
         description: "Do not render Testcord plugin cards under chat messages.",
         default: false,
     },
+    disableProfilePopoutEmbeds: {
+        type: OptionType.BOOLEAN,
+        description: "Do not convert dcp:user shortcuts or render Discord profile cards.",
+        default: false,
+    },
+    useUsernameInProfileLinks: {
+        type: OptionType.BOOLEAN,
+        description: "Use usernames instead of display names in dcp:user links.",
+        default: false,
+    },
     performanceCachePluginCards: {
         type: OptionType.BOOLEAN,
         description: "Cache plugin name lookups and skip plugin-card scans for messages that cannot contain plugin links.",
+        default: false,
+    },
+    performanceNetworkOptimizations: {
+        type: OptionType.BOOLEAN,
+        description: "Reduce network requests across Testcord plugins: share and dedupe repeated message fetches, cache immutable resources, warm up the connection, and parallelize independent requests. No change to what Discord receives.",
+        default: false,
+    },
+    performanceAggressiveNetwork: {
+        type: OptionType.BOOLEAN,
+        description: "Aggressive network mode for supported plugins (e.g. AutoRedeem skip-precheck and higher concurrency). Faster, but may increase captcha and rate-limit risk. Requires the network optimizations toggle above.",
         default: false,
     }
 });
@@ -387,6 +493,151 @@ function getPluginLink(pluginName: string) {
     return `https://github.com/TestcordDev/Testcord/tree/main/${PluginMeta[pluginName].folderName}`;
 }
 
+function getDisplayName(user: User) {
+    return settings.store.useUsernameInProfileLinks ? user.username : user.globalName || user.username;
+}
+
+function getUserSubtitle(user: User) {
+    return user.discriminator === "0" ? `@${user.username}` : user.tag;
+}
+
+function escapeLinkLabel(label: string) {
+    return label.replace(/[\\\]\[]/g, "\\$&");
+}
+
+function getCachedUsers() {
+    const users = (UserStore as typeof UserStore & { getUsers?: () => Record<string, User>; }).getUsers?.();
+
+    return users ? Object.values(users) : [];
+}
+
+function resolveUser(search: string) {
+    const query = search.trim().replace(/[.!?)]*$/, "");
+    if (!query) return;
+
+    const mentionId = USER_MENTION_PATTERN.exec(query)?.[1];
+    const userId = mentionId ?? (USER_ID_PATTERN.test(query) ? query : undefined);
+
+    if (userId) return UserStore.getUser(userId) ?? undefined;
+
+    const cacheKey = query.toLowerCase();
+    if (userResolveCache.has(cacheKey)) {
+        const cachedId = userResolveCache.get(cacheKey);
+        return cachedId ? UserStore.getUser(cachedId) ?? undefined : undefined;
+    }
+
+    const users = getCachedUsers();
+    const user = users.find(user => user.username.toLowerCase() === cacheKey || user.globalName?.toLowerCase() === cacheKey || user.tag.toLowerCase() === cacheKey)
+        ?? users.find(user => user.username.toLowerCase().startsWith(cacheKey) || user.globalName?.toLowerCase().startsWith(cacheKey) || user.tag.toLowerCase().startsWith(cacheKey))
+        ?? users.find(user => user.username.toLowerCase().includes(cacheKey) || user.globalName?.toLowerCase().includes(cacheKey) || user.tag.toLowerCase().includes(cacheKey));
+
+    if (!user) return;
+
+    userResolveCache.set(cacheKey, user.id);
+    if (userResolveCache.size > USER_RESOLVE_CACHE_LIMIT) {
+        const oldest = userResolveCache.keys().next().value;
+        if (oldest !== undefined) userResolveCache.delete(oldest);
+    }
+
+    return user;
+}
+
+function getUserLink(user: User) {
+    return `https://discord.com/users/${user.id}`;
+}
+
+function colorToHex(color: number) {
+    return `#${color.toString(16).padStart(6, "0")}`;
+}
+
+function getColorBrightness(color: number) {
+    const red = (color >> 16) & 0xff;
+    const green = (color >> 8) & 0xff;
+    const blue = color & 0xff;
+
+    return (red * 299 + green * 587 + blue * 114) / 1000;
+}
+
+function darkenColor(color: number) {
+    const red = Math.round(((color >> 16) & 0xff) * 0.65);
+    const green = Math.round(((color >> 8) & 0xff) * 0.65);
+    const blue = Math.round((color & 0xff) * 0.65);
+
+    return colorToHex((red << 16) | (green << 8) | blue);
+}
+
+function getProfileCardTheme(profile: ProfileTheme | undefined) {
+    const colors = profile?.themeColors?.filter(color => Number.isFinite(color)) ?? [];
+
+    if (colors.length >= 2) {
+        const averageBrightness = colors.reduce((total, color) => total + getColorBrightness(color), 0) / colors.length;
+        const darkText = averageBrightness >= 160;
+
+        return {
+            background: `linear-gradient(135deg, ${colorToHex(colors[0])}, ${colorToHex(colors[1])})`,
+            border: darkenColor(colors[0]),
+            text: darkText ? "#111214" : "#fff",
+            muted: darkText ? "rgba(17, 18, 20, 0.72)" : "rgba(255, 255, 255, 0.78)",
+            shadow: darkText ? "none" : "0 1px 2px rgb(0 0 0 / 45%)",
+        };
+    }
+
+    return {
+        background: "var(--background-secondary)",
+        border: "var(--background-modifier-accent)",
+        text: "var(--text-default)",
+        muted: "var(--text-muted)",
+        shadow: "none",
+    };
+}
+
+function ChatProfileCard({ user }: { user: User; }) {
+    const profile = useStateFromStores([UserProfileStore], () => UserProfileStore.getUserProfile(user.id) as ProfileTheme | undefined, [user.id]);
+    const displayName = user.globalName || user.username;
+    const cardTheme = getProfileCardTheme(profile);
+
+    useEffect(() => {
+        if (!profile && !user.bot) void fetchUserProfile(user.id);
+    }, [profile, user.bot, user.id]);
+
+    return (
+        <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: 12,
+            borderRadius: 8,
+            background: cardTheme.background,
+            border: `1px solid ${cardTheme.border}`,
+            minWidth: 280,
+            maxWidth: 420,
+            boxShadow: "0 2px 8px rgb(0 0 0 / 18%)",
+        }}>
+            <Avatar
+                src={user.getAvatarURL(null, 80, true)}
+                size="SIZE_56"
+            />
+            <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontWeight: 600, color: cardTheme.text, textShadow: cardTheme.shadow, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {displayName}
+                </div>
+                <div style={{ color: cardTheme.muted, textShadow: cardTheme.shadow, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {getUserSubtitle(user)}
+                </div>
+                <div style={{ color: cardTheme.muted, textShadow: cardTheme.shadow, fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {user.id}
+                </div>
+            </div>
+            <Button
+                size={Button.Sizes.SMALL}
+                onClick={() => openUserProfile(user.id)}
+            >
+                Profile
+            </Button>
+        </div>
+    );
+}
+
 function replacePluginAliases(content: string) {
     return content.replace(PLUGIN_PATTERN, match => {
         const [, query] = PLUGIN_MATCH_PATTERN.exec(match) ?? [];
@@ -398,9 +649,26 @@ function replacePluginAliases(content: string) {
     });
 }
 
+function replaceUserAliases(content: string) {
+    if (settings.store.disableProfilePopoutEmbeds) return content;
+
+    return content.replace(USER_PATTERN, match => {
+        const [, query] = USER_MATCH_PATTERN.exec(match) ?? [];
+        const user = query ? resolveUser(query) : undefined;
+
+        if (!user) return match;
+
+        return `[${escapeLinkLabel(getDisplayName(user))}](<${getUserLink(user)}>)${query?.match(/[.!?)]*$/)?.[0] ?? ""}`;
+    });
+}
+
+function replaceAliases(content: string) {
+    return replaceUserAliases(replacePluginAliases(content));
+}
+
 const PluginCards = ErrorBoundary.wrap(function PluginCards({ message }: { message: Message; }) {
     if (isPerformanceEnabled() && settings.store.performanceDisablePluginCards) return null;
-    if (isPluginCardCacheEnabled() && !PLUGIN_CARD_MARKER_PATTERN.test(message.content)) return null;
+    if (!PLUGIN_CARD_MARKER_PATTERN.test(message.content)) return null;
 
     const seenPlugins = new Set<string>();
     const pluginCards: JSX.Element[] = [];
@@ -451,6 +719,55 @@ const PluginCards = ErrorBoundary.wrap(function PluginCards({ message }: { messa
     );
 }, { noop: true });
 
+const ProfileCards = ErrorBoundary.wrap(function ProfileCards({ message }: { message: Message; }) {
+    if (settings.store.disableProfilePopoutEmbeds) return null;
+    if (!USER_CARD_MARKER_PATTERN.test(message.content)) return null;
+
+    const seenUsers = new Set<string>();
+    const profileCards: JSX.Element[] = [];
+
+    USER_PATTERN.lastIndex = 0;
+
+    let match;
+    while ((match = USER_PATTERN.exec(message.content)) !== null) {
+        const user = match[1] ? resolveUser(match[1].trim()) : undefined;
+
+        if (!user || seenUsers.has(user.id)) continue;
+        seenUsers.add(user.id);
+
+        profileCards.push(
+            <ChatProfileCard
+                key={user.id}
+                user={user}
+            />
+        );
+    }
+
+    USER_LINK_PATTERN.lastIndex = 0;
+
+    while ((match = USER_LINK_PATTERN.exec(message.content)) !== null) {
+        const user = match[1] ? UserStore.getUser(match[1]) : undefined;
+
+        if (!user || seenUsers.has(user.id)) continue;
+        seenUsers.add(user.id);
+
+        profileCards.push(
+            <ChatProfileCard
+                key={user.id}
+                user={user}
+            />
+        );
+    }
+
+    if (profileCards.length === 0) return null;
+
+    return (
+        <div style={{ display: "grid", gap: 8, marginTop: 0 }}>
+            {profileCards}
+        </div>
+    );
+}, { noop: true });
+
 let hotkeyHandler: ((e: KeyboardEvent) => void) | null = null;
 
 export default definePlugin({
@@ -463,11 +780,20 @@ export default definePlugin({
     dependencies: ["MessageAccessoriesAPI", "MessageEventsAPI"],
 
     onBeforeMessageSend(_, msg) {
-        msg.content = replacePluginAliases(msg.content);
+        msg.content = replaceAliases(msg.content);
+    },
+
+    onBeforeMessageEdit(_, __, msg) {
+        msg.content = replaceAliases(msg.content);
     },
 
     renderMessageAccessory(props) {
-        return <PluginCards message={props.message} />;
+        return (
+            <>
+                <PluginCards message={props.message} />
+                <ProfileCards message={props.message} />
+            </>
+        );
     },
 
     start() {

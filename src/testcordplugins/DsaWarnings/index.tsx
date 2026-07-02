@@ -150,20 +150,26 @@ function StatusCard({
     message: string;
     onClick?: () => void | Promise<void>;
 }) {
-    return (
-        <Clickable className={cl("card")} onClick={onClick ?? (() => null)}>
-            <div className={cl("card-top")}>
-                <div className={cl("card-left")}>
-                    <div className={cl("glyph")}>!</div>
-                    <div className={cl("card-content")}>
-                        <div className={cl("chip-row")}>
-                            <span className={cl("chip", "chip-user")}>DSA Lookup</span>
-                        </div>
-                        <BaseText className={cl("category")} size="xl" weight="extrabold" defaultColor={false}>{title}</BaseText>
-                        <BaseText className={cl("facts")} size="sm" weight="medium" defaultColor={false}>{message}</BaseText>
+    const content = (
+        <div className={cl("card-top")}>
+            <div className={cl("card-left")}>
+                <div className={cl("glyph")}>!</div>
+                <div className={cl("card-content")}>
+                    <div className={cl("chip-row")}>
+                        <span className={cl("chip", "chip-user")}>DSA Lookup</span>
                     </div>
+                    <BaseText className={cl("category")} size="xl" weight="extrabold" defaultColor={false}>{title}</BaseText>
+                    <BaseText className={cl("facts")} size="sm" weight="medium" defaultColor={false}>{message}</BaseText>
                 </div>
             </div>
+        </div>
+    );
+
+    if (!onClick) return <div className={cl("card")}>{content}</div>;
+
+    return (
+        <Clickable className={cl("card")} onClick={onClick} aria-label={title}>
+            {content}
         </Clickable>
     );
 }
@@ -234,14 +240,7 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
     const [refreshKey, setRefreshKey] = useState(0);
     const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
     const [result] = useAwaiter(() => {
-        console.warn("[DsaWarnings/component] useAwaiter calling fetchActiveWarnings for", user.id);
-        return fetchActiveWarnings(user.id).then(r => {
-            console.warn("[DsaWarnings/component] fetchActiveWarnings resolved:", r?.kind, JSON.stringify(r).slice(0, 200));
-            return r;
-        }).catch(e => {
-            console.warn("[DsaWarnings/component] fetchActiveWarnings rejected:", e);
-            return null;
-        });
+        return fetchActiveWarnings(user.id).catch(() => null);
     }, {
         deps: [user.id, refreshKey],
         fallbackValue: null
@@ -295,7 +294,7 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                     <BaseText className={cl("title")} size="md" weight="bold" defaultColor={false}>Active DSA Warnings</BaseText>
                     <BaseText className={cl("count")} size="xs" weight="semibold" defaultColor={false}>{subtitle}</BaseText>
                 </div>
-                <Clickable className={cl("open")} onClick={() => VencordNative.native.openExternal(buildDsaBrowseUrl(user.id))}>
+                <Clickable className={cl("open")} onClick={() => VencordNative.native.openExternal(buildDsaBrowseUrl(user.id))} aria-label="Open DSA lookup">
                     <BaseText tag="span" size="xs" weight="bold" defaultColor={false}>Open DSA Lookup</BaseText>
                 </Clickable>
             </div>
@@ -321,6 +320,7 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                             className={cl("card")}
                             key={action.uuid}
                             onClick={() => VencordNative.native.openExternal(buildDsaBrowseUrl(action.parsedId))}
+                            aria-label={`Open DSA warning ${formatLabel(action.category)}`}
                         >
                             <div className={cl("card-top")}>
                                 <div className={cl("card-left")}>
@@ -399,6 +399,7 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                             className={classes(cl("card"), cl("card-breach"))}
                             key={`${breach.source}-${breach.id || breach.no || index}`}
                             onClick={() => VencordNative.native.openExternal(buildCordCatUrl(user.id))}
+                            aria-label={`Open breach result ${getBreachName(breach)}`}
                         >
                             <div className={cl("card-top")}>
                                 <div className={cl("card-left")}>
@@ -485,6 +486,7 @@ const DsaWarningsCollection = ErrorBoundary.wrap(function DsaWarningsCollection(
                 <Clickable
                     className={cl("toggle")}
                     onClick={() => setExpandedUserId(current => current === user.id ? null : user.id)}
+                    aria-label={isExpanded ? "Show fewer DSA results" : "Show all DSA results"}
                 >
                     <BaseText className={cl("toggle-text")} tag="span" size="xs" weight="bold" defaultColor={false}>
                         {isExpanded ? "Show Less" : `Show All ${actions.length + breaches.length} Results`}

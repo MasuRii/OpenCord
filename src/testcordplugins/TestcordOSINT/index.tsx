@@ -509,6 +509,7 @@ function OSINTScanPanel({ userId, channelId, modalProps }: { userId: string; cha
 
     const fetchStateRef = useRef<FetchState>({ running: false, aborted: false, total: 0 } as FetchState);
     const messagesRef = useRef<MessageData[]>([]);
+    const lastMessagesUpdateRef = useRef(0);
 
     const user = UserStore.getUser(userId);
 
@@ -538,7 +539,11 @@ function OSINTScanPanel({ userId, channelId, modalProps }: { userId: string; cha
                     if (cancelled || messages.length === 0) break;
                     acc.push(...messages.map(toMessageData));
                     state.total = acc.length;
-                    setAllMessages([...acc]);
+                    const now = Date.now();
+                    if (!unlimited || now - lastMessagesUpdateRef.current > 500) {
+                        lastMessagesUpdateRef.current = now;
+                        setAllMessages([...acc]);
+                    }
                     offset += messages.length;
                     if (!unlimited && acc.length >= limit) break;
                     if (offset >= total) break;
@@ -593,6 +598,7 @@ function OSINTScanPanel({ userId, channelId, modalProps }: { userId: string; cha
             }
 
             if (!cancelled) {
+                setAllMessages([...acc]);
                 runAnalysis([...acc]);
                 setPhase("analyzing");
                 if (settings.store.useAI && acc.length > 0) {
