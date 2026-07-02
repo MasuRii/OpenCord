@@ -214,7 +214,14 @@ async function handleRedeem(item: QueueItem) {
     const { code, channelId, messageId, guildId } = item;
     const fast = settings.store.speedMode;
 
-    if (fast || settings.store.prevalidate) {
+    // Aggressive mode (TestcordHelper) lets a speed-mode user skip the precheck
+    // round-trip entirely, shaving one RTT off each redeem. This raises captcha
+    // risk (precheck is what reduces captchas), so it only applies in speed mode
+    // and only when the TestcordHelper aggressive toggle is on. Default behavior
+    // is unchanged.
+    const skipPrecheck = fast && TestcordRequestCoordinator.aggressiveNetworkEnabled();
+
+    if (!skipPrecheck && (fast || settings.store.prevalidate)) {
         const pre = await precheckGift(code);
         if (!pre.ok) {
             const reason = pre.reason ?? "unredeemable";

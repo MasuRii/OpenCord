@@ -6,7 +6,7 @@
 
 import { Flex } from "@components/Flex";
 import { DeleteIcon } from "@components/Icons";
-import { Button, Text, Tooltip, useState } from "@webpack/common";
+import { Button, Text, Tooltip, useEffect, useRef, useState } from "@webpack/common";
 
 import { rmRule, settings } from "..";
 import { cl, Rule } from "../utils";
@@ -20,7 +20,17 @@ export function Rule(props: {
 }) {
     const { rule, index } = props;
     const [isBeingEdited, setBeingEdited] = useState(false);
+    const editorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const reactiveSettings = settings.use(["rules"]);
+
+    useEffect(() => () => {
+        if (editorTimerRef.current) clearTimeout(editorTimerRef.current);
+        const editor = editors.get(index);
+        if (editor) {
+            editor.destroy();
+            editors.delete(index);
+        }
+    }, [index]);
 
     return <div className={cl("rule")}>
         <Text>
@@ -40,9 +50,11 @@ export function Rule(props: {
                         <Button color={!isBeingEdited ? Button.Colors.TRANSPARENT : Button.Colors.BRAND} className={cl("replacement-btn")} onClick={() => {
                             if (!isBeingEdited) {
                                 setBeingEdited(true);
-                                setTimeout(() => {
+                                editorTimerRef.current = setTimeout(() => {
+                                    editorTimerRef.current = null;
                                     const container = document.querySelector(`#vc-jstr-editor-${index}`);
-                                    container!.innerHTML = reactiveSettings.rules[index].replace || "// This will be evaluated if the match regex matches something.\n// You may use the _ object to access useful info. See at the top of this\n// settings window for a full list.\n// This is an async function that'll be awaited when ran.\n// Have fun!";
+                                    if (!container) return;
+                                    container.innerHTML = reactiveSettings.rules[index].replace || "// This will be evaluated if the match regex matches something.\n// You may use the _ object to access useful info. See at the top of this\n// settings window for a full list.\n// This is an async function that'll be awaited when ran.\n// Have fun!";
                                     const editor = window.ace.edit(container);
                                     editor.setTheme("ace/theme/one_dark");
                                     editor.session.setMode("ace/mode/javascript");
@@ -52,6 +64,7 @@ export function Rule(props: {
                             }
                             if (isBeingEdited) {
                                 const editor = editors.get(index);
+                                if (!editor) return;
                                 settings.store.rules[index].replace = editor.getValue();
                                 editor.destroy();
                                 editors.delete(index);

@@ -284,12 +284,16 @@ function injectCall(
 
 // ─── Restore persisted fakes on startup ──────────────────────────────────────
 let _restoreHandler: (() => void) | null = null;
+let _restoreTimer: ReturnType<typeof setTimeout> | null = null;
 
 function scheduleRestore() {
     _restoreHandler = () => {
         FluxDispatcher.unsubscribe("CONNECTION_OPEN", _restoreHandler!);
         _restoreHandler = null;
-        setTimeout(doRestore, 1200);
+        _restoreTimer = setTimeout(() => {
+            _restoreTimer = null;
+            doRestore();
+        }, 1200);
     };
     FluxDispatcher.subscribe("CONNECTION_OPEN", _restoreHandler);
 }
@@ -386,6 +390,8 @@ function FakeDMPanel({ onClose, btnRect }: { onClose(): void; btnRect: DOMRect; 
     const [status, setStatus] = React.useState<{ msg: string; ok: boolean; } | null>(null);
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
     const panelRef = React.useRef<HTMLDivElement>(null);
+    const focusTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const statusTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // ── Position ──────────────────────────────────────────────────────────────
     const [pos, setPos] = React.useState<React.CSSProperties>({ opacity: 0, position: "fixed", zIndex: 1000000, width: "430px" });
@@ -399,7 +405,16 @@ function FakeDMPanel({ onClose, btnRect }: { onClose(): void; btnRect: DOMRect; 
         setPos({ left: `${left}px`, top: `${top}px`, opacity: 1, position: "fixed", zIndex: 1000000, width: `${PW}px`, height: "auto", visibility: "visible", display: "flex", flexDirection: "column", pointerEvents: "auto" });
     }, [btnRect]);
 
-    React.useEffect(() => { setTimeout(() => textareaRef.current?.focus(), 80); }, []);
+    React.useEffect(() => {
+        focusTimerRef.current = setTimeout(() => {
+            focusTimerRef.current = null;
+            textareaRef.current?.focus();
+        }, 80);
+        return () => {
+            if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+            if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+        };
+    }, []);
     React.useEffect(() => {
         const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         document.addEventListener("keydown", h, true);
@@ -408,7 +423,11 @@ function FakeDMPanel({ onClose, btnRect }: { onClose(): void; btnRect: DOMRect; 
 
     function setMsg(msg: string, ok: boolean) {
         setStatus({ msg, ok });
-        setTimeout(() => setStatus(null), 2500);
+        if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+        statusTimerRef.current = setTimeout(() => {
+            statusTimerRef.current = null;
+            setStatus(null);
+        }, 2500);
     }
 
     function send() {
@@ -421,7 +440,11 @@ function FakeDMPanel({ onClose, btnRect }: { onClose(): void; btnRect: DOMRect; 
         setText("");
         setMsg("Message injected ✓", true);
         setDateStr(toLocal(new Date(date.getTime() + 60_000)));
-        setTimeout(() => textareaRef.current?.focus(), 10);
+        if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+        focusTimerRef.current = setTimeout(() => {
+            focusTimerRef.current = null;
+            textareaRef.current?.focus();
+        }, 10);
     }
 
     function sendCall() {
@@ -647,6 +670,10 @@ export default definePlugin({
         if (_restoreHandler) {
             FluxDispatcher.unsubscribe("CONNECTION_OPEN", _restoreHandler);
             _restoreHandler = null;
+        }
+        if (_restoreTimer) {
+            clearTimeout(_restoreTimer);
+            _restoreTimer = null;
         }
         fakeIds.clear();
         _idCounter = 0;

@@ -27,17 +27,21 @@ const settings = definePluginSettings({
     includeImages: { type: OptionType.BOOLEAN, default: true, description: "Include image attachments" },
 });
 
-async function fetchAllMessages(channelId: string): Promise<Message[]> {
+let currentExportAbort: AbortController | null = null;
+
+async function fetchAllMessages(channelId: string, signal?: AbortSignal): Promise<Message[]> {
     const result: Message[] = [] as any;
     let before: string | undefined = undefined;
 
     while (true) {
+        if (signal?.aborted) break;
         const res = await RestAPI.get({
             url: Constants.Endpoints.MESSAGES(channelId),
             query: { limit: 100, ...(before ? { before } : {}) },
             retries: 2
         }).catch(() => null as any);
 
+        if (signal?.aborted) break;
         const batch = res?.body ?? [];
         if (!batch.length) break;
         result.push(...batch);
@@ -140,8 +144,12 @@ function renderHtml(channelId: string, messages: Message[]): string {
 }
 
 async function exportChannel(channelId: string) {
+    currentExportAbort?.abort();
+    const controller = new AbortController();
+    currentExportAbort = controller;
     Toasts.show({ id: Toasts.genId(), type: Toasts.Type.MESSAGE, message: "Exporting..." });
-    const messages = await fetchAllMessages(channelId);
+    const messages = await fetchAllMessages(channelId, controller.signal);
+    if (controller.signal.aborted) return;
     const html = renderHtml(channelId, messages as any);
 
     const filename = `export-${channelId}-${new Date().toISOString().split("T")[0]}.html`;
@@ -160,6 +168,7 @@ async function exportChannel(channelId: string) {
         URL.revokeObjectURL(url);
         Toasts.show({ id: Toasts.genId(), type: Toasts.Type.SUCCESS, message: "Export downloaded." });
     }
+    if (currentExportAbort === controller) currentExportAbort = null;
 }
 
 function exportCurrentChannel() {
@@ -251,6 +260,8 @@ export default definePlugin({
     },
 
     stop() {
+        currentExportAbort?.abort();
+        currentExportAbort = null;
         removeHeaderBarButton("Exporter");
         removeChannelToolbarButton("Exporter");
     },

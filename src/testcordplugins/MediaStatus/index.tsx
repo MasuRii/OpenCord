@@ -117,12 +117,13 @@ interface MediaData {
     photographer?: string;
 }
 
-async function fetchJellyfinData(): Promise<MediaData | null> {
+async function fetchJellyfinData(signal?: AbortSignal): Promise<MediaData | null> {
     if (!settings.store.serverUrl || !settings.store.apiKey) return null;
 
     try {
         const response = await fetch(`${settings.store.serverUrl}/Sessions`, {
-            headers: { "X-Emby-Token": settings.store.apiKey }
+            headers: { "X-Emby-Token": settings.store.apiKey },
+            signal
         });
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -179,12 +180,13 @@ async function fetchJellyfinData(): Promise<MediaData | null> {
         }
 
     } catch (e) {
+        if (signal?.aborted) return null;
         logger.error("Failed to fetch Jellyfin data:", e);
         return null;
     }
 }
 
-async function fetchPlexData(): Promise<MediaData | null> {
+async function fetchPlexData(signal?: AbortSignal): Promise<MediaData | null> {
     if (!settings.store.serverUrl || !settings.store.apiKey) return null;
 
     try {
@@ -192,7 +194,8 @@ async function fetchPlexData(): Promise<MediaData | null> {
             headers: {
                 "X-Plex-Token": settings.store.apiKey,
                 "Accept": "application/json"
-            }
+            },
+            signal
         });
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -251,6 +254,7 @@ async function fetchPlexData(): Promise<MediaData | null> {
         }
 
     } catch (e) {
+        if (signal?.aborted) return null;
         logger.error("Failed to fetch Plex data:", e);
         return null;
     }
@@ -286,6 +290,11 @@ export default definePlugin({
     authors: [TestcordDevs.x2b, TestcordDevs.nnenaza],
     dependencies: ["UserSettingsAPI"],
     settings,
+    interval: undefined as ReturnType<typeof setInterval> | undefined,
+    abortController: undefined as AbortController | undefined,
+    running: false,
+    generation: 0,
+    updateInFlight: false,
 
     settingsAboutComponent: () => (
         <>
@@ -303,6 +312,9 @@ export default definePlugin({
     ),
 
     async start() {
+        this.running = true;
+        this.generation++;
+        this.updateInFlight = false;
         this.updatePresence();
         this.interval = setInterval(
             () => this.updatePresence(),
@@ -311,10 +323,12 @@ export default definePlugin({
     },
 
     stop() {
-        if (this.interval) {
-            clearInterval(this.interval);
-            this.interval = undefined;
-        }
+        this.running = false;
+        this.generation++;
+        this.abortController?.abort();
+        this.abortController = undefined;
+        clearInterval(this.interval);
+        this.interval = undefined;
         this.clearPresence();
     },
 
@@ -327,10 +341,18 @@ export default definePlugin({
     },
 
     async updatePresence() {
+        if (!this.running || this.updateInFlight) return;
+        this.updateInFlight = true;
+        const { generation } = this;
+        const abortController = new AbortController();
+        this.abortController = abortController;
+
         try {
             const mediaData = await (settings.store.serverType === ServiceType.JELLYFIN ?
-                fetchJellyfinData() :
-                fetchPlexData());
+                fetchJellyfinData(abortController.signal) :
+                fetchPlexData(abortController.signal));
+
+            if (!this.running || generation !== this.generation) return;
 
             if (!mediaData || (mediaData.isPaused && settings.store.hideWhenPaused)) {
                 this.clearPresence();
@@ -386,6 +408,8 @@ export default definePlugin({
                 small_text: getServerName()
             } : undefined;
 
+            if (!this.running || generation !== this.generation) return;
+
             const activityType = mediaData.type === MediaType.AUDIO ? 2 : 3;
 
             const activity = {
@@ -408,8 +432,12 @@ export default definePlugin({
             });
 
         } catch (err) {
+            if (abortController.signal.aborted) return;
             logger.error("Failed to update presence:", err);
             this.clearPresence();
+        } finally {
+            if (this.abortController === abortController) this.abortController = undefined;
+            if (generation === this.generation) this.updateInFlight = false;
         }
     }
 });

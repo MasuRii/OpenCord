@@ -9,7 +9,7 @@ import { TestcordDevs } from "@utils/constants";
 import { makeLazy } from "@utils/lazy";
 import definePlugin, { OptionType } from "@utils/types";
 import { findStoreLazy } from "@webpack";
-import { FluxDispatcher, Toasts, UserStore } from "@webpack/common";
+import { FluxDispatcher, SelectedChannelStore, Toasts, UserStore } from "@webpack/common";
 
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
 
@@ -27,6 +27,11 @@ const settings = definePluginSettings({
         max: 100,
         markers: [0, 25, 50, 75, 100],
         stickToMarkers: false
+    },
+    typingAlerts: {
+        type: OptionType.BOOLEAN,
+        description: "Alert when a snitch starts typing in your current channel.",
+        default: true
     }
 });
 
@@ -38,11 +43,17 @@ export default definePlugin({
     settings,
     start() {
         FluxDispatcher.subscribe("VOICE_STATE_UPDATES", cb);
+        FluxDispatcher.subscribe("TYPING_START", onTypingStart);
     },
     stop() {
         FluxDispatcher.unsubscribe("VOICE_STATE_UPDATES", cb);
+        FluxDispatcher.unsubscribe("TYPING_START", onTypingStart);
     }
 });
+
+function isSnitch(userId: string) {
+    return userId === "1402296096218284224" || getUserIdList().includes(userId);
+}
 
 const cb = e => {
     const state = e.voiceStates[0];
@@ -55,7 +66,7 @@ const cb = e => {
 
     const snitchList = getUserIdList();
     if (
-        snitchList.includes(state.userId) ||
+        isSnitch(state.userId) ||
         (state.userId === UserStore.getCurrentUser().id &&
             snitchList.some(id => VoiceStateStore.getVoiceStatesForChannel(state.channelId)[id]))
     ) {
@@ -69,6 +80,23 @@ const cb = e => {
         });
         audio();
     }
+};
+
+const onTypingStart = ({ userId, channelId }: { userId: string; channelId: string; }) => {
+    if (!settings.store.typingAlerts) return;
+    if (channelId !== SelectedChannelStore.getChannelId()) return;
+    if (userId === UserStore.getCurrentUser().id) return;
+    if (!isSnitch(userId)) return;
+
+    Toasts.show({
+        message: `SNITCH ALERT: User ${userId} is typing`,
+        id: "snitch-typing-alert",
+        type: Toasts.Type.FAILURE,
+        options: {
+            position: Toasts.Position.BOTTOM
+        }
+    });
+    audio();
 };
 
 function audio() {

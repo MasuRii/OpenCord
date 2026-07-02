@@ -46,7 +46,7 @@ export async function unzipBlob(blob: Blob): Promise<{ entries: ZipEntry[]; read
             const compressedSize = readLE(buf, ptr + 20, 4);
             const size = readLE(buf, ptr + 24, 4);
             const localHeaderOffset = readLE(buf, ptr + 42, 4);
-            const nameBytes = buf.slice(ptr + 46, ptr + 46 + nameLen);
+            const nameBytes = buf.subarray(ptr + 46, ptr + 46 + nameLen);
             const name = new TextDecoder().decode(nameBytes);
             entries.push({ name, isDirectory: name.endsWith("/"), compressedSize, size, offset: localHeaderOffset, compression });
             ptr += 46 + nameLen + extraLen + commentLen;
@@ -66,7 +66,7 @@ export async function unzipBlob(blob: Blob): Promise<{ entries: ZipEntry[]; read
             const size = readLE(buf, ptr + 22, 4);
             const nameLen = readLE(buf, ptr + 26, 2);
             const extraLen = readLE(buf, ptr + 28, 2);
-            const nameBytes = buf.slice(ptr + 30, ptr + 30 + nameLen);
+            const nameBytes = buf.subarray(ptr + 30, ptr + 30 + nameLen);
             const name = new TextDecoder().decode(nameBytes);
             const dataStart = ptr + 30 + nameLen + extraLen;
             entries.push({ name, isDirectory: name.endsWith("/"), compressedSize, size, offset: ptr, compression });
@@ -87,7 +87,7 @@ export async function unzipBlob(blob: Blob): Promise<{ entries: ZipEntry[]; read
         const nameLen = readLE(buf, off + 26, 2);
         const extraLen = readLE(buf, off + 28, 2);
         const dataStart = off + 30 + nameLen + extraLen;
-        const slice = buf.slice(dataStart, dataStart + e.compressedSize);
+        const slice = buf.subarray(dataStart, dataStart + e.compressedSize);
         if (e.compression === 0) {
             return slice.buffer.slice(slice.byteOffset, slice.byteOffset + slice.byteLength);
         }

@@ -5,8 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import definePlugin from "@utils/types";
-import { OptionType } from "@utils/types";
+import definePlugin, { OptionType } from "@utils/types";
 
 const infos = {
     other: { os: "Other", browser: "Discord Web" },

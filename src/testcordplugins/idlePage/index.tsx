@@ -80,13 +80,14 @@ export default definePlugin({
     ],
 
     authors: [TestcordDevs.x2b],
+    interval: undefined as ReturnType<typeof setInterval> | undefined,
     start(){
         if (settings.store.onHomeClick)
             this.interval = setInterval(() => c = 0, 1000);
     },
     stop() {
-        if (settings.store.onHomeClick)
-            clearInterval(this.interval);
+        clearInterval(this.interval);
+        this.interval = undefined;
     },
     startIdle(){
         c++;

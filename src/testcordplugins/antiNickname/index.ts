@@ -5,8 +5,7 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import definePlugin from "@utils/types";
-import { OptionType } from "@utils/types";
+import definePlugin, { OptionType } from "@utils/types";
 import { RestAPI, showToast,Toasts, UserStore } from "@webpack/common";
 
 const settings = definePluginSettings({

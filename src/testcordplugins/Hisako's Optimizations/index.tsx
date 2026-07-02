@@ -35,7 +35,7 @@ const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Skip Discord spring animations.",
         default: true,
-        disabled: () => isPluginEnabled("DisableAnimations"),
+        disabled: () => isPluginEnabled("DisableAnimations") || isPluginEnabled("optimizerPremium"),
         onChange(value) {
             if (!started) return;
             if (value && springModules.length === 0) loadSpringModules();
@@ -46,7 +46,7 @@ const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Delay expensive activity list DOM updates.",
         default: true,
-        disabled: () => isPluginEnabled("OpenOptimizer"),
+        disabled: () => isPluginEnabled("optimizerPremium"),
         onChange(value) {
             if (!started) return;
             if (value) installDomThrottling();
@@ -138,7 +138,7 @@ function clearPendingDomTimers() {
 }
 
 function installDomThrottling() {
-    if (originalDomMethods.size !== 0 || isPluginEnabled("OpenOptimizer")) return;
+    if (originalDomMethods.size !== 0 || isPluginEnabled("optimizerPremium")) return;
 
     try {
         for (const method of domMethods) {
@@ -173,7 +173,7 @@ export default definePlugin({
     patches: [
         {
             find: "dotCycle",
-            predicate: () => settings.store.disableTypingDots && !isPluginEnabled("NoTypingAnimation"),
+            predicate: () => settings.store.disableTypingDots && !isPluginEnabled("NoTypingAnimation") && !isPluginEnabled("optimizerPremium"),
             replacement: {
                 match: /focused:(\i)/g,
                 replace: (_, focused) => `_focused:${focused}=false`
@@ -184,7 +184,7 @@ export default definePlugin({
     start() {
         started = true;
 
-        if (settings.store.disableSpringAnimations && !isPluginEnabled("DisableAnimations")) {
+        if (settings.store.disableSpringAnimations && !isPluginEnabled("DisableAnimations") && !isPluginEnabled("optimizerPremium")) {
             loadSpringModules();
             setSpringAnimations(true);
         }
@@ -198,7 +198,7 @@ export default definePlugin({
         started = false;
         restoreDomThrottling();
 
-        if (springModules.length !== 0 && !isPluginEnabled("DisableAnimations")) {
+        if (springModules.length !== 0 && !isPluginEnabled("DisableAnimations") && !isPluginEnabled("optimizerPremium")) {
             setSpringAnimations(false);
         }
 

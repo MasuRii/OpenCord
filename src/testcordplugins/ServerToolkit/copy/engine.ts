@@ -59,6 +59,11 @@ export interface CopyOptions {
     target: CopyTarget;
     include: CopyInclude;
     wipe: CopyWipe;
+    limits: {
+        emojis: number;
+        stickers: number;
+    };
+    signal?: AbortSignal;
     onLog: (line: string) => void;
 }
 
@@ -76,9 +81,14 @@ const MAX_STICKER_SIZE_BYTES = 512 * 1024;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function fetchBlob(url: string, maxSize: number): Promise<Blob> {
+function throwIfAborted(signal?: AbortSignal) {
+    if (signal?.aborted) throw new Error("Cancelled");
+}
+
+async function fetchBlob(url: string, maxSize: number, signal?: AbortSignal): Promise<Blob> {
     for (let size = 4096; size >= 16; size /= 2) {
-        const res = await fetch(`${url}?size=${size}&lossless=true&animated=true`);
+        throwIfAborted(signal);
+        const res = await fetch(`${url}?size=${size}&lossless=true&animated=true`, { signal });
         if (!res.ok) {
             throw new Error(`Failed to fetch ${url} - ${res.status}`);
         }
@@ -90,8 +100,8 @@ async function fetchBlob(url: string, maxSize: number): Promise<Blob> {
     throw new Error(`Failed to fetch within size limit of ${maxSize / 1000}kB`);
 }
 
-async function cloneEmoji(guildId: string, emoji: { name: string; url: string }) {
-    const data = await fetchBlob(emoji.url, MAX_EMOJI_SIZE_BYTES);
+async function cloneEmoji(guildId: string, emoji: { name: string; url: string }, signal?: AbortSignal) {
+    const data = await fetchBlob(emoji.url, MAX_EMOJI_SIZE_BYTES, signal);
     const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
@@ -105,12 +115,12 @@ async function cloneEmoji(guildId: string, emoji: { name: string; url: string })
     });
 }
 
-async function cloneSticker(guildId: string, sticker: { name: string; url: string; tags: string; description: string }) {
+async function cloneSticker(guildId: string, sticker: { name: string; url: string; tags: string; description: string }, signal?: AbortSignal) {
     const data = new FormData();
     data.append("name", sticker.name);
     data.append("tags", sticker.tags);
     data.append("description", sticker.description);
-    data.append("file", await fetchBlob(sticker.url, MAX_STICKER_SIZE_BYTES));
+    data.append("file", await fetchBlob(sticker.url, MAX_STICKER_SIZE_BYTES, signal));
 
     await RestAPI.post({
         url: `/guilds/${guildId}/stickers`,
@@ -118,11 +128,11 @@ async function cloneSticker(guildId: string, sticker: { name: string; url: strin
     });
 }
 
-async function getGuildIconBase64(guild: AnyGuild): Promise<string | null> {
+async function getGuildIconBase64(guild: AnyGuild, signal?: AbortSignal): Promise<string | null> {
     if (!guild.icon) return null;
     const url = `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png?size=128`;
     try {
-        const blob = await fetchBlob(url, 256 * 1024);
+        const blob = await fetchBlob(url, 256 * 1024, signal);
         return await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -135,17 +145,18 @@ async function getGuildIconBase64(guild: AnyGuild): Promise<string | null> {
 }
 
 export async function runCopy(opts: CopyOptions): Promise<void> {
-    const { source: partialSource, target, include, wipe, onLog } = opts;
+    const { source: partialSource, target, include, wipe, limits, signal, onLog } = opts;
 
     // Resolve source guild to full object
     const source = (GuildStore.getGuild(partialSource.id) ?? partialSource) as AnyGuild;
 
     onLog(`→ Source Server: ${source.name} (${source.id})`);
+    throwIfAborted(signal);
 
     let targetId: string;
     if (target.kind === "new") {
         onLog(`→ Creating new server: ${target.name}...`);
-        const iconBase64 = await getGuildIconBase64(source);
+        const iconBase64 = await getGuildIconBase64(source, signal);
         const { body: newGuild } = await RestAPI.post({
             url: "/guilds",
             body: {
@@ -164,6 +175,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
             const nonCategories = defaultChannels.filter((c: any) => c.type !== 4);
             const categories = defaultChannels.filter((c: any) => c.type === 4);
             for (const ch of [...nonCategories, ...categories]) {
+                throwIfAborted(signal);
                 await RestAPI.del({ url: `/channels/${ch.id}` });
                 await sleep(500);
             }
@@ -178,7 +190,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
         // Overwrite existing target name and profile picture (icon)
         onLog("  · Overwriting target server name and icon...");
         try {
-            const iconBase64 = await getGuildIconBase64(source);
+            const iconBase64 = await getGuildIconBase64(source, signal);
             await RestAPI.patch({
                 url: `/guilds/${targetId}`,
                 body: {
@@ -202,6 +214,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
                 const nonCategories = targetChannels.filter((c: any) => c.type !== 4);
                 const categories = targetChannels.filter((c: any) => c.type === 4);
                 for (const ch of [...nonCategories, ...categories]) {
+                    throwIfAborted(signal);
                     await RestAPI.del({ url: `/channels/${ch.id}` });
                     await sleep(400);
                 }
@@ -214,6 +227,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
             try {
                 const targetRoles = GuildRoleStore.getSortedRoles(targetId);
                 for (const role of targetRoles) {
+                    throwIfAborted(signal);
                     if (role.name !== "@everyone" && !role.managed) {
                         await RestAPI.del({ url: `/guilds/${targetId}/roles/${role.id}` });
                         await sleep(400);
@@ -228,6 +242,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
             try {
                 const targetEmojis = EmojiStore.getGuildEmoji(targetId) || [];
                 for (const em of targetEmojis) {
+                    throwIfAborted(signal);
                     await RestAPI.del({ url: `/guilds/${targetId}/emojis/${em.id}` });
                     await sleep(400);
                 }
@@ -240,6 +255,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
             try {
                 const targetStickers = StickersStore.getStickersByGuildId(targetId) || [];
                 for (const st of targetStickers) {
+                    throwIfAborted(signal);
                     await RestAPI.del({ url: `/guilds/${targetId}/stickers/${st.id}` });
                     await sleep(400);
                 }
@@ -250,6 +266,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Copy Server Settings
+    throwIfAborted(signal);
     if (include.serverSettings) {
         onLog("→ Copying server settings...");
         try {
@@ -269,6 +286,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Role Mapping
+    throwIfAborted(signal);
     const roleMapping: Record<string, string> = {};
     roleMapping[source.id] = targetId;
     if (include.roles) {
@@ -277,6 +295,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
             const roles = GuildRoleStore.getSortedRoles(source.id);
             const backupRoles = roles.filter((role: any) => role.name !== "@everyone");
             for (const role of backupRoles) {
+                throwIfAborted(signal);
                 try {
                     const { body } = await RestAPI.post({
                         url: `/guilds/${targetId}/roles`,
@@ -301,6 +320,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Channel Mapping
+    throwIfAborted(signal);
     const channelMapping: Record<string, string> = {};
     if (include.channels) {
         onLog("→ Copying channels...");
@@ -338,6 +358,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
 
             // Copy Categories first
             for (const category of categories) {
+                throwIfAborted(signal);
                 try {
                     const permissionOverwrites = category.permission_overwrites.map((o: any) => ({
                         ...o,
@@ -372,6 +393,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
                 const nonForums = groupChannels.filter(c => c.type !== 15).sort((a, b) => a.position - b.position);
                 const forums = groupChannels.filter(c => c.type === 15).sort((a, b) => a.position - b.position);
                 for (const ch of [...nonForums, ...forums]) {
+                    throwIfAborted(signal);
                     try {
                         const permissionOverwrites = ch.permission_overwrites.map((o: any) => ({
                             ...o,
@@ -418,6 +440,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Bot List Creator
+    throwIfAborted(signal);
     if (include.bots) {
         onLog("→ Generating Bot List Invite links...");
         try {
@@ -444,6 +467,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
                 });
                 await sleep(800);
                 for (const bot of bots) {
+                    throwIfAborted(signal);
                     const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${bot.id}&scope=bot&permissions=0`;
                     await RestAPI.post({
                         url: `/channels/${botChannel.id}/messages`,
@@ -464,14 +488,21 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Copy Emojis
+    throwIfAborted(signal);
     if (include.emojis) {
         onLog("→ Copying emojis...");
         try {
             const allEmotes = EmojiStore.getGuildEmoji(source.id) || [];
-            for (const emote of allEmotes) {
+            const maxPerType = Math.max(0, limits.emojis || 0);
+            const limitedEmotes = [
+                ...allEmotes.filter((emote: any) => !emote.animated).slice(0, maxPerType),
+                ...allEmotes.filter((emote: any) => emote.animated).slice(0, maxPerType),
+            ];
+            for (const emote of limitedEmotes) {
+                throwIfAborted(signal);
                 try {
                     const url = `https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? "gif" : "png"}`;
-                    await cloneEmoji(targetId, { name: emote.name, url });
+                    await cloneEmoji(targetId, { name: emote.name, url }, signal);
                     onLog(`  · Copied emoji: :${emote.name}:`);
                     await sleep(2000);
                 } catch (e: any) {
@@ -482,7 +513,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
                         await sleep(waitMs);
                         try {
                             const url = `https://cdn.discordapp.com/emojis/${emote.id}.${emote.animated ? "gif" : "png"}`;
-                            await cloneEmoji(targetId, { name: emote.name, url });
+                            await cloneEmoji(targetId, { name: emote.name, url }, signal);
                             onLog(`  · Copied emoji (Retry): :${emote.name}:`);
                             await sleep(2000);
                         } catch (e2) {
@@ -499,11 +530,13 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Copy Stickers
+    throwIfAborted(signal);
     if (include.stickers) {
         onLog("→ Copying stickers...");
         try {
-            const allStickers = StickersStore.getStickersByGuildId(source.id) || [];
+            const allStickers = (StickersStore.getStickersByGuildId(source.id) || []).slice(0, Math.max(0, limits.stickers || 0));
             for (const sticker of allStickers) {
+                throwIfAborted(signal);
                 try {
                     const ext = StickerExtMap[sticker.format_type as keyof typeof StickerExtMap] || "png";
                     const url = `https://media.discordapp.net/stickers/${sticker.id}.${ext}`;
@@ -512,7 +545,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
                         url,
                         tags: sticker.tags || "",
                         description: sticker.description || "",
-                    });
+                    }, signal);
                     onLog(`  · Copied sticker: ${sticker.name}`);
                     await sleep(1000);
                 } catch (e) {
@@ -525,12 +558,14 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Copy Webhooks
+    throwIfAborted(signal);
     if (include.webhooks) {
         onLog("→ Copying webhooks...");
         try {
             const res = await RestAPI.get({ url: `/guilds/${source.id}/webhooks` });
             const sourceWebhooks = res.body ?? [];
             for (const hw of sourceWebhooks) {
+                throwIfAborted(signal);
                 try {
                     const mappedChannelId = channelMapping[hw.channel_id];
                     if (!mappedChannelId) continue;
@@ -553,6 +588,7 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Copy Own Nickname
+    throwIfAborted(signal);
     if (include.ownNickname) {
         onLog("→ Copying own nickname...");
         try {
@@ -571,12 +607,14 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
     }
 
     // Copy Other Nicknames
+    throwIfAborted(signal);
     if (include.otherNicknames) {
         onLog("→ Copying other members' nicknames...");
         try {
             const me = UserStore.getCurrentUser();
             const members = Object.values(GuildMemberStore.getMembers(source.id)) as any[];
             for (const m of members) {
+                throwIfAborted(signal);
                 if (m.userId !== me.id && m.nick) {
                     try {
                         await RestAPI.patch({
@@ -595,5 +633,6 @@ export async function runCopy(opts: CopyOptions): Promise<void> {
         }
     }
 
+    throwIfAborted(signal);
     onLog("✓ Guild Copy operation complete!");
 }

@@ -8,23 +8,26 @@ import { addProfileBadge, BadgePosition, removeProfileBadge } from "@api/Badges"
 import { debounce } from "@shared/debounce";
 import { proxyLazy } from "@utils/lazy";
 import { User } from "@vencord/discord-types";
-import { useEffect, useState, zustandCreate } from "@webpack/common";
+import { useEffect, zustandCreate } from "@webpack/common";
 
 import { settings } from "../../settings";
 import { Badge, Decoration, getBadges, getEffects, getPresets, getUsers, ProfileEffects } from "../api";
 import { FETCH_COOLDOWN } from "../constants";
 
+const USERS_CACHE_MAX = 1000;
+const FETCH_QUEUE_MAX = 250;
+
 interface UserData {
     profileEffectId?: string;
     banner?: string;
     avatar?: string;
-    decoration?: string | null;
+    decoration?: string | Decoration | null;
     nameplate?: string;
-    fetchedAt: Date;
+    fetchedAt?: Date;
 }
 
 interface UsersDecorationsState {
-    users: Map<string, UserData>;
+    users: Map<string, UserData | null>;
     decorations: Map<string, Decoration>;
     profileEffects: Map<string, ProfileEffects>;
     badges: Map<string, Badge[]>;
@@ -42,8 +45,25 @@ interface UsersDecorationsState {
     fetchBadges: () => Promise<void>;
 }
 
+function pruneUsers(users: Map<string, UserData | null>) {
+    while (users.size > USERS_CACHE_MAX) {
+        const oldest = users.keys().next().value;
+        if (!oldest) break;
+        users.delete(oldest);
+    }
+}
+
+function capFetchQueue(fetchQueue: Set<string>) {
+    while (fetchQueue.size > FETCH_QUEUE_MAX) {
+        const oldest = fetchQueue.values().next().value;
+        if (!oldest) break;
+        fetchQueue.delete(oldest);
+    }
+    return fetchQueue;
+}
+
 export const useUsersProfileStore = proxyLazy(() => zustandCreate((set: any, get: any) => ({
-    users: new Map<string, UserData>(),
+    users: new Map<string, UserData | null>(),
     decorations: new Map<string, Decoration>(),
     profileEffects: new Map<string, ProfileEffects>(),
     badges: new Map<string, Badge[]>(),
@@ -123,11 +143,12 @@ export const useUsersProfileStore = proxyLazy(() => zustandCreate((set: any, get
         const fetchIds = [...fetchQueue];
         const fetchedUsers = await getUsers(fetchIds);
 
-        const newUsers = new Map(users);
+        const newUsers = new Map<string, UserData | null>(users);
         for (const fetchId of fetchIds) {
             const newUser = fetchedUsers[fetchId] ?? null;
             newUsers.set(fetchId, newUser);
         }
+        pruneUsers(newUsers);
 
         set({ users: newUsers });
     }),
@@ -139,14 +160,14 @@ export const useUsersProfileStore = proxyLazy(() => zustandCreate((set: any, get
             if (!force && Date.now() - fetchedAt.getTime() < FETCH_COOLDOWN) return;
         }
 
-        set({ fetchQueue: new Set(fetchQueue).add(userId) });
+        set({ fetchQueue: capFetchQueue(new Set<string>(fetchQueue).add(userId)) });
         bulkFetch();
     },
     async fetchMany(userIds) {
         if (!userIds.length) return;
         const { users, fetchQueue, bulkFetch } = get();
 
-        const newFetchQueue = new Set(fetchQueue);
+        const newFetchQueue = new Set<string>(fetchQueue);
 
         const now = Date.now();
         for (const userId of userIds) {
@@ -157,7 +178,7 @@ export const useUsersProfileStore = proxyLazy(() => zustandCreate((set: any, get
             newFetchQueue.add(userId);
         }
 
-        set({ fetchQueue: newFetchQueue });
+        set({ fetchQueue: capFetchQueue(newFetchQueue) });
         bulkFetch();
     },
     get(userId: string) {
@@ -177,55 +198,28 @@ export const useUsersProfileStore = proxyLazy(() => zustandCreate((set: any, get
     },
     set(userId: string, data: Partial<UserData>) {
         const { users } = get();
-        const newUsers = new Map(users);
+        const newUsers = new Map<string, UserData | null>(users);
 
         newUsers.set(userId, { ...data, fetchedAt: new Date() });
+        pruneUsers(newUsers);
         set({ users: newUsers });
     }
 } as UsersDecorationsState)));
 
 export function useUserAvatarDecoration(user?: User): Decoration | null | undefined {
-    try {
-        const [AvatarDecoration, setAvatarDecoration] = useState<string | null>(user ? useUsersProfileStore.getState().getDecorAsset(user.id) ?? null : null);
+    const avatarDecoration = useUsersProfileStore(state => user ? state.getDecorAsset(user.id) : undefined);
+    const decoration = useUsersProfileStore(state => avatarDecoration ? state.decorations.get(avatarDecoration) : undefined);
 
-        useEffect(() => {
-            const destructor = (() => {
-                try {
-                    return useUsersProfileStore.subscribe(
-                        state => {
-                            if (!user) return;
-                            const newAvatarDecoration = state.getDecorAsset(user.id);
-                            if (!newAvatarDecoration) return;
-                            if (AvatarDecoration !== newAvatarDecoration) setAvatarDecoration(newAvatarDecoration);
-                        }
-                    );
-                } catch {
-                    return () => { };
-                }
-            })();
+    useEffect(() => {
+        if (!user) return;
+        useUsersProfileStore.getState().fetch(user.id);
+    }, [user?.id]);
 
-            try {
-                if (user) {
-                    const { fetch: fetchuserAvatarDecoration } = useUsersProfileStore.getState();
-                    fetchuserAvatarDecoration(user.id);
-                }
-            } catch { }
+    useEffect(() => {
+        if (avatarDecoration && !decoration) useUsersProfileStore.getState().fetchDecorations();
+    }, [avatarDecoration, decoration]);
 
-            return destructor;
-        }, []);
-        if (AvatarDecoration) {
-            const decoration = useUsersProfileStore.getState().decorations.get(AvatarDecoration);
-            if (!decoration) {
-                useUsersProfileStore.getState().fetchDecorations();
-                const decoration = useUsersProfileStore.getState().decorations.get(AvatarDecoration);
-                return decoration ? { asset: AvatarDecoration, skuId: decoration.skuId, animated: decoration.animated } : null;
-            }
-            return decoration ? { asset: AvatarDecoration, skuId: decoration.skuId, animated: decoration.animated } : null;
-        }
-        return null;
-    } catch (e) {
-        console.error(e);
-    }
+    if (!avatarDecoration) return null;
 
-    return null;
+    return decoration ? { asset: avatarDecoration, skuId: decoration.skuId, animated: decoration.animated } : null;
 }

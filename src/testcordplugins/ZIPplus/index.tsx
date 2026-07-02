@@ -33,6 +33,8 @@ const settings = definePluginSettings({
 });
 
 const extensionsToZip = new Set<string>();
+const MAX_ZIP_SOURCE_BYTES = 1024 * 1024 * 1024;
+const MAX_ZIP_SOURCE_FILES = 10_000;
 let interceptingEvents = false;
 
 type ZipPreviewNative = PluginNative<typeof import("./native")>;
@@ -119,6 +121,8 @@ function shouldZipFile(file: File): boolean {
 }
 
 async function zipFile(file: File): Promise<File> {
+    if (file.size > MAX_ZIP_SOURCE_BYTES) throw new Error("File is too large to zip.");
+
     const arrayBuffer = await file.arrayBuffer();
     const data = new Uint8Array(arrayBuffer);
 
@@ -143,6 +147,8 @@ async function readFileEntry(entry: FileSystemFileEntry): Promise<File> {
 
 async function readDirectoryEntry(entry: FileSystemDirectoryEntry): Promise<Record<string, Uint8Array>> {
     const files: Record<string, Uint8Array> = {};
+    let totalBytes = 0;
+    let totalFiles = 0;
 
     async function readEntries(dirEntry: FileSystemDirectoryEntry, path = ""): Promise<void> {
         const reader = dirEntry.createReader();
@@ -160,6 +166,12 @@ async function readDirectoryEntry(entry: FileSystemDirectoryEntry): Promise<Reco
 
                         if (entry.isFile) {
                             const file = await readFileEntry(entry as FileSystemFileEntry);
+                            totalBytes += file.size;
+                            totalFiles++;
+                            if (totalBytes > MAX_ZIP_SOURCE_BYTES || totalFiles > MAX_ZIP_SOURCE_FILES) {
+                                throw new Error("Folder is too large to zip.");
+                            }
+
                             const arrayBuffer = await file.arrayBuffer();
                             files[entryPath] = new Uint8Array(arrayBuffer);
                         } else if (entry.isDirectory) {
@@ -295,10 +307,8 @@ async function fetchBlob(url: string): Promise<Blob | null> {
     if (native?.fetchAttachment) {
         try {
             const buffer = await native.fetchAttachment(url);
-            if (buffer instanceof Uint8Array && buffer.length > 0) {
-                const arrayBuffer = new ArrayBuffer(buffer.length);
-                new Uint8Array(arrayBuffer).set(buffer);
-                return new Blob([arrayBuffer]);
+            if (buffer instanceof Uint8Array && buffer.length > 0 && buffer.length <= MAX_FETCH_BLOB_BYTES) {
+                return new Blob([buffer as Uint8Array<ArrayBuffer>]);
             }
         } catch {
             return null;
@@ -314,8 +324,10 @@ async function fetchBlob(url: string): Promise<Blob | null> {
             cache: "no-cache"
         });
         if (res.ok) {
+            const length = Number(res.headers.get("content-length"));
+            if (length > MAX_FETCH_BLOB_BYTES) return null;
             const blob = await res.blob();
-            if (blob.size > 0) return blob;
+            if (blob.size > 0 && blob.size <= MAX_FETCH_BLOB_BYTES) return blob;
         }
     } catch (error) {
         if (!isExpectedFetchError(error)) return null;
@@ -342,7 +354,7 @@ async function fetchBlobWithXHR(url: string): Promise<Blob | null> {
 
             xhr.onload = () => {
                 if (xhr.status === 200 && xhr.response instanceof Blob && xhr.response.size > 0) {
-                    resolve(xhr.response);
+                    resolve(xhr.response.size <= MAX_FETCH_BLOB_BYTES ? xhr.response : null);
                 } else {
                     resolve(null);
                 }
@@ -421,14 +433,23 @@ function MessageContextMenu(children: React.ReactNode[], props: ZipMessageContex
 const expandedState = new Map<string, boolean>();
 const blobCache = new Map<string, Blob>();
 const MAX_BLOB_CACHE = 30;
+const MAX_BLOB_CACHE_BYTES = 100 * 1024 * 1024;
+const MAX_FETCH_BLOB_BYTES = 100 * 1024 * 1024;
+let blobCacheBytes = 0;
 
 function cacheBlob(key: string, blob: Blob) {
     // Refresh insertion order so the most recently used key is last
-    if (blobCache.has(key)) blobCache.delete(key);
+    const existing = blobCache.get(key);
+    if (existing) {
+        blobCacheBytes -= existing.size;
+        blobCache.delete(key);
+    }
     blobCache.set(key, blob);
-    while (blobCache.size > MAX_BLOB_CACHE) {
+    blobCacheBytes += blob.size;
+    while (blobCache.size > MAX_BLOB_CACHE || blobCacheBytes > MAX_BLOB_CACHE_BYTES) {
         const oldest = blobCache.keys().next().value;
         if (oldest === undefined) break;
+        blobCacheBytes -= blobCache.get(oldest)?.size ?? 0;
         blobCache.delete(oldest);
     }
 }
@@ -543,6 +564,7 @@ export default definePlugin({
         document.removeEventListener("paste", handlePaste, true);
         interceptingEvents = false;
         blobCache.clear();
+        blobCacheBytes = 0;
         expandedState.clear();
     }
 });

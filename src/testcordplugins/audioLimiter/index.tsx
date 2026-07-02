@@ -6,6 +6,7 @@
 
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
+import { FormSwitch } from "@components/FormSwitch";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
@@ -386,7 +387,6 @@ function VisualIndicator() {
 }
 
 // Settings component
-const _Forms = Forms as any;
 const _Slider = Slider as any;
 
 function SettingsPanel() {
@@ -403,73 +403,54 @@ function SettingsPanel() {
 
       <Forms.FormDivider />
 
-      <_Forms.FormItem>
-        <_Forms.FormLabel>Maximum Volume (%)</_Forms.FormLabel>
-        <_Slider
-          initialValue={settings.store.maxVolume}
-          onValueChange={(value: any) => (settings.store.maxVolume = value)}
-          min={10}
-          max={100}
-          markers={[50, 60, 70, 80, 90, 100]}
-          stickToMarkers={false}
-        />
-        <Forms.FormText>
-          Maximum allowed volume: {settings.store.maxVolume}%
-        </Forms.FormText>
-      </_Forms.FormItem>
+      <Forms.FormTitle>Maximum Volume (%)</Forms.FormTitle>
+      <_Slider
+        initialValue={settings.store.maxVolume}
+        onValueChange={(value: any) => (settings.store.maxVolume = value)}
+        min={10}
+        max={100}
+        markers={[50, 60, 70, 80, 90, 100]}
+        stickToMarkers={false}
+      />
+      <Forms.FormText>
+        Maximum allowed volume: {settings.store.maxVolume}%
+      </Forms.FormText>
 
-      <_Forms.FormItem>
-        <_Forms.FormLabel>Maximum Decibels (dB)</_Forms.FormLabel>
-        <_Slider
-          initialValue={settings.store.maxDecibels}
-          onValueChange={(value: any) => (settings.store.maxDecibels = value)}
-          min={-20}
-          max={0}
-          markers={[-20, -15, -10, -6, -3, 0]}
-          stickToMarkers={false}
-        />
-        <Forms.FormText>
-          Maximum audio level: {settings.store.maxDecibels} dB
-        </Forms.FormText>
-      </_Forms.FormItem>
+      <Forms.FormTitle>Maximum Decibels (dB)</Forms.FormTitle>
+      <_Slider
+        initialValue={settings.store.maxDecibels}
+        onValueChange={(value: any) => (settings.store.maxDecibels = value)}
+        min={-20}
+        max={0}
+        markers={[-20, -15, -10, -6, -3, 0]}
+        stickToMarkers={false}
+      />
+      <Forms.FormText>
+        Maximum audio level: {settings.store.maxDecibels} dB
+      </Forms.FormText>
 
       <Forms.FormDivider />
 
-      <_Forms.FormItem>
-        <_Forms.FormSwitch
-          value={settings.store.enableVolumeLimiting}
-          onChange={(value: any) => (settings.store.enableVolumeLimiting = value)}
-        >
-          Enable volume limiting
-        </_Forms.FormSwitch>
-      </_Forms.FormItem>
-
-      <_Forms.FormItem>
-        <_Forms.FormSwitch
-          value={settings.store.enableDbLimiting}
-          onChange={(value: any) => (settings.store.enableDbLimiting = value)}
-        >
-          Enable decibel limiting
-        </_Forms.FormSwitch>
-      </_Forms.FormItem>
-
-      <_Forms.FormItem>
-        <_Forms.FormSwitch
-          value={settings.store.showNotifications}
-          onChange={(value: any) => (settings.store.showNotifications = value)}
-        >
-          Show notifications
-        </_Forms.FormSwitch>
-      </_Forms.FormItem>
-
-      <_Forms.FormItem>
-        <_Forms.FormSwitch
-          value={settings.store.showVisualIndicator}
-          onChange={(value: any) => (settings.store.showVisualIndicator = value)}
-        >
-          Show visual indicator
-        </_Forms.FormSwitch>
-      </_Forms.FormItem>
+      <FormSwitch
+        title="Enable volume limiting"
+        value={settings.store.enableVolumeLimiting}
+        onChange={value => (settings.store.enableVolumeLimiting = value)}
+      />
+      <FormSwitch
+        title="Enable decibel limiting"
+        value={settings.store.enableDbLimiting}
+        onChange={value => (settings.store.enableDbLimiting = value)}
+      />
+      <FormSwitch
+        title="Show notifications"
+        value={settings.store.showNotifications}
+        onChange={value => (settings.store.showNotifications = value)}
+      />
+      <FormSwitch
+        title="Show visual indicator"
+        value={settings.store.showVisualIndicator}
+        onChange={value => (settings.store.showVisualIndicator = value)}
+      />
 
       <Forms.FormDivider />
 

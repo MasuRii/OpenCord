@@ -122,6 +122,7 @@ async function getAllSavedAccounts(): Promise<GhostAccount[]> {
 }
 
 let savedAccounts: GhostAccount[] = [];
+let preConnectRunning = false;
 
 async function ghostActivate(account: GhostAccount) {
     if (ghostStates.get(account.userId)?.connecting) return;
@@ -317,6 +318,7 @@ function useStreamPoller(userId: string | null, active: boolean) {
             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
             return;
         }
+        let cancelled = false;
 
         pollRef.current = setInterval(async () => {
             try {
@@ -326,6 +328,7 @@ function useStreamPoller(userId: string | null, active: boolean) {
                     body: JSON.stringify({ userId }),
                 });
                 const d = await r.json();
+                if (cancelled) return;
                 if (d.state === "resolving") setStatus("🔍 Resolving URL...");
                 else if (d.state === "starting") setStatus("⏳ Starting stream...");
                 else if (d.state === "active") {
@@ -345,6 +348,7 @@ function useStreamPoller(userId: string | null, active: boolean) {
         }, 800);
 
         return () => {
+            cancelled = true;
             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         };
     }, [userId, active]);
@@ -369,6 +373,7 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
     const [pollStatus, setPollStatus] = useStreamPoller(streamingUserId, isPolling);
     const states = useGhostStates();
     const popoverRef = useRef<HTMLDivElement>(null);
+    const mountedRef = useRef(true);
 
     // The displayed status is either the direct one (during initial request) or the poll
     const displayStatus = isPolling ? pollStatus : streamStatus;
@@ -392,24 +397,31 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
     }, [anchorRect]);
 
     useEffect(() => {
-        getAllSavedAccounts().then(v => { setAccounts(v); savedAccounts = v; });
+        getAllSavedAccounts().then(v => {
+            if (!mountedRef.current) return;
+            setAccounts(v);
+            savedAccounts = v;
+        });
 
         // Auto-follow enabled by default (true if no value yet in DataStore)
         DataStore.get(DS_KEY_AUTO_FOLLOW).then((v: boolean | null) => {
+            if (!mountedRef.current) return;
             const shouldFollow = v ?? true;
             setAutoFollowState(shouldFollow);
             if (shouldFollow) startFollowing();
         });
 
-        DataStore.get(DS_KEY_SELECTED).then((v: string | null) => { if (v) setSelectedId(v); });
+        DataStore.get(DS_KEY_SELECTED).then((v: string | null) => { if (mountedRef.current && v) setSelectedId(v); });
 
         // Smart auto-selection of virtual cable on VERY FIRST launch
         Native.listAudioInputDevices().catch(() => []).then(async (devs: any[]) => {
             const names = (devs as any[])?.map((d: any) => d.dshowName ?? d.name ?? d.label ?? "").filter(Boolean) ?? [];
+            if (!mountedRef.current) return;
             if (names.length) {
                 setDshowDevices(names);
 
                 const savedMic = await DataStore.get(DS_KEY_MIC_DEVICE);
+                if (!mountedRef.current) return;
                 // If the user has NEVER chosen a mic (first time)
                 if (savedMic === null || savedMic === undefined) {
                     const virtualMic = names.find(n =>
@@ -430,9 +442,15 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
                 }
             }
         }).catch(() => { });
+
+        return () => { mountedRef.current = false; };
     }, []);
 
-    async function saveAccounts(next: GhostAccount[]) { setAccounts(next); savedAccounts = next; await DataStore.set(DS_KEY_TOKENS, next); }
+    async function saveAccounts(next: GhostAccount[]) {
+        if (mountedRef.current) setAccounts(next);
+        savedAccounts = next;
+        await DataStore.set(DS_KEY_TOKENS, next);
+    }
 
     async function addAccount() {
         const raw = tokenInput.trim();
@@ -442,12 +460,14 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
         let added = 0, failed = 0, updated = [...accounts];
         for (const token of tokens) {
             const info = await fetchUser(token);
+            if (!mountedRef.current) return;
             if (!info) { failed++; continue; }
             updated = [...updated.filter(a => a.userId !== info.userId), { ...info, token }];
             added++;
         }
         if (added > 0) {
             await saveAccounts(updated);
+            if (!mountedRef.current) return;
             Toasts.show({ message: `${added} account${added > 1 ? "s" : ""} added${failed > 0 ? `, ${failed} failed` : ""}`, type: Toasts.Type.SUCCESS, id: Toasts.genId() });
         } else {
             Toasts.show({ message: `All tokens invalid (${failed})`, type: Toasts.Type.FAILURE, id: Toasts.genId() });
@@ -476,6 +496,7 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
                 signal: AbortSignal.timeout(5000), // short timeout — the server now responds immediately
             });
             const d = await r.json();
+            if (!mountedRef.current) return;
             if (!d.ok) {
                 setStreamStatus("❌ Error: " + (d.error ?? "unknown"));
                 setIsPolling(false);
@@ -486,6 +507,7 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
                 setIsPolling(true);
             }
         } catch (e: any) {
+            if (!mountedRef.current) return;
             setStreamStatus("❌ ghost-server unreachable: " + (e?.message ?? String(e)));
             setIsPolling(false);
         }
@@ -753,21 +775,27 @@ export default definePlugin({
     userAreaButton: { icon: GhostIcon, render: GhostUserAreaButton, priority: 1 },
 
     async start() {
+        preConnectRunning = true;
         const autoFollow = await DataStore.get(DS_KEY_AUTO_FOLLOW);
+        if (!preConnectRunning) return;
         if (autoFollow === true) startFollowing();
         const mic = await DataStore.get(DS_KEY_MIC_DEVICE);
+        if (!preConnectRunning) return;
         if (mic) ghostMicLabel = mic;
         const allAccs = await getAllSavedAccounts();
+        if (!preConnectRunning) return;
         if (allAccs.length > 0) savedAccounts = allAccs;
 
         this._preConnectTimer = setTimeout(() => {
             this._preConnectTimer = null;
+            if (!preConnectRunning) return;
             Native.init().catch(() => { });
 
             (async () => {
-                if (savedAccounts.length === 0) return;
+                if (!preConnectRunning || savedAccounts.length === 0) return;
                 console.log("[GhostClient] Pre-connecting", savedAccounts.length, "account(s)...");
                 for (const acc of savedAccounts) {
+                    if (!preConnectRunning) return;
                     Native.preConnectGhost(acc.userId, acc.token, ghostMicLabel)
                         .then(r => console.log("[GhostClient] Pre-connected:", acc.username, r?.ok))
                         .catch(() => { });
@@ -798,11 +826,15 @@ export default definePlugin({
     _preConnectTimer: null as ReturnType<typeof setTimeout> | null,
 
     stop() {
+        preConnectRunning = false;
         if (this._preConnectTimer) {
             clearTimeout(this._preConnectTimer);
             this._preConnectTimer = null;
         }
-        ghostDeactivateAll();
         stopFollowing();
+        const ids = Array.from(ghostStates.keys());
+        ghostStates.clear();
+        notify();
+        (ids.length ? Native.leaveVoiceAll(ids) : Promise.resolve()).finally(() => Native.stop().catch(() => { }));
     },
 });

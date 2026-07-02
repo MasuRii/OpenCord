@@ -109,13 +109,13 @@ export default definePlugin({
     addToolBarButton: (children: { toolbar: React.ReactNode[] | React.ReactNode; }) => {
         if (Array.isArray(children.toolbar))
             return children.toolbar.push(
-                <ErrorBoundary noop={true}>
+                <ErrorBoundary key="user-notes-data" noop={true}>
                     <OpenNotesDataButton />
                 </ErrorBoundary>
             );
 
         children.toolbar = [
-            <ErrorBoundary noop={true}>
+            <ErrorBoundary key="user-notes-data" noop={true}>
                 <OpenNotesDataButton />
             </ErrorBoundary>,
             children.toolbar,

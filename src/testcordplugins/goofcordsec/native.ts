@@ -181,7 +181,8 @@ function generateClientHints(platform: "win32" | "darwin" | "linux", arch: strin
         { brand: "Not_A Brand", version: "99.0.0.0" },
     ];
 
-    let pPlatform = "Unknown", pVersion = osVersion, pArch = "x86", pBitness = "64";
+    let pPlatform = "Unknown", pVersion = osVersion, pArch = "x86";
+    const pBitness = "64";
     if (platform === "win32") { pPlatform = "Windows"; pVersion = "10.0.0"; }
     else if (platform === "darwin") { pPlatform = "macOS"; pArch = arch === "arm64" ? "arm" : "x86"; }
     else if (platform === "linux") { pPlatform = "Linux"; pVersion = ""; }

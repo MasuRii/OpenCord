@@ -277,12 +277,18 @@ function MultiInstanceModal({ rootProps }: { rootProps: any; }) {
     const [openInstances, setOpenInstances] = React.useState<string[]>([]);
     const [ctx, setCtx] = React.useState<CtxState | null>(null);
     const [status, setStatus] = React.useState<string | null>(null);
+    const mountedRef = React.useRef(true);
+    const statusTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     React.useEffect(() => {
         captureCurrentToken();
-        DataStore.get<SavedAccount[]>(STORE_KEY).then(v => setSavedAccounts(v ?? []));
+        DataStore.get<SavedAccount[]>(STORE_KEY).then(v => { if (mountedRef.current) setSavedAccounts(v ?? []); });
         setNativeAccounts(getNativeAccounts());
-        Native.getOpenInstances().then(ids => setOpenInstances(ids ?? [])).catch(() => { });
+        Native.getOpenInstances().then(ids => { if (mountedRef.current) setOpenInstances(ids ?? []); }).catch(() => { });
+        return () => {
+            mountedRef.current = false;
+            if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+        };
     }, []);
 
     const allAccounts = React.useMemo<AccountEntry[]>(() => {
@@ -306,8 +312,17 @@ function MultiInstanceModal({ rootProps }: { rootProps: any; }) {
 
     const refreshInstances = async () => {
         const ids = await Native.getOpenInstances().catch(() => []);
+        if (!mountedRef.current) return;
         setOpenInstances(ids ?? []);
     };
+
+    function clearStatusLater() {
+        if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
+        statusTimerRef.current = setTimeout(() => {
+            statusTimerRef.current = null;
+            if (mountedRef.current) setStatus(null);
+        }, 3000);
+    }
 
     const handleNewWindow = async (acc: AccountEntry) => {
         if (!acc.hasToken) return;
@@ -315,13 +330,14 @@ function MultiInstanceModal({ rootProps }: { rootProps: any; }) {
         setStatus(t("Opening window…"));
         // @ts-ignore - Passing the username
         const res = await Native.openInstanceWindow(acc.token, acc.id, false, acc.username).catch(() => ({ ok: false, error: "error" }));
+        if (!mountedRef.current) return;
         if ((res as any).ok) {
             setStatus(t("Window opened ✓"));
             await refreshInstances();
         } else {
             setStatus(`${t("Error:")} ` + ((res as any).error ?? t("unknown")));
         }
-        setTimeout(() => setStatus(null), 3000);
+        clearStatusLater();
     };
 
     const handleNewDetached = async (acc: AccountEntry) => {
@@ -330,13 +346,14 @@ function MultiInstanceModal({ rootProps }: { rootProps: any; }) {
         setStatus(t("Opening detached instance…"));
         // @ts-ignore - 'detached' argument and username added
         const res = await Native.openInstanceWindow(acc.token, acc.id, true, acc.username).catch(() => ({ ok: false, error: "error" }));
+        if (!mountedRef.current) return;
         if ((res as any).ok) {
             setStatus(t("Instance opened ✓"));
             await refreshInstances();
         } else {
             setStatus(`${t("Error:")} ` + ((res as any).error ?? t("unknown")));
         }
-        setTimeout(() => setStatus(null), 3000);
+        clearStatusLater();
     };
 
     const handleNewGrouped = async (acc: AccountEntry) => {
@@ -345,13 +362,14 @@ function MultiInstanceModal({ rootProps }: { rootProps: any; }) {
         setStatus(t("Opening grouped instance…"));
         // @ts-ignore
         const res = await Native.openInstanceWindowGrouped(acc.token, acc.id, acc.username).catch(() => ({ ok: false, error: "error" }));
+        if (!mountedRef.current) return;
         if ((res as any).ok) {
             setStatus(t("Instance opened ✓"));
             await refreshInstances();
         } else {
             setStatus(`${t("Error:")} ` + ((res as any).error ?? t("unknown")));
         }
-        setTimeout(() => setStatus(null), 3000);
+        clearStatusLater();
     };
 
     const openCtx = (e: React.MouseEvent, acc: AccountEntry) => {

@@ -603,7 +603,7 @@ const settings = definePluginSettings({
     },
     preventWebSocketFlood: {
         type: OptionType.BOOLEAN,
-        description: "Throttle WebSocket reconnect attempts with exponential backoff cap. Prevents reconnect storms from flooding the main thread during transient network issues.",
+        description: "Drop only byte-identical gateway frames sent back to back within 50ms. Never blocks reconnect, resume, or heartbeat traffic, so it cannot wedge the connection when tabbed out.",
         default: false,
         restartNeeded: true
     },
@@ -630,6 +630,24 @@ const settings = definePluginSettings({
     freezeWhenUnfocused: {
         type: OptionType.BOOLEAN,
         description: "Pause all CSS animations and transitions while the window is hidden/backgrounded. Stops the client burning CPU+GPU on offscreen animation; everything resumes on refocus.",
+        default: false
+    },
+
+    // --- Typing and attachment optimizations ---
+
+    optimizeChatInput: {
+        type: OptionType.BOOLEAN,
+        description: "Isolate the chat input with layout/paint containment, strip its transitions, and debounce per-keystroke draft saves so storage writes happen after you stop typing. Kills typing lag spikes.",
+        default: true
+    },
+    optimizeLargeAttachments: {
+        type: OptionType.BOOLEAN,
+        description: "Apply content-visibility and containment to text/code file previews so a large txt attachment doesn't repaint the entire message list. Big win when a long file is posted in chat.",
+        default: true
+    },
+    containAttachmentImages: {
+        type: OptionType.BOOLEAN,
+        description: "Apply content-visibility, containment and async decode to attachment image grids. Offscreen images in image-heavy messages skip decode and paint until scrolled into view.",
         default: true
     },
 });
@@ -651,7 +669,7 @@ type WebkitWindow = Window & typeof globalThis & {
 
 export default definePlugin({
     name: "optimizerPremium",
-    description: "All-in-one performance suite: webpack patches (tooltip, emoji, spinner, confetti, analytics, reactions, Sentry), bounded image cache, react-spring skip, offscreen media pause, MutationObserver DOM throttle, CSS containment (messages, members, DMs, embeds, servers, channels, forum, guild list, search), backdrop-blur/sticker/effect/upsell/spoiler/box-shadow/text-shadow/filter/backdrop suppression, lazy images/iframes, rAF reduction, passive listeners, console suppression (log/debug/info/warn/group/count/assert/dir/timers), ResizeObserver throttle, memory manager, GIF freeze (canvas/css), concurrency limit, message cache trimmer, animated avatar freeze, avatar quality reducer, cache limits, idle callback optimizer, drag-and-drop suppression, spellcheck opt-out, overscroll contain, link preview suppress, canvas effects hide.",
+    description: "All-in-one performance suite: webpack patches (tooltip, emoji, spinner, confetti, analytics, reactions, Sentry), bounded image cache, react-spring skip, offscreen media pause, MutationObserver DOM throttle, CSS containment (messages, members, DMs, embeds, servers, channels, forum, guild list, search), backdrop-blur/sticker/effect/upsell/spoiler/box-shadow/text-shadow/filter/backdrop suppression, lazy images/iframes, rAF reduction, passive listeners, console suppression (log/debug/info/warn/group/count/assert/dir/timers), ResizeObserver throttle, memory manager, GIF freeze (canvas/css), concurrency limit, message cache trimmer, animated avatar freeze, avatar quality reducer, cache limits, idle callback optimizer, drag-and-drop suppression, spellcheck opt-out, overscroll contain, link preview suppress, canvas effects hide, chat input containment (typing lag), large text attachment containment, attachment image grid containment.",
     tags: ["Utility", "Developers"],
     authors: [TestcordDevs.x2b, TestcordDevs.SirPhantom89],
     settings,
@@ -792,6 +810,9 @@ export default definePlugin({
     fetchQueue: [] as Array<{ target: RequestInfo | URL; init?: RequestInit; resolve: (v: Response) => void; reject: (v: unknown) => void }>,
     originalScrollTo: null as typeof window.scrollTo | null,
     rICMessagePort: null as MessagePort | null,
+    rICMessagePort1: null as MessagePort | null,
+    rICCallbacks: null as Map<number, { cb: IdleRequestCallback; options?: IdleRequestOptions }> | null,
+    cacheTrimActivityHandler: null as (() => void) | null,
     suppressConsoleWarnEl: null as HTMLStyleElement | null,
     reactionStyleEl: null as HTMLStyleElement | null,
     canvasSuppressEl: null as HTMLStyleElement | null,
@@ -807,6 +828,11 @@ export default definePlugin({
     spellcheckObserver: null as MutationObserver | null,
     unfocusedFreezeStyleEl: null as HTMLStyleElement | null,
     unfocusedVisibilityHandler: null as (() => void) | null,
+    fluxThrottleState: null as {
+        origDispatch: typeof FluxDispatcher.dispatch;
+        wrappedDispatch: typeof FluxDispatcher.dispatch;
+        timers: Map<string, ReturnType<typeof setTimeout>>;
+    } | null,
 
     start() {
         if (settings.store.verboseLogging) logger.info("Starting optimizer suite");
@@ -1956,6 +1982,29 @@ export default definePlugin({
             );
         }
 
+        if (settings.store.optimizeChatInput) {
+            rules.push(
+                "[class*=\"channelTextArea_\"], [class*=\"scrollableContainer_\"][class*=\"channelTextArea_\"] { contain: layout style; }",
+                "[class*=\"channelTextArea_\"] [class*=\"slateContainer_\"], [class*=\"channelTextArea_\"] [class*=\"textArea_\"] { contain: style; }",
+                "[class*=\"channelTextArea_\"] *, [class*=\"channelTextArea_\"] *::before, [class*=\"channelTextArea_\"] *::after { transition: none !important; animation: none !important; }",
+                "[data-slate-editor] { contain: style; }",
+                "[class*=\"autocomplete_\"], [class*=\"autocompleteInner_\"], [class*=\"autocompleteRow_\"], [class*=\"applicationCommand_\"], [role=\"listbox\"] { contain: none !important; content-visibility: visible !important; }"
+            );
+        }
+        if (settings.store.optimizeLargeAttachments) {
+            rules.push(
+                "[class*=\"messageAttachment_\"], [class*=\"nonMediaAttachment_\"], [class*=\"fileNameLink_\"] { contain: content; }",
+                "[class*=\"messageListItem_\"] pre, [class*=\"messageListItem_\"] [class*=\"codeContainer_\"], [class*=\"messageListItem_\"] [class*=\"hljs\"] { content-visibility: auto; contain-intrinsic-size: auto 400px; contain: content; }",
+                "[class*=\"textPreview_\"], [class*=\"codeActionsCodeBlock_\"] { content-visibility: auto; contain-intrinsic-size: auto 300px; }"
+            );
+        }
+        if (settings.store.containAttachmentImages) {
+            rules.push(
+                "[class*=\"imageContainer_\"], [class*=\"mosaicItem_\"], [class*=\"clickableWrapper_\"][class*=\"imageZoom_\"] { content-visibility: auto; contain-intrinsic-size: auto 300px; contain: content; }",
+                "[class*=\"mosaic_\"], [class*=\"gridContainer_\"][class*=\"attachment_\"] { contain: layout style; }"
+            );
+        }
+
         if (!rules.length) return;
         this.extraStyleEl = document.createElement("style");
         this.extraStyleEl.id = "op-extra-optimizations";
@@ -2190,8 +2239,10 @@ export default definePlugin({
         this.originalIdleCallback = window.requestIdleCallback.bind(window);
         this.originalCancelIdleCallback = window.cancelIdleCallback.bind(window);
         const channel = new MessageChannel();
+        this.rICMessagePort1 = channel.port1;
         this.rICMessagePort = channel.port2;
         const callbacks = new Map<number, { cb: IdleRequestCallback; options?: IdleRequestOptions }>();
+        this.rICCallbacks = callbacks;
         let nextId = 1;
         channel.port1.onmessage = () => {
             const now = performance.now();
@@ -2229,6 +2280,13 @@ export default definePlugin({
             this.rICMessagePort.close();
             this.rICMessagePort = null;
         }
+        if (this.rICMessagePort1) {
+            this.rICMessagePort1.onmessage = null;
+            this.rICMessagePort1.close();
+            this.rICMessagePort1 = null;
+        }
+        this.rICCallbacks?.clear();
+        this.rICCallbacks = null;
     },
 
     installMessageCacheTrimmer() {
@@ -2241,7 +2299,8 @@ export default definePlugin({
             if (id) lastActivity.set(id, Date.now());
         };
         trackActivity();
-        const unsub = FluxDispatcher.subscribe("CHANNEL_SELECT", trackActivity);
+        FluxDispatcher.subscribe("CHANNEL_SELECT", trackActivity);
+        this.cacheTrimActivityHandler = trackActivity;
 
         this.cacheTrimTimer = setInterval(() => {
             try {
@@ -2265,6 +2324,9 @@ export default definePlugin({
                     }
                     trimmed++;
                 }
+                for (const [chId, last] of lastActivity) {
+                    if (last <= cutoff && !allChannels[chId]) lastActivity.delete(chId);
+                }
                 if (trimmed && settings.store.verboseLogging) {
                     logger.info(`Trimmed ${trimmed} channel message caches`);
                 }
@@ -2272,7 +2334,6 @@ export default definePlugin({
                 if (settings.store.verboseLogging) logger.warn("Message cache trim failed", err);
             }
         }, intervalMs);
-        (this as any).__trimUnsub = unsub;
     },
 
     teardownMessageCacheTrimmer() {
@@ -2280,10 +2341,9 @@ export default definePlugin({
             clearInterval(this.cacheTrimTimer);
             this.cacheTrimTimer = null;
         }
-        const unsub = (this as any).__trimUnsub;
-        if (typeof unsub === "function") {
-            unsub();
-            (this as any).__trimUnsub = undefined;
+        if (this.cacheTrimActivityHandler) {
+            FluxDispatcher.unsubscribe("CHANNEL_SELECT", this.cacheTrimActivityHandler);
+            this.cacheTrimActivityHandler = null;
         }
     },
 
@@ -2635,26 +2695,18 @@ export default definePlugin({
     installWebSocketFloodPreventer() {
         const origSend = WebSocket.prototype.send;
         (window as any).__op_origWsSend = origSend;
-        let reconnectCount = 0;
-        let lastReconnect = 0;
-        const MIN_INTERVAL = 2000;
+        const DEDUPE_WINDOW_MS = 50;
+        const lastSend = new WeakMap<WebSocket, { data: string; at: number; }>();
         WebSocket.prototype.send = function (data: any) {
-            try {
-                const parsed = typeof data === "string" && data.startsWith("{") ? JSON.parse(data) : null;
-                if (parsed && parsed.op === 7) {
-                    const now = Date.now();
-                    if (now - lastReconnect < MIN_INTERVAL) {
-                        reconnectCount++;
-                        if (reconnectCount > 3) return;
-                    } else {
-                        reconnectCount = 0;
-                    }
-                    lastReconnect = now;
-                }
-            } catch { }
+            if (typeof data === "string") {
+                const now = Date.now();
+                const prev = lastSend.get(this);
+                if (prev && prev.data === data && now - prev.at < DEDUPE_WINDOW_MS) return;
+                lastSend.set(this, { data, at: now });
+            }
             return origSend.call(this, data);
         };
-        if (settings.store.verboseLogging) logger.info("WebSocket reconnect throttle active");
+        if (settings.store.verboseLogging) logger.info("WebSocket duplicate-frame dedupe active");
     },
 
     teardownWebSocketFloodPreventer() {
@@ -2666,12 +2718,14 @@ export default definePlugin({
     },
 
     installFluxThrottle() {
+        if (this.fluxThrottleState) return;
+
         const origDispatch = FluxDispatcher.dispatch.bind(FluxDispatcher);
         const THROTTLED = new Set(["TYPING_START", "TYPING_STOP"]);
         const timers = new Map<string, ReturnType<typeof setTimeout>>();
         const DEBOUNCE_MS = 120;
-        (window as any).__op_fluxState = { origDispatch, timers };
-        FluxDispatcher.dispatch = function (payload: { type: string }) {
+
+        const wrappedDispatch = function (payload: { type: string }) {
             if (THROTTLED.has(payload.type)) {
                 const existing = timers.get(payload.type);
                 if (existing) clearTimeout(existing);
@@ -2683,15 +2737,22 @@ export default definePlugin({
             }
             return origDispatch(payload);
         } as typeof FluxDispatcher.dispatch;
+
+        this.fluxThrottleState = { origDispatch, wrappedDispatch, timers };
+        FluxDispatcher.dispatch = wrappedDispatch;
     },
 
     teardownFluxThrottle() {
-        const state = (window as any).__op_fluxState;
+        const state = this.fluxThrottleState;
         if (state) {
             for (const t of state.timers.values()) clearTimeout(t);
             state.timers.clear();
-            FluxDispatcher.dispatch = state.origDispatch;
-            delete (window as any).__op_fluxState;
+
+            if (FluxDispatcher.dispatch === state.wrappedDispatch) {
+                FluxDispatcher.dispatch = state.origDispatch;
+            }
+
+            this.fluxThrottleState = null;
         }
     },
 

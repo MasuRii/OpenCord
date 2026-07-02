@@ -14,6 +14,10 @@ import { React, useEffect, useMemo, useRef, useState } from "@webpack/common";
 import type { ElementType, MutableRefObject, ReactElement, ReactNode, Ref, SyntheticEvent } from "react";
 
 const PREVIEW_CACHE_LIMIT = 500;
+const PREVIEW_LISTENER_LIMIT = 500;
+const BACKGROUND_QUEUE_LIMIT = 1000;
+const LOAD_QUEUE_LIMIT = 1000;
+const SEEN_PREVIEW_LIMIT = 1000;
 const DEFAULT_CONCURRENT_LOADS = 6;
 const DEFAULT_BACKGROUND_PRELOADS = 3;
 const DEFAULT_BACKGROUND_PRELOAD_LIMIT = 250;
@@ -131,6 +135,10 @@ function recordSeenPreview(src: string) {
     if (!src || seenOriginalSrcs.has(src)) return;
 
     seenOriginalSrcs.add(src);
+    if (seenOriginalSrcs.size > SEEN_PREVIEW_LIMIT) {
+        const oldest = seenOriginalSrcs.values().next().value;
+        if (oldest) seenOriginalSrcs.delete(oldest);
+    }
     bumpStat("seenPreviews");
 }
 
@@ -519,6 +527,10 @@ function acquireLoadSlot(onReady: () => void) {
     if (activeLoads < getMaxConcurrentLoads()) {
         entry.start();
     } else {
+        if (loadQueue.length >= LOAD_QUEUE_LIMIT) {
+            const dropped = loadQueue.shift();
+            if (dropped) dropped.cancelled = true;
+        }
         loadQueue.push(entry);
     }
 
@@ -596,6 +608,11 @@ function subscribePreviewLoad(src: string, listener: () => void) {
     const listeners = previewLoadListeners.get(src) ?? new Set();
     listeners.add(listener);
     previewLoadListeners.set(src, listeners);
+    while (previewLoadListeners.size > PREVIEW_LISTENER_LIMIT) {
+        const oldest = previewLoadListeners.keys().next().value;
+        if (!oldest) break;
+        previewLoadListeners.delete(oldest);
+    }
 
     return () => {
         listeners.delete(listener);
@@ -608,6 +625,11 @@ function queueBackgroundPreload(src: string) {
 
     bumpStat("backgroundQueued");
     backgroundPreloadQueued.add(src);
+    if (backgroundPreloadQueued.size > BACKGROUND_QUEUE_LIMIT) {
+        const oldest = backgroundPreloadQueued.values().next().value;
+        if (oldest) backgroundPreloadQueued.delete(oldest);
+    }
+    if (backgroundPreloadQueue.length >= BACKGROUND_QUEUE_LIMIT) backgroundPreloadQueue.shift();
     backgroundPreloadQueue.push(src);
     pumpBackgroundPreloads();
 }

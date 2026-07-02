@@ -157,7 +157,7 @@ async function loadOpenPGP(): Promise<void> {
     if (openpgpLoaded) return;
     if (openpgpLoadPromise) return openpgpLoadPromise;
 
-    openpgpLoadPromise = new Promise(async (resolve, reject) => {
+    openpgpLoadPromise = new Promise((resolve, reject) => {
         // First try to load from unpkg
         const script = document.createElement("script");
         script.src = "https://unpkg.com/openpgp@5.11.3/dist/openpgp.min.js";

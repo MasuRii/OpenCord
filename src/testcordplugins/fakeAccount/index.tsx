@@ -20,6 +20,8 @@ let fakeAccounts: any[] = [];
 let activeFakeId: string | null = null;
 let realUserSnapshot: any = null;
 let _store: any = null;
+let running = false;
+let emitChangeTimer: ReturnType<typeof setTimeout> | null = null;
 let _origGetUsers: (() => any[]) | null = null;
 let _origGetValidUsers: (() => any[]) | null = null;
 
@@ -338,6 +340,7 @@ export default definePlugin({
     dependencies: ["HeaderBarAPI"],
 
     async start() {
+        running = true;
         FluxDispatcher.subscribe("MULTI_ACCOUNT_SWITCH_FAILURE", onSwitchFailure);
         FluxDispatcher.subscribe("MULTI_ACCOUNT_SWITCH_ATTEMPT", onSwitchAttempt);
         FluxDispatcher.subscribe("MULTI_ACCOUNT_REMOVE_ACCOUNT", onRemoveAccount);
@@ -347,6 +350,7 @@ export default definePlugin({
         addHeaderBarButton("fake-account-restore", () => <RestoreButton />, 5);
 
         waitFor(["getUsers", "getValidUsers", "getHasLoggedInAccounts"], async (mod: any) => {
+            if (!running) return;
             // Critical Validation: verify matched store is indeed the MultiAccountStore
             // and not another Webpack store sharing these method names.
             // Patching the wrong store causes all rooms to disappear
@@ -359,6 +363,7 @@ export default definePlugin({
             _store = mod;
 
             const savedIds: string[] = (await DataStore.get(DS_KEY)) ?? [];
+            if (!running) return;
             for (const id of savedIds) {
                 if (fakeAccounts.find(f => f.id === id)) continue;
                 const user = UserStore.getUser(id);
@@ -380,11 +385,19 @@ export default definePlugin({
             }
 
             patchStore();
-            setTimeout(() => mod.emitChange?.(), 500);
+            emitChangeTimer = setTimeout(() => {
+                emitChangeTimer = null;
+                if (running) mod.emitChange?.();
+            }, 500);
         });
     },
 
     stop() {
+        running = false;
+        if (emitChangeTimer) {
+            clearTimeout(emitChangeTimer);
+            emitChangeTimer = null;
+        }
         FluxDispatcher.unsubscribe("MULTI_ACCOUNT_SWITCH_FAILURE", onSwitchFailure);
         FluxDispatcher.unsubscribe("MULTI_ACCOUNT_SWITCH_ATTEMPT", onSwitchAttempt);
         FluxDispatcher.unsubscribe("MULTI_ACCOUNT_REMOVE_ACCOUNT", onRemoveAccount);

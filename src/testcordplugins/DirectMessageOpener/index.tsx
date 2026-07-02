@@ -145,7 +145,8 @@ function ToolBarHeader() {
             <HeaderBarIcon
                 tooltip="Open DM by User ID"
                 position="bottom"
-                className="vc-dm-opener"
+                className="vc-plugin-icon-button vc-dm-opener"
+                iconClassName="vc-plugin-icon-button"
                 icon={UserIcon}
                 onClick={openDirectMessageModal}
             />

@@ -12,6 +12,7 @@ import type { BreachRecord, CordCatUserInfo, DsaAction, DsaLookupResult } from "
 const logger = new Logger("DsaWarnings");
 const SUCCESS_CACHE_TTL_MS = 5 * 60 * 1000;
 const ERROR_CACHE_TTL_MS = 60 * 1000;
+const RESULT_CACHE_MAX = 200;
 const Native = VencordNative.pluginHelpers.DsaWarnings as PluginNative<typeof import("./native")>;
 
 const resultCache = new Map<string, { expiresAt: number; result: DsaLookupResult; }>();
@@ -157,7 +158,16 @@ export function getActionTags(action: DsaAction) {
 
 function setCache(parsedId: string, result: DsaLookupResult) {
     const ttl = result.kind === "ready" ? SUCCESS_CACHE_TTL_MS : ERROR_CACHE_TTL_MS;
+    const now = Date.now();
+    for (const [key, entry] of resultCache) {
+        if (entry.expiresAt <= now) resultCache.delete(key);
+    }
     resultCache.set(parsedId, { expiresAt: Date.now() + ttl, result });
+    while (resultCache.size > RESULT_CACHE_MAX) {
+        const oldest = resultCache.keys().next().value;
+        if (!oldest) break;
+        resultCache.delete(oldest);
+    }
     return result;
 }
 
@@ -217,13 +227,10 @@ function parseReadyResponse(parsedId: string, body: string): DsaLookupResult | n
 }
 
 export async function fetchActiveWarnings(parsedId: string): Promise<DsaLookupResult> {
-    logger.warn("fetchActiveWarnings called for", parsedId);
     const cached = resultCache.get(parsedId);
     if (cached && cached.expiresAt > Date.now()) {
-        logger.warn("Returning cached result, kind=", cached.result.kind);
         return cached.result;
     }
-    logger.warn("No cache hit, calling Native.fetchCordCatQuery");
 
     try {
         const nativeResult = await Native.fetchCordCatQuery?.(parsedId);
@@ -233,8 +240,6 @@ export async function fetchActiveWarnings(parsedId: string): Promise<DsaLookupRe
             logger.warn("Native call failed:", msg);
             return setCache(parsedId, { kind: "error", error: msg });
         }
-
-        logger.warn("Native result: status=", nativeResult.status, "bodyLen=", nativeResult.body?.length);
 
         if (nativeResult.status === 503) {
             const msg = `CordCat returned 503: ${(nativeResult.body ?? "").slice(0, 200)}`;
