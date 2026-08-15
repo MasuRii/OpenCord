@@ -59,41 +59,37 @@ function CustomButtonIcon({ svg }: { svg: string; }) {
 }
 
 function HeaderChatButtons() {
-    return (
-        <>
-            {buttonEntries.filter(entry => entry.enabled !== false).map(entry => {
-                const Icon = () => <CustomButtonIcon svg={entry.svg} />;
-
-                return (
-                    <HeaderBarButton
-                        key={entry.id}
-                        icon={Icon}
-                        tooltip={entry.label}
-                        onClick={() => handleButtonClick(entry.message)}
-                    />
-                );
-            })}
-        </>
-    );
+    const enabledButtons: React.ReactNode[] = [];
+    for (const entry of buttonEntries) {
+        if (entry.enabled === false) continue;
+        const Icon = () => <CustomButtonIcon svg={entry.svg} />;
+        enabledButtons.push(
+            <HeaderBarButton
+                key={entry.id}
+                icon={Icon}
+                tooltip={entry.label}
+                onClick={() => handleButtonClick(entry.message)}
+            />
+        );
+    }
+    return <>{enabledButtons}</>;
 }
 
 function ChannelChatButtons() {
-    return (
-        <>
-            {buttonEntries.filter(entry => entry.enabled !== false).map(entry => {
-                const Icon = () => <CustomButtonIcon svg={entry.svg} />;
-
-                return (
-                    <ChannelToolbarButton
-                        key={entry.id}
-                        icon={Icon}
-                        tooltip={entry.label}
-                        onClick={() => handleButtonClick(entry.message)}
-                    />
-                );
-            })}
-        </>
-    );
+    const enabledButtons: React.ReactNode[] = [];
+    for (const entry of buttonEntries) {
+        if (entry.enabled === false) continue;
+        const Icon = () => <CustomButtonIcon svg={entry.svg} />;
+        enabledButtons.push(
+            <ChannelToolbarButton
+                key={entry.id}
+                icon={Icon}
+                tooltip={entry.label}
+                onClick={() => handleButtonClick(entry.message)}
+            />
+        );
+    }
+    return <>{enabledButtons}</>;
 }
 
 async function addButtonEntry(forceUpdate: () => void) {
@@ -333,7 +329,7 @@ migratePluginSettings("ChatButtonsPlus", "Meow", "Woof");
 export default definePlugin({
     name: "ChatButtonsPlus",
     description: "Add custom chat buttons with personalized + messages and SVG icons",
-    tags: ["Chat", "Customisation"],
+    tags: ["Chat", "Customisation", "Utility"],
     authors: [TestcordDevs.x2b],
     dependencies: ["HeaderBarAPI"],
     settings,
@@ -343,9 +339,10 @@ export default definePlugin({
         render: (({ isMainChat }) => {
             if (!isMainChat || settings.store.location !== "chatbar") return null;
 
-        return (
-            <>
-                {buttonEntries.filter(entry => entry.enabled !== false).map(entry => (
+            const enabledButtons: React.ReactNode[] = [];
+            for (const entry of buttonEntries) {
+                if (entry.enabled === false) continue;
+                enabledButtons.push(
                     <ChatBarButton
                         key={entry.id}
                         tooltip={entry.label}
@@ -353,10 +350,10 @@ export default definePlugin({
                     >
                         <CustomButtonIcon svg={entry.svg} />
                     </ChatBarButton>
-                ))}
-            </>
-        );
-    }) as any,
+                );
+            }
+            return <>{enabledButtons}</>;
+        }) as any,
     },
 
     async start() {

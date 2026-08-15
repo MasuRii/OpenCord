@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { TestcordRequestCoordinator } from "@api/index";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, ModalSize } from "@utils/modal";
 import { useAwaiter } from "@utils/react";
 import { findByPropsLazy } from "@webpack";
@@ -66,16 +67,25 @@ export function GuildPruneModal(props) {
     }, [index]);
 
     useAwaiter(async () => {
-        const response = await RestAPI.get(
-            {
-                url: `/guilds/${joinedServers[index].id}/messages/search?author_id=${UserStore.getCurrentUser().id}`
-            });
-        const recentResponse = await RestAPI.get(
-            {
-                url: `/guilds/${joinedServers[index].id}/messages/search?author_id=${UserStore.getCurrentUser().id}&min_id=${SnowflakeUtils.fromTimestamp(Date.now() - (7 * 24 * 60 * 60 * 1000))}`
-            });
-        setMessages(response.body.total_results.toString());
-        setRecentMessages(recentResponse.body.total_results.toString());
+        const userId = UserStore.getCurrentUser().id;
+        const totalUrl = `/guilds/${joinedServers[index].id}/messages/search?author_id=${userId}`;
+        const recentUrl = `/guilds/${joinedServers[index].id}/messages/search?author_id=${userId}&min_id=${SnowflakeUtils.fromTimestamp(Date.now() - (7 * 24 * 60 * 60 * 1000))}`;
+
+        // Independent counts; parallelize under the TestcordHelper network
+        // optimizations toggle (one RTT instead of two). Default stays sequential.
+        if (TestcordRequestCoordinator.networkOptimizationsEnabled()) {
+            const [response, recentResponse] = await Promise.all([
+                RestAPI.get({ url: totalUrl }),
+                RestAPI.get({ url: recentUrl }),
+            ]);
+            setMessages(response.body.total_results.toString());
+            setRecentMessages(recentResponse.body.total_results.toString());
+        } else {
+            const response = await RestAPI.get({ url: totalUrl });
+            const recentResponse = await RestAPI.get({ url: recentUrl });
+            setMessages(response.body.total_results.toString());
+            setRecentMessages(recentResponse.body.total_results.toString());
+        }
     },
         {
             deps: [index],

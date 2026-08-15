@@ -75,40 +75,40 @@ export default definePlugin({
         {
             find: "noiseSuppression:",
             replacement: {
-                match: /noiseSuppression:!?\d/,
+                match: /noiseSuppression:!?[a-zA-Z0-9_$]+/,
                 replace: "noiseSuppression:$self.getNoiseSuppression()"
             }
         },
         {
             find: "echoCancellation:",
             replacement: {
-                match: /echoCancellation:!?\d/,
+                match: /echoCancellation:!?[a-zA-Z0-9_$]+/,
                 replace: "echoCancellation:$self.getEchoCancellation()"
             }
         },
         {
             find: "autoGainControl:",
             replacement: {
-                match: /autoGainControl:!?\d/,
+                match: /autoGainControl:!?[a-zA-Z0-9_$]+/,
                 replace: "autoGainControl:$self.getAutoGainControl()"
             }
         },
         {
             find: "x-google-max-bitrate",
             replacement: {
-                match: /"x-google-max-bitrate=".concat\(\i\)/,
-                replace: '"x-google-max-bitrate=".concat($self.getAudioBitrate()*1000)'
+                match: /x-google-max-bitrate=\$\{(\i)\}/,
+                replace: (_, varName) => "x-google-max-bitrate=${$self.getAudioBitrate()*1000}"
             }
         },
         {
-            find: "b=AS:",
+            find: "b=AS:${",
             replacement: {
-                match: /b=AS:\d+/,
-                replace: "b=AS:$self.getAudioBitrate()*1000"
+                match: /b=AS:\$\{Math\.floor\(this\.bitrate\/1e3\)\}/,
+                replace: "b=AS:${$self.getAudioBitrate()}"
             }
         },
         {
-            find: "priority:",
+            find: 'priority:"low"',
             replacement: {
                 match: /priority:"low"/,
                 replace: "priority:$self.getAudioPriority()"

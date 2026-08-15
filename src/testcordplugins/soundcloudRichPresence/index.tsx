@@ -33,6 +33,10 @@ const SC_API = "https://api-v2.soundcloud.com";
 const logger = new Logger("SoundCloudRichPresence");
 
 let updateInterval: NodeJS.Timeout | undefined;
+let abortController: AbortController | undefined;
+let active = false;
+let generation = 0;
+let updateInFlight = false;
 let lastTrackUrl = "";
 let trackStart = 0;
 
@@ -79,12 +83,13 @@ async function getAsset(appId: string, key: string): Promise<string> {
     return (await ApplicationAssetUtils.fetchAssetIds(appId, [key]))[0];
 }
 
-async function fetchCurrentTrack(): Promise<{ track: SCTrack; playedAt: number; } | null> {
+async function fetchCurrentTrack(signal?: AbortSignal): Promise<{ track: SCTrack; playedAt: number; } | null> {
     if (!settings.store.oauthToken) return null;
 
     try {
         const res = await fetch(`${SC_API}/me/play-history/tracks?limit=1`, {
             headers: { Authorization: `OAuth ${settings.store.oauthToken}` },
+            signal,
         });
 
         if (res.status === 401) {
@@ -104,16 +109,18 @@ async function fetchCurrentTrack(): Promise<{ track: SCTrack; playedAt: number; 
 
         return { track: item.track, playedAt };
     } catch (e) {
+        if (signal?.aborted) return null;
         logger.error("Failed to fetch SoundCloud play history", e);
         return null;
     }
 }
 
-async function getActivity(): Promise<Activity | null> {
+async function getActivity(signal: AbortSignal, updateGeneration: number): Promise<Activity | null> {
     const appId = settings.store.discordAppId;
     if (!appId) return null;
 
-    const result = await fetchCurrentTrack();
+    const result = await fetchCurrentTrack(signal);
+    if (!active || updateGeneration !== generation) return null;
     if (!result) return null;
 
     const { track, playedAt } = result;
@@ -127,6 +134,9 @@ async function getActivity(): Promise<Activity | null> {
     const largeImage = artworkKey
         ? await getAsset(appId, artworkKey)
         : await getAsset(appId, "soundcloud");
+    const smallImage = await getAsset(appId, "soundcloud");
+
+    if (!active || updateGeneration !== generation) return null;
 
     const buttons: ActivityButton[] = [];
     if (settings.store.showSongLink)
@@ -143,7 +153,7 @@ async function getActivity(): Promise<Activity | null> {
         assets: {
             large_image: largeImage,
             large_text: track.title,
-            small_image: await getAsset(appId, "soundcloud"),
+            small_image: smallImage,
             small_text: "SoundCloud",
         },
         buttons: buttons.length ? buttons.map(b => b.label) : undefined,
@@ -153,12 +163,23 @@ async function getActivity(): Promise<Activity | null> {
     };
 }
 
-async function updatePresence() {
+async function updatePresence(updateGeneration = generation) {
+    if (!active || updateGeneration !== generation || updateInFlight) return;
+    updateInFlight = true;
+    const controller = new AbortController();
+    abortController = controller;
+
     try {
-        setActivity(await getActivity());
+        const activity = await getActivity(controller.signal, updateGeneration);
+        if (!active || updateGeneration !== generation) return;
+        setActivity(activity);
     } catch (e) {
+        if (controller.signal.aborted) return;
         logger.error("Failed to update presence", e);
         setActivity(null);
+    } finally {
+        if (abortController === controller) abortController = undefined;
+        if (updateGeneration === generation) updateInFlight = false;
     }
 }
 
@@ -187,11 +208,18 @@ export default definePlugin({
     },
 
     start() {
-        updatePresence();
-        updateInterval = setInterval(updatePresence, (settings.store.refreshInterval ?? 10) * 1000);
+        active = true;
+        generation++;
+        updateInFlight = false;
+        updatePresence(generation);
+        updateInterval = setInterval(() => updatePresence(generation), (settings.store.refreshInterval ?? 10) * 1000);
     },
 
     stop() {
+        active = false;
+        generation++;
+        abortController?.abort();
+        abortController = undefined;
         clearInterval(updateInterval);
         updateInterval = undefined;
         lastTrackUrl = "";

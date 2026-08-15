@@ -5,13 +5,16 @@
  */
 
 import { TestcordDevs } from "@utils/constants";
+import { fetchUserProfile } from "@utils/discord";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
+import { UserProfileActions, UserProfileStore } from "@webpack/common";
 
 import settings from "./settings";
 import { RelationshipStore } from "./stores";
 
 const { getBlockedUsersForVoiceChannel, getIgnoredUsersForVoiceChannel } = findByPropsLazy("getBlockedUsersForVoiceChannel", "getIgnoredUsersForVoiceChannel");
+const pendingProfileFetches = new Set<string>();
 
 export default definePlugin({
     name: "BypassBlockedOrIgnored",
@@ -31,10 +34,17 @@ export default definePlugin({
             }
         },
         {
-            find: "{handleBlockedOrIgnoredUserVoiceChannelJoin(",
+            find: "user-profile-sidebar-heading-",
             replacement: {
-                match: /{handleBlockedOrIgnoredUserVoiceChannelJoin\((\i),(\i)\){/,
-                replace: "{handleBlockedOrIgnoredUserVoiceChannelJoin($1,$2){if($self.handleBlockedOrIgnoredUserVoiceChannelJoin($1,$2))return;"
+                match: /null==(\i)\|\|null==(\i)(\?null:)/,
+                replace: "null==$1||null==$2||$self.shouldShowBlockedProfilesFor($1.id)$3"
+            }
+        },
+        {
+            find: "handleBlockedOrIgnoredUserVoiceChannelJoin",
+            replacement: {
+                match: /handleBlockedOrIgnoredUserVoiceChannelJoin\(\i,\i\)\{/,
+                replace: "$&if($self.handleBlockedOrIgnoredUserVoiceChannelJoin(arguments[0],arguments[1]))return;"
             }
         }
     ],
@@ -70,5 +80,46 @@ export default definePlugin({
         return shouldBypassBlocked && hasBlockedUsers && shouldBypassIgnored
             || !hasBlockedUsers && shouldBypassIgnored && hasIgnoredUsers
             || shouldBypassBlocked && hasBlockedUsers && !hasIgnoredUsers;
+    },
+
+    shouldShowBlockedProfiles() {
+        return settings.store.alwaysShowBlockedProfiles;
+    },
+
+    shouldShowBlockedProfilesFor(userId) {
+        const shouldShow = settings.store.alwaysShowBlockedProfiles && RelationshipStore.isBlocked(userId);
+        if (shouldShow) this.fetchBlockedProfile(userId);
+
+        return shouldShow;
+    },
+
+    fetchBlockedProfile(userId) {
+        if (pendingProfileFetches.has(userId) || UserProfileStore.getUserProfile(userId) != null) return;
+
+        pendingProfileFetches.add(userId);
+        void fetchUserProfile(userId)
+            .catch(() => null)
+            .finally(() => pendingProfileFetches.delete(userId));
+    },
+
+    openBlockedProfile(props) {
+        props.onHide?.();
+        UserProfileActions.openUserProfileModal({
+            userId: props.user.id,
+            guildId: props.guildId,
+            channelId: props.channelId,
+            messageId: props.messageId,
+            roleId: props.roleId,
+            sourceAnalyticsLocations: props.newAnalyticsLocations
+        });
+
+        return null;
+    },
+
+    closeRestrictedProfile(props) {
+        props.onHide?.();
+        props.onClose?.();
+
+        return null;
     }
 });

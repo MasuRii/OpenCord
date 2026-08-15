@@ -11,7 +11,7 @@ import { showApiKeyWarning } from "@utils/apiKeyWarning";
 import definePlugin, { OptionType } from "@utils/types";
 import { ComponentDispatch, MediaEngineStore, React, showToast, Toasts, useEffect, useRef, useState } from "@webpack/common";
 
-import { getGroqKey } from "../nightcordAI/groqManager";
+import { getGroqKey } from "../TestcordAI/groqManager";
 
 // ── Settings ──────────────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ async function transcribe(blob: Blob): Promise<string> {
     const apiKey = await getGroqKey();
 
     if (!apiKey) {
-        throw new Error("API key missing — Configure your key in Settings → NightcordAI");
+        throw new Error("API key missing — Configure your key in Settings → TestcordAI");
     }
 
     const form = new FormData();
@@ -351,10 +351,10 @@ const VoiceDictationButton: ChatBarButtonFactory = ({ isMainChat }) => {
     if (!isMainChat || settings.store.location !== "chatbar") return null;
 
     const tooltip = errorMsg || (processing
-            ? "Transcribing..."
-            : recording
-                ? "Stop dictation"
-                : "Voice dictation");
+        ? "Transcribing..."
+        : recording
+            ? "Stop dictation"
+            : "Voice dictation");
 
     return (
         <ChatBarButton tooltip={tooltip} onClick={toggle}>
@@ -369,6 +369,7 @@ export default definePlugin({
     name: "VoiceDictation",
     description: "Real-time voice dictation via Groq Whisper (free). API key shared with TestcordAI.",
     authors: [{ name: "User", id: 0n }],
+    tags: ["Voice", "Utility"],
     dependencies: ["ChatInputButtonAPI", "HeaderBarAPI"],
     settings,
 

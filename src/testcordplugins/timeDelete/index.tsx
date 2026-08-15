@@ -69,8 +69,10 @@ function TimeDeleteIcon({ height = 20, width = 20, className, color = "currentCo
     );
 }
 
+const TIME_DELETE_KEYS = ["isActive"] as const;
+
 function TimeDeleteButton() {
-    const { isActive } = settings.use(["isActive"]);
+    const { isActive } = settings.use(TIME_DELETE_KEYS);
 
     const ButtonIcon = (props: IconProps & { color?: string; }) => (
         <TimeDeleteIcon
@@ -95,7 +97,7 @@ function TimeDeleteButton() {
 export default definePlugin({
     name: "timeDelete",
     description: "Automatically deletes your sent messages after a configurable delay.",
-    tags: ["Utility", "Chat"],
+    tags: ["Utility", "Chat", "Privacy"],
     authors: [TestcordDevs.x2b],
     dependencies: ["HeaderBarAPI"],
     settings,

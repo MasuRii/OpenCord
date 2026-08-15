@@ -254,7 +254,8 @@ export default definePlugin({
     },
 
     _borderScanQueued: false,
-    _borderObserver: null as MutationObserver | null,
+    _borderObserver: null as ReturnType<typeof setInterval> | null,
+    _applyBordersKey: null as string | null,
     _startupTimer: null as ReturnType<typeof setTimeout> | null,
 
     start() {
@@ -268,15 +269,14 @@ export default definePlugin({
             this.applyBorders();
         }, 1000);
 
-        const observer = new MutationObserver(() => {
+        const observer = setInterval(() => {
             if (this._borderScanQueued) return;
             this._borderScanQueued = true;
             requestAnimationFrame(() => {
                 this._borderScanQueued = false;
                 this.applyBorders();
             });
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
+        }, 1000);
         this._borderObserver = observer;
     },
 
@@ -292,13 +292,20 @@ export default definePlugin({
         }
         this._borderScanQueued = false;
         if (this._borderObserver) {
-            this._borderObserver.disconnect();
+            clearInterval(this._borderObserver);
             this._borderObserver = null;
         }
     },
 
     applyBorders() {
         const s = settings.store;
+        const key = [
+            s.enableBorders, s.borderWidth, s.borderColor, s.borderColorEnd,
+            s.animationSpeed, s.enableGradients, s.animatedBorder, s.showChannelName
+        ].join(",");
+        if (key === this._applyBordersKey) return;
+        this._applyBordersKey = key;
+
         const root = document.documentElement;
         if (!s.enableBorders) { this.removeBorders(); return; }
 

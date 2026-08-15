@@ -5,9 +5,8 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import definePlugin from "@utils/types";
-import { OptionType } from "@utils/types";
-import { RestAPI, showToast,Toasts, UserStore } from "@webpack/common";
+import definePlugin, { OptionType } from "@utils/types";
+import { GuildMemberStore, GuildStore, RestAPI, showToast, Toasts, UserStore } from "@webpack/common";
 
 const settings = definePluginSettings({
     showToast: {
@@ -20,6 +19,7 @@ const settings = definePluginSettings({
 // Anti-loop: track guilds we're currently resetting to avoid infinite loops
 // (our own PATCH will trigger GUILD_MEMBER_UPDATE with nick null, which is fine, but we avoid duplicates)
 const resettingGuilds = new Set<string>();
+const knownNicks = new Map<string, string | null>();
 
 async function resetNick(guildId: string, forcedNick: string, currentUserId: string) {
     if (resettingGuilds.has(guildId)) return;
@@ -74,21 +74,42 @@ export default definePlugin({
         GUILD_MEMBER_UPDATE({ guildId, user, nick }: {
             guildId: string;
             user: { id: string; };
-            nick: string | null;
+            nick?: string | null;
         }) {
             const currentUser = UserStore.getCurrentUser();
             if (!currentUser || user.id !== currentUser.id) return;
 
+            const currentNick = nick ?? null;
+            const prevNick = knownNicks.get(guildId);
+            knownNicks.set(guildId, currentNick);
+
             // nick null or empty = already reset (by us or the admin), nothing to do
-            if (!nick) return;
+            if (!currentNick) return;
+
+            // If the nickname didn't change (e.g. server tag, role, avatar decoration updated), do nothing
+            if (prevNick !== undefined && prevNick === currentNick) return;
 
             // Someone forced a nick on us — reset immediately
-            setTimeout(() => resetNick(guildId, nick, currentUser.id), 300);
+            setTimeout(() => resetNick(guildId, currentNick, currentUser.id), 300);
         }
     },
 
-    start() {},
+    start() {
+        knownNicks.clear();
+        const currentUser = UserStore.getCurrentUser();
+        if (currentUser) {
+            const guilds = GuildStore.getGuilds();
+            if (guilds) {
+                for (const guildId in guilds) {
+                    const member = GuildMemberStore.getMember(guildId, currentUser.id);
+                    knownNicks.set(guildId, member?.nick ?? null);
+                }
+            }
+        }
+    },
+
     stop() {
         resettingGuilds.clear();
+        knownNicks.clear();
     }
 });

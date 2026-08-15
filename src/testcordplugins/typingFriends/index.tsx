@@ -294,8 +294,9 @@ export default definePlugin({
             }
         },
         {
-            find: "this.handleOpenPrivateChannel",
+            find: "openPrivateChannel=()=>{let{user:e}=this.props",
             predicate: () => settings.store.showFriendsSection,
+            noWarn: true,
             replacement: {
                 match: /subText:\s*\(0,\s*([A-Za-z0-9_$]+)\.jsx\)\(\s*([A-Za-z0-9_$]+\.[A-Za-z0-9_$]+)\s*,\s*\{([\s\S]*?)\}\s*\)/,
                 replace: 'subText:(window.__typingUsers?.has(e.id)?(0,$1.jsx)("div",{children:"Typing in "+window.__typingUsers.get(e.id)}):(0,$1.jsx)($2,{$3}))'

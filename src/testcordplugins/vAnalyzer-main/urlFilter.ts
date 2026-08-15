@@ -11,6 +11,9 @@ import { settings } from "./settings";
 const STORE_KEY_CUSTOM_WHITELIST = "vAnalyzer_customWhitelist";
 const STORE_KEY_CUSTOM_BLOCKLIST = "vAnalyzer_customBlocklist";
 const STORE_KEY_FMHY_CACHE = "vAnalyzer_fmhyBlocklist";
+const FMHY_FILTERLIST_URL = "https://raw.githubusercontent.com/fmhy/FMHYFilterlist/main/filterlist.txt";
+const FETCH_TIMEOUT_MS = 15_000;
+const MAX_FILTERLIST_BYTES = 2 * 1024 * 1024;
 
 const BUILTIN_WHITELIST = new Set([
     "discord.com",
@@ -69,6 +72,15 @@ function extractHostname(url: string): string | null {
     } catch {
         return null;
     }
+}
+
+async function readCappedText(response: Response) {
+    const length = Number(response.headers.get("content-length"));
+    if (Number.isFinite(length) && length > MAX_FILTERLIST_BYTES) throw new Error("Filterlist was too large.");
+
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_FILTERLIST_BYTES) throw new Error("Filterlist was too large.");
+    return text;
 }
 
 function getDomainVariants(hostname: string): string[] {
@@ -164,9 +176,9 @@ export async function loadFmhyBlocklist(): Promise<void> {
 
 export async function fetchFmhyBlocklist(): Promise<number> {
     try {
-        const res = await fetch("https://raw.githubusercontent.com/fmhy/FMHYFilterlist/main/filterlist.txt");
+        const res = await fetch(FMHY_FILTERLIST_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const text = await res.text();
+        const text = await readCappedText(res);
         const domains = parseFmhyFilterlist(text);
         fmhyBlocklist = new Set(domains);
         await DataStore.set(STORE_KEY_FMHY_CACHE, { domains, fetchedAt: Date.now() });

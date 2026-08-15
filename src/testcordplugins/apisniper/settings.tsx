@@ -7,8 +7,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
 import ErrorBoundary from "@components/ErrorBoundary";
-import { PluginNative } from "@utils/types";
-import { OptionType } from "@utils/types";
+import { OptionType, PluginNative } from "@utils/types";
 import { Alerts } from "@webpack/common";
 
 import { SniperDir } from "./components/FolderSelectInput";

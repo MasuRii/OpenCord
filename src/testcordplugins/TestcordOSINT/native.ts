@@ -13,6 +13,29 @@ export interface NativeOSINTResponse {
     headers?: Record<string, string>;
 }
 
+const FETCH_TIMEOUT_MS = 30_000;
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+const ALLOWED_METHODS = new Set(["GET", "POST"]);
+
+function isAllowedUrl(url: string) {
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol === "https:") return true;
+        return parsed.protocol === "http:" && ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname);
+    } catch {
+        return false;
+    }
+}
+
+async function readCappedText(response: Response) {
+    const length = Number(response.headers.get("content-length"));
+    if (Number.isFinite(length) && length > MAX_RESPONSE_BYTES) throw new Error("Response was too large.");
+
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) throw new Error("Response was too large.");
+    return text;
+}
+
 export async function osintFetch(
     _: IpcMainInvokeEvent,
     url: string,
@@ -21,17 +44,22 @@ export async function osintFetch(
     body?: string
 ): Promise<NativeOSINTResponse> {
     try {
+        const normalizedMethod = method.toUpperCase();
+        if (!ALLOWED_METHODS.has(normalizedMethod)) throw new Error("HTTP method is not allowed.");
+        if (!isAllowedUrl(url)) throw new Error("URL is not allowed.");
+
         const response = await fetch(url, {
-            method,
+            method: normalizedMethod,
             headers: {
                 "Content-Type": "application/json",
                 ...headers,
             },
             body,
+            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         });
         return {
             status: response.status,
-            body: await response.text(),
+            body: await readCappedText(response),
             headers: Object.fromEntries(response.headers.entries()),
         };
     } catch (error) {
@@ -62,7 +90,7 @@ export async function fetchCordCat(
         return {
             ok: true,
             status: response.status,
-            body: await response.text(),
+            body: await readCappedText(response),
         };
     } catch (error) {
         return {

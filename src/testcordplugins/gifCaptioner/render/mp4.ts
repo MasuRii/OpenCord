@@ -9,6 +9,9 @@ import { showError } from "../ui/statusCard";
 import GifRenderer from "./gifRenderer";
 
 const MIN_FRAME_LENGTH = 1000 / 50;
+const MAX_VIDEO_DURATION_SECONDS = 30;
+const MAX_VIDEO_FRAMES = 600;
+const MAX_VIDEO_PIXELS = 4_000_000;
 
 interface RenderVideoOptions {
     transform: GifTransform;
@@ -104,27 +107,36 @@ async function renderVideoWithElement({ transform }: RenderVideoOptions) {
             return;
         }
 
+        if (width * height > MAX_VIDEO_PIXELS) {
+            showError("Video is too large to caption safely.");
+            return;
+        }
+
         const duration = Number.isFinite(video.duration) ? video.duration : 0;
         if (!duration) {
             showError("Failed to read video metadata.");
             return;
         }
 
-        const frameEstimate = Math.max(1, Math.ceil(duration * 1000 / MIN_FRAME_LENGTH));
+        if (duration > MAX_VIDEO_DURATION_SECONDS) {
+            showError("Video is too long to caption safely.");
+            return;
+        }
+
+        const frameEstimate = Math.min(MAX_VIDEO_FRAMES, Math.max(1, Math.ceil(duration * 1000 / MIN_FRAME_LENGTH)));
         const renderer = new GifRenderer({ frames: frameEstimate, width, height, transform });
-        const step = MIN_FRAME_LENGTH / 1000;
+        const step = duration / frameEstimate;
+        const delay = Math.max(MIN_FRAME_LENGTH, step * 1000);
 
-        renderer.addVideoFrame(video, MIN_FRAME_LENGTH);
+        renderer.addVideoFrame(video, delay);
 
-        let lastTime = 0;
         let time = step;
 
-        while (time < duration) {
+        for (let frame = 1; frame < frameEstimate; frame++) {
             const ok = await seekTo(video, time);
             if (!ok) break;
 
-            renderer.addVideoFrame(video, Math.max(MIN_FRAME_LENGTH, (time - lastTime) * 1000));
-            lastTime = time;
+            renderer.addVideoFrame(video, delay);
             time += step;
         }
 

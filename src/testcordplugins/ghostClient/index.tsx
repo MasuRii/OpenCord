@@ -8,6 +8,7 @@ import "./styles.css";
 
 import { DataStore } from "@api/index";
 import { UserAreaButton, UserAreaButtonFactory, UserAreaRenderProps } from "@api/UserArea";
+import { sleep } from "@utils/misc";
 import definePlugin, { PluginNative } from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import { React, ReactDOM, Toasts, useEffect, useRef,useState } from "@webpack/common";
@@ -29,11 +30,46 @@ let ghostMicLabel: string = "default";
 
 const Native = VencordNative.pluginHelpers.GhostClient as PluginNative<typeof import("./native")>;
 
-function GhostIcon({ width = 20, height = 20, className }: { width?: number; height?: number; className?: string; }) {
+function GhostIcon({ width = 20, height = 20, className, active }: { width?: number; height?: number; className?: string; active?: boolean }) {
+    const lineLength = 30;
+    const lineStyle: React.CSSProperties = {
+        strokeDasharray: lineLength,
+        strokeDashoffset: active ? lineLength : 0,
+        transition: "stroke-dashoffset 0.1s ease-in-out",
+    };
+
     return (
         <svg aria-hidden="true" role="img" xmlns="http://www.w3.org/2000/svg" width={width} height={height} className={className} fill="none" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M16 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM2 20.53A9.53 9.53 0 0 1 11.53 11h.94c1.28 0 2.5.25 3.61.7.41.18.36.77-.05.96a7 7 0 0 0-3.65 8.6c.11.36-.13.74-.5.74H6.15a.5.5 0 0 1-.5-.55l.27-2.6c.02-.26-.27-.37-.41-.16-.48.74-1.03 1.8-1.32 2.9a.53.53 0 0 1-.5.41h-.22C2.66 22 2 21.34 2 20.53Z" />
-            <path fill="currentColor" d="M24 19a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z" />
+            <mask id="ghostClientLine">
+                <rect width="100%" height="100%" fill="#ffffff" />
+                <line
+                    className="blackLine"
+                    x1="22"
+                    y1="2"
+                    x2="2"
+                    y2="22"
+                    stroke="#000000"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    style={lineStyle}
+                />
+            </mask>
+
+            <g mask="url(#ghostClientLine)">
+                <path fill={!active ? "var(--status-danger)" : "currentColor"} d="M16 6a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM2 20.53A9.53 9.53 0 0 1 11.53 11h.94c1.28 0 2.5.25 3.61.7.41.18.36.77-.05.96a7 7 0 0 0-3.65 8.6c.11.36-.13.74-.5.74H6.15a.5.5 0 0 1-.5-.55l.27-2.6c.02-.26-.27-.37-.41-.16-.48.74-1.03 1.8-1.32 2.9a.53.53 0 0 1-.5.41h-.22C2.66 22 2 21.34 2 20.53Z" />
+                <path fill={!active ? "var(--status-danger)" : "currentColor"} d="M24 19a5 5 0 1 1-10 0 5 5 0 0 1 10 0Z" />
+            </g>
+
+            <line
+                x1="22"
+                y1="2"
+                x2="2"
+                y2="22"
+                stroke="var(--status-danger, currentColor)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                style={lineStyle}
+            />
         </svg>
     );
 }
@@ -122,6 +158,7 @@ async function getAllSavedAccounts(): Promise<GhostAccount[]> {
 }
 
 let savedAccounts: GhostAccount[] = [];
+let preConnectRunning = false;
 
 async function ghostActivate(account: GhostAccount) {
     if (ghostStates.get(account.userId)?.connecting) return;
@@ -130,7 +167,7 @@ async function ghostActivate(account: GhostAccount) {
     const vs = getMyVoiceState();
     try {
         // Add a short delay to avoid collisions during mass activations
-        await new Promise(r => setTimeout(r, 100));
+        await sleep(100);
         const result = await Native.connectGhost(account.userId, account.token, vs?.guildId ?? "", vs?.channelId ?? "", ghostMicLabel);
         if (!result.ok) {
             ghostStates.set(account.userId, { active: false, connecting: false, error: result.error ?? "Error" });
@@ -164,7 +201,7 @@ async function ghostDeactivateAll() {
         for (let i = 0; i < ids.length; i++) {
             Native.leaveVoice(ids[i]).catch(() => { });
             // Progressive delay: the more accounts, the more spacing to let the server breathe
-            if (i % 3 === 0) await new Promise(r => setTimeout(r, 150));
+            if (i % 3 === 0) await sleep(150);
         }
         // Final safety call to ensure EVERYTHING is cut server-side
         Native.leaveVoiceAll(ids).catch(() => { });
@@ -317,6 +354,7 @@ function useStreamPoller(userId: string | null, active: boolean) {
             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
             return;
         }
+        let cancelled = false;
 
         pollRef.current = setInterval(async () => {
             try {
@@ -326,6 +364,7 @@ function useStreamPoller(userId: string | null, active: boolean) {
                     body: JSON.stringify({ userId }),
                 });
                 const d = await r.json();
+                if (cancelled) return;
                 if (d.state === "resolving") setStatus("🔍 Resolving URL...");
                 else if (d.state === "starting") setStatus("⏳ Starting stream...");
                 else if (d.state === "active") {
@@ -345,6 +384,7 @@ function useStreamPoller(userId: string | null, active: boolean) {
         }, 800);
 
         return () => {
+            cancelled = true;
             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         };
     }, [userId, active]);
@@ -369,6 +409,7 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
     const [pollStatus, setPollStatus] = useStreamPoller(streamingUserId, isPolling);
     const states = useGhostStates();
     const popoverRef = useRef<HTMLDivElement>(null);
+    const mountedRef = useRef(true);
 
     // The displayed status is either the direct one (during initial request) or the poll
     const displayStatus = isPolling ? pollStatus : streamStatus;
@@ -392,24 +433,31 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
     }, [anchorRect]);
 
     useEffect(() => {
-        getAllSavedAccounts().then(v => { setAccounts(v); savedAccounts = v; });
+        getAllSavedAccounts().then(v => {
+            if (!mountedRef.current) return;
+            setAccounts(v);
+            savedAccounts = v;
+        });
 
         // Auto-follow enabled by default (true if no value yet in DataStore)
         DataStore.get(DS_KEY_AUTO_FOLLOW).then((v: boolean | null) => {
+            if (!mountedRef.current) return;
             const shouldFollow = v ?? true;
             setAutoFollowState(shouldFollow);
             if (shouldFollow) startFollowing();
         });
 
-        DataStore.get(DS_KEY_SELECTED).then((v: string | null) => { if (v) setSelectedId(v); });
+        DataStore.get(DS_KEY_SELECTED).then((v: string | null) => { if (mountedRef.current && v) setSelectedId(v); });
 
         // Smart auto-selection of virtual cable on VERY FIRST launch
         Native.listAudioInputDevices().catch(() => []).then(async (devs: any[]) => {
             const names = (devs as any[])?.map((d: any) => d.dshowName ?? d.name ?? d.label ?? "").filter(Boolean) ?? [];
+            if (!mountedRef.current) return;
             if (names.length) {
                 setDshowDevices(names);
 
                 const savedMic = await DataStore.get(DS_KEY_MIC_DEVICE);
+                if (!mountedRef.current) return;
                 // If the user has NEVER chosen a mic (first time)
                 if (savedMic === null || savedMic === undefined) {
                     const virtualMic = names.find(n =>
@@ -430,9 +478,15 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
                 }
             }
         }).catch(() => { });
+
+        return () => { mountedRef.current = false; };
     }, []);
 
-    async function saveAccounts(next: GhostAccount[]) { setAccounts(next); savedAccounts = next; await DataStore.set(DS_KEY_TOKENS, next); }
+    async function saveAccounts(next: GhostAccount[]) {
+        if (mountedRef.current) setAccounts(next);
+        savedAccounts = next;
+        await DataStore.set(DS_KEY_TOKENS, next);
+    }
 
     async function addAccount() {
         const raw = tokenInput.trim();
@@ -442,12 +496,14 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
         let added = 0, failed = 0, updated = [...accounts];
         for (const token of tokens) {
             const info = await fetchUser(token);
+            if (!mountedRef.current) return;
             if (!info) { failed++; continue; }
             updated = [...updated.filter(a => a.userId !== info.userId), { ...info, token }];
             added++;
         }
         if (added > 0) {
             await saveAccounts(updated);
+            if (!mountedRef.current) return;
             Toasts.show({ message: `${added} account${added > 1 ? "s" : ""} added${failed > 0 ? `, ${failed} failed` : ""}`, type: Toasts.Type.SUCCESS, id: Toasts.genId() });
         } else {
             Toasts.show({ message: `All tokens invalid (${failed})`, type: Toasts.Type.FAILURE, id: Toasts.genId() });
@@ -476,6 +532,7 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
                 signal: AbortSignal.timeout(5000), // short timeout — the server now responds immediately
             });
             const d = await r.json();
+            if (!mountedRef.current) return;
             if (!d.ok) {
                 setStreamStatus("❌ Error: " + (d.error ?? "unknown"));
                 setIsPolling(false);
@@ -486,6 +543,7 @@ function GhostPopover({ onClose, anchorRect }: { onClose: () => void; anchorRect
                 setIsPolling(true);
             }
         } catch (e: any) {
+            if (!mountedRef.current) return;
             setStreamStatus("❌ ghost-server unreachable: " + (e?.message ?? String(e)));
             setIsPolling(false);
         }
@@ -728,9 +786,9 @@ const GhostUserAreaButton: UserAreaButtonFactory = ({ iconForeground, hideToolti
         <div ref={btnRef} style={{ position: "relative" }}>
             <UserAreaButton
                 tooltipText={hideTooltips ? undefined : "Ghost Accounts — left click: toggle | right click: config"}
-                icon={<GhostIcon className={`${iconForeground} ${anyActive ? "gc-icon--active" : ""}`} />}
+                icon={<GhostIcon className={`${iconForeground} ${anyActive ? "gc-icon--active" : ""}`} active={anyActive} />}
                 plated={nameplate != null}
-                redGlow={false}
+                redGlow={!anyActive}
                 onClick={handleLeftClick}
                 onContextMenu={e => { e.preventDefault(); e.stopPropagation(); openPopover(); }}
             />
@@ -753,25 +811,31 @@ export default definePlugin({
     userAreaButton: { icon: GhostIcon, render: GhostUserAreaButton, priority: 1 },
 
     async start() {
+        preConnectRunning = true;
         const autoFollow = await DataStore.get(DS_KEY_AUTO_FOLLOW);
+        if (!preConnectRunning) return;
         if (autoFollow === true) startFollowing();
         const mic = await DataStore.get(DS_KEY_MIC_DEVICE);
+        if (!preConnectRunning) return;
         if (mic) ghostMicLabel = mic;
         const allAccs = await getAllSavedAccounts();
+        if (!preConnectRunning) return;
         if (allAccs.length > 0) savedAccounts = allAccs;
 
         this._preConnectTimer = setTimeout(() => {
             this._preConnectTimer = null;
+            if (!preConnectRunning) return;
             Native.init().catch(() => { });
 
             (async () => {
-                if (savedAccounts.length === 0) return;
+                if (!preConnectRunning || savedAccounts.length === 0) return;
                 console.log("[GhostClient] Pre-connecting", savedAccounts.length, "account(s)...");
                 for (const acc of savedAccounts) {
+                    if (!preConnectRunning) return;
                     Native.preConnectGhost(acc.userId, acc.token, ghostMicLabel)
                         .then(r => console.log("[GhostClient] Pre-connected:", acc.username, r?.ok))
                         .catch(() => { });
-                    await new Promise(r => setTimeout(r, 800));
+                    await sleep(800);
                 }
             })();
         }, 10000);
@@ -798,11 +862,15 @@ export default definePlugin({
     _preConnectTimer: null as ReturnType<typeof setTimeout> | null,
 
     stop() {
+        preConnectRunning = false;
         if (this._preConnectTimer) {
             clearTimeout(this._preConnectTimer);
             this._preConnectTimer = null;
         }
-        ghostDeactivateAll();
         stopFollowing();
+        const ids = Array.from(ghostStates.keys());
+        ghostStates.clear();
+        notify();
+        (ids.length ? Native.leaveVoiceAll(ids) : Promise.resolve()).finally(() => Native.stop().catch(() => { }));
     },
 });
