@@ -6,17 +6,28 @@
 
 import { IpcMainInvokeEvent } from "electron";
 
+const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 30000;
+
 export async function fetchAttachment(_event: IpcMainInvokeEvent, url: string): Promise<Uint8Array | null> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     try {
         if (!url) return null;
 
-        const res = await fetch(url);
+        const controller = new AbortController();
+        timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) return null;
+        const length = Number(res.headers.get("content-length"));
+        if (length > MAX_ATTACHMENT_BYTES) return null;
 
         const arrayBuffer = await res.arrayBuffer();
+        if (arrayBuffer.byteLength > MAX_ATTACHMENT_BYTES) return null;
         return new Uint8Array(arrayBuffer);
     } catch {
         return null;
+    } finally {
+        if (timeout) clearTimeout(timeout);
     }
 }
 

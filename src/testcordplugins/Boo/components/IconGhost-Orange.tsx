@@ -17,5 +17,3 @@ function IconGhostOrange() {
 }
 
 export default IconGhostOrange;
-
-

@@ -10,6 +10,7 @@ import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api
 import { DataStore } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
+import { sleep } from "@utils/misc";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { findByProps } from "@webpack";
@@ -366,6 +367,8 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
     const [copied, setCopied] = useState(false);
     const [accountSearch, setAccountSearch] = useState("");
     const fileRef = useRef<HTMLInputElement>(null);
+    const mountedRef = useRef(true);
+    const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const filteredAccounts = useMemo(() => {
         if (!accountSearch.trim()) return accounts;
@@ -379,13 +382,22 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
         if (accountsCache !== null) {
             setAccounts(accountsCache);
             setLoaded(true);
-            return;
+            return () => {
+                mountedRef.current = false;
+                if (detectTimer.current) clearTimeout(detectTimer.current);
+                if (copiedTimer.current) clearTimeout(copiedTimer.current);
+            };
         }
         let cancelled = false;
         getAccounts().then(v => {
             if (!cancelled) { setAccounts(v); setLoaded(true); }
         });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+            mountedRef.current = false;
+            if (detectTimer.current) clearTimeout(detectTimer.current);
+            if (copiedTimer.current) clearTimeout(copiedTimer.current);
+        };
     }, []);
 
     const handleTabChange = useCallback((newTab: "saved" | "add") => {
@@ -407,6 +419,7 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
         const ns: Record<string, string> = {};
         for (const acc of accounts) {
             ns[acc.id] = "checking";
+            if (!mountedRef.current) return;
             setStatuses({ ...ns });
             try {
                 const r = await Native.checkToken(acc.token);
@@ -414,9 +427,11 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
             } catch {
                 ns[acc.id] = "error";
             }
+            if (!mountedRef.current) return;
             setStatuses({ ...ns });
-            await new Promise(r => setTimeout(r, 400));
+            await sleep(400);
         }
+        if (!mountedRef.current) return;
         setVerifying(false);
         const invalidAccs = accounts.filter(a => ns[a.id] === "invalid");
         if (invalidAccs.length > 0) {
@@ -441,11 +456,14 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
         setResults(initial); setChecking(true); setDone(false);
         const updated = [...initial];
         const existing = await getAccounts();
+        if (!mountedRef.current) return;
         const validForRouting: Array<{ username: string; token: string; }> = [];
         for (let i = 0; i < tokens.length; i++) {
+            if (!mountedRef.current) return;
             updated[i] = { ...updated[i], status: "checking" }; setResults([...updated]);
             try {
                 const result = await Native.checkToken(tokens[i]);
+                if (!mountedRef.current) return;
                 if (result.valid && result.user) {
                     const u = result.user;
                     const av = getAvatarUrl(u.id, u.avatar);
@@ -454,6 +472,7 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
                         existing.push({ id: u.id, token: tokens[i], username: u.global_name || u.username, discriminator: u.discriminator ?? "0", avatar: av });
                         await saveAccounts(existing);
                         await patchTokenStore();
+                        if (!mountedRef.current) return;
                         setAccounts([...existing]);
                     }
                     validForRouting.push({ username: u.global_name || u.username, token: tokens[i] });
@@ -462,8 +481,9 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
                     updated[i] = { ...updated[i], status: (result as any).error === "rate_limited" ? "rate_limited" : (result as any).error ? "error" : "invalid" };
                 }
             } catch { updated[i] = { ...updated[i], status: "error" }; }
+            if (!mountedRef.current) return;
             setResults([...updated]);
-            await new Promise(r => setTimeout(r, 200));
+            await sleep(200);
         }
         const dest = destOverride ?? settings.store.importDestination ?? "both";
         if (dest !== "importer" && validForRouting.length) {
@@ -485,6 +505,8 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
         setPaste(val);
         if (detectTimer.current) clearTimeout(detectTimer.current);
         detectTimer.current = setTimeout(() => {
+            detectTimer.current = null;
+            if (!mountedRef.current) return;
             setDetectedCount(parseBulkTokens(val).length);
         }, 150);
     }
@@ -520,11 +542,14 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
                                 setVerifying(true);
                                 try {
                                     const tokens = await Native.findLocalTokens();
+                                    if (!mountedRef.current) return;
                                     const existing = await getAccounts();
+                                    if (!mountedRef.current) return;
                                     let addedCount = 0;
                                     for (const tok of tokens) {
                                         if (!existing.find(a => a.token === tok)) {
                                             const verified = await Native.checkToken(tok);
+                                            if (!mountedRef.current) return;
                                             if (verified.valid && verified.user) {
                                                 const u = verified.user;
                                                 const av = getAvatarUrl(u.id, u.avatar);
@@ -533,12 +558,13 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
                                                     addedCount++;
                                                 }
                                             }
-                                            await new Promise(r => setTimeout(r, 200));
+                                            await sleep(200);
                                         }
                                     }
                                     if (addedCount > 0) {
                                         await saveAccounts(existing);
                                         await patchTokenStore();
+                                        if (!mountedRef.current) return;
                                         setAccounts([...existing]);
                                         (window as any).Vencord?.Webpack?.findByProps?.("showToast")?.showToast?.(`${addedCount} new accounts imported!`);
                                     } else {
@@ -547,12 +573,12 @@ function TokenModal({ rootProps }: { rootProps: any; }) {
                                 } catch (err) {
                                     console.error("[TokenImporter] Scan failed:", err);
                                 } finally {
-                                    setVerifying(false);
+                                    if (mountedRef.current) setVerifying(false);
                                 }
                             }}>
                                 <FolderIcon width={12} height={12} style={{ marginRight: 4 }} /> Scan local Discords
                             </button>}
-                            <button className="ti-verify-btn" style={{ marginRight: 6, opacity: copied ? 0.7 : 1 }} onClick={() => { copyMyToken(); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>
+                            <button className="ti-verify-btn" style={{ marginRight: 6, opacity: copied ? 0.7 : 1 }} onClick={() => { copyMyToken(); setCopied(true); if (copiedTimer.current) clearTimeout(copiedTimer.current); copiedTimer.current = setTimeout(() => { copiedTimer.current = null; if (mountedRef.current) setCopied(false); }, 1500); }}>
                                 {copied ? "Copied ✓" : "My Token"}
                             </button>
                             <button className="ti-verify-btn" onClick={verifyAll} disabled={verifying || !loaded}>
@@ -681,7 +707,11 @@ function DangerousAckModal({ rootProps, settingKey, onConfirm }: { rootProps: an
 function useDangerousToggle(key: DangerousSetting): [boolean, (v: boolean) => void] {
     const current = settings.use([key])[key] as boolean;
     const [acked, setAcked] = useState<Set<DangerousSetting>>(new Set());
-    useEffect(() => { getAckedDangerous().then(setAcked); }, []);
+    useEffect(() => {
+        let cancelled = false;
+        getAckedDangerous().then(v => { if (!cancelled) setAcked(v); });
+        return () => { cancelled = true; };
+    }, []);
 
     const set = useCallback((next: boolean) => {
         if (!next) {
@@ -759,6 +789,7 @@ export default definePlugin({
     settings,
     settingsAboutComponent: TokenImporterAbout,
     _injectTimer: null as ReturnType<typeof setTimeout> | null,
+    _started: false,
     handleQuickSwitch(event: KeyboardEvent) {
         if (event.altKey && event.key === "g") {
             event.preventDefault();
@@ -766,12 +797,14 @@ export default definePlugin({
         }
     },
     async start() {
+        this._started = true;
         addHeaderBarButton("nightcord-token-importer", () => <TokenImporterButton />, 10);
         if (settings.store.enableQuickSwitch) {
             document.addEventListener("keydown", this.handleQuickSwitch);
         }
         try {
             const existing = await getAccounts();
+            if (!this._started) return;
             // Auto-scan requires BOTH the local-scan capability and the auto-on-startup toggle.
             if (
                 settings.store.enableLocalScan
@@ -779,11 +812,13 @@ export default definePlugin({
                 && window.DiscordNative?.process?.platform === "win32"
             ) {
                 const autoFound = await Native.findLocalTokens();
+                if (!this._started) return;
                 let added = false;
                 const current = [...existing];
                 for (const tok of autoFound) {
                     if (!current.find(a => a.token === tok)) {
                         const verified = await Native.checkToken(tok);
+                        if (!this._started) return;
                         if (verified.valid && verified.user) {
                             const u = verified.user;
                             if (!current.find(a => a.id === u.id)) {
@@ -795,6 +830,7 @@ export default definePlugin({
                 }
                 if (added) {
                     await saveAccounts(current);
+                    if (!this._started) return;
                     await patchTokenStore();
                 }
             }
@@ -810,16 +846,19 @@ export default definePlugin({
         }
     },
     async _injectAccounts() {
+        if (!this._started) return;
         if (!settings.store.injectIntoMultiAccountStore) return;
         try {
             const saved = await getAccounts();
+            if (!this._started) return;
             if (!saved.length) return;
             const FluxDispatcher = findByProps("dispatch", "subscribe", "register");
             if (!FluxDispatcher?.dispatch) return;
             const existing = new Set((findByProps("getAccounts")?.getAccounts?.() ?? []).map((u: any) => u.id));
             const toInject = saved.filter(a => !existing.has(a.id));
             for (const acc of toInject) {
-                await new Promise(r => setTimeout(r, 0));
+                if (!this._started) return;
+                await sleep(0);
                 try {
                     FluxDispatcher.dispatch({
                         type: "MULTI_ACCOUNT_VALIDATE_TOKEN_SUCCESS",
@@ -828,11 +867,12 @@ export default definePlugin({
                         user: { id: acc.id, username: acc.username, discriminator: acc.discriminator, avatar: null }
                     });
                 } catch { }
-                await new Promise(r => setTimeout(r, 300));
+                await sleep(300);
             }
         } catch (e) { console.error("[TokenImporter] inject:", e); }
     },
     stop() {
+        this._started = false;
         if (this._injectTimer) { clearTimeout(this._injectTimer); this._injectTimer = null; }
         document.removeEventListener("keydown", this.handleQuickSwitch);
         removeHeaderBarButton("nightcord-token-importer");

@@ -4,9 +4,10 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { ApplicationCommandInputType, sendBotMessage } from "@api/Commands";
+import { ApplicationCommandInputType, registerCommand, sendBotMessage, unregisterCommand } from "@api/Commands";
+import { isPluginEnabled } from "@api/PluginManager";
 import { definePluginSettings } from "@api/Settings";
-import { UserAreaButton } from "@api/UserArea";
+import { UserAreaButton, UserAreaRenderProps } from "@api/UserArea";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
@@ -71,7 +72,10 @@ const fakeVoiceState = {
     selfVideo: false
 };
 
+let buttonRerender: (() => void) | null = null;
+
 function refreshVoiceState() {
+    buttonRerender?.();
     if (!wsModule || !SelectedChannelStore || !ChannelStore || !MediaEngineStore) return;
 
     const socket = wsModule.getSocket();
@@ -166,53 +170,88 @@ function handleKeydown(e: KeyboardEvent) {
     }
 }
 
-function FakeDeafenIcon() {
+function FakeDeafenIcon({ className }: { className?: string; }) {
     const enabled = fakeVoiceState.selfDeaf;
+    const lineLength = 30;
+    const lineStyle: React.CSSProperties = {
+        strokeDasharray: lineLength,
+        strokeDashoffset: enabled ? lineLength : 0,
+        transition: "stroke-dashoffset 0.1s ease-in-out",
+    };
+
     return (
-        <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
-            <rect
-                x="6"
-                y="8"
-                width="20"
-                height="4"
-                rx="2"
-                fill={enabled ? "#fff" : "#888"}
-            />
-            <rect
-                x="11"
-                y="3"
-                width="10"
-                height="8"
-                rx="3"
-                fill={enabled ? "#fff" : "#888"}
-            />
-            <circle
-                cx="10"
-                cy="21"
-                r="4"
-                stroke={enabled ? "#fff" : "#888"}
-                strokeWidth="2"
-                fill="none"
-            />
-            <circle
-                cx="22"
-                cy="21"
-                r="4"
-                stroke={enabled ? "#fff" : "#888"}
-                strokeWidth="2"
-                fill="none"
-            />
-            <path
-                d="M14 21c1 1 3 1 4 0"
-                stroke={enabled ? "#fff" : "#888"}
+        <svg className={className} width="28" height="28" viewBox="0 0 32 32" fill="none">
+            <mask id="fakeMuteDeafenLine">
+                <rect width="100%" height="100%" fill="#ffffff" />
+                <line
+                    className="blackLine"
+                    x1="29"
+                    y1="2"
+                    x2="2"
+                    y2="29"
+                    stroke="#000000"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    style={lineStyle}
+                />
+            </mask>
+
+            <g mask="url(#fakeMuteDeafenLine)">
+                <rect
+                    x="6"
+                    y="8"
+                    width="20"
+                    height="4"
+                    rx="2"
+                    fill={!enabled ? "var(--status-danger)" : "currentColor"}
+                />
+                <rect
+                    x="11"
+                    y="3"
+                    width="10"
+                    height="8"
+                    rx="3"
+                    fill={!enabled ? "var(--status-danger)" : "currentColor"}
+                />
+                <circle
+                    cx="10"
+                    cy="21"
+                    r="4"
+                    stroke={!enabled ? "var(--status-danger)" : "currentColor"}
+                    strokeWidth="2"
+                    fill="none"
+                />
+                <circle
+                    cx="22"
+                    cy="21"
+                    r="4"
+                    stroke={!enabled ? "var(--status-danger)" : "currentColor"}
+                    strokeWidth="2"
+                    fill="none"
+                />
+                <path
+                    d="M14 21c1 1 3 1 4 0"
+                    stroke={!enabled ? "var(--status-danger)" : "currentColor"}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                />
+            </g>
+
+            <line
+                x1="29"
+                y1="2"
+                x2="2"
+                y2="29"
+                stroke="var(--status-danger, currentColor)"
                 strokeWidth="2"
                 strokeLinecap="round"
+                style={lineStyle}
             />
         </svg>
     );
 }
 
-function FakeMuteDeafenButton() {
+function FakeMuteDeafenButton({ iconForeground, hideTooltips, nameplate }: UserAreaRenderProps) {
     const [, forceUpdate] = React.useReducer(x => x + 1, 0);
 
     const handleClick = React.useCallback(() => {
@@ -228,25 +267,28 @@ function FakeMuteDeafenButton() {
     const isEnabled = fakeVoiceState.selfDeaf;
 
     React.useEffect(() => {
-        const interval = setInterval(() => forceUpdate(), 500);
-        return () => clearInterval(interval);
+        buttonRerender = forceUpdate;
+        return () => { buttonRerender = null; };
     }, []);
 
     return (
         <UserAreaButton
+            className="button__201d5 wrapper__201d5"
             tooltipText={
-                isEnabled ? "Disable Fake Mute & Deafen" : "Enable Fake Mute & Deafen"
+                hideTooltips ? void 0 : isEnabled ? "Disable Fake Mute & Deafen" : "Enable Fake Mute & Deafen"
             }
-            icon={<FakeDeafenIcon />}
+            icon={<FakeDeafenIcon className={iconForeground} />}
             role="switch"
             aria-checked={isEnabled}
-            redGlow={isEnabled}
+            redGlow={!isEnabled}
+            plated={nameplate != null}
             onClick={handleClick}
         />
     );
 }
 
 let lastVoiceChannelId: string | null = null;
+let refreshVoiceStateTimer: ReturnType<typeof setTimeout> | null = null;
 function handleVoiceChannelChange() {
     try {
         const currentChannelId = SelectedChannelStore?.getVoiceChannelId?.();
@@ -255,7 +297,9 @@ function handleVoiceChannelChange() {
         lastVoiceChannelId = currentChannelId ?? null;
 
         if (currentChannelId && currentChannelId !== previousChannelId && (fakeVoiceState.selfMute || fakeVoiceState.selfDeaf)) {
-            setTimeout(() => {
+            if (refreshVoiceStateTimer) clearTimeout(refreshVoiceStateTimer);
+            refreshVoiceStateTimer = setTimeout(() => {
+                refreshVoiceStateTimer = null;
                 refreshVoiceState();
             }, 500);
         }
@@ -265,6 +309,7 @@ function handleVoiceChannelChange() {
 }
 
 let originalSend: any;
+let commandsRegistered = false;
 
 export default definePlugin({
     name: "FakeMuteDeafen",
@@ -272,10 +317,9 @@ export default definePlugin({
     tags: ["Voice", "Privacy"],
     authors: [TestcordDevs.x2b, TestcordDevs.dot, TestcordDevs.sirphantom89, TestcordDevs.hyyven],
     dependencies: ["CommandsAPI"],
-    enabledByDefault: true,
     settings,
 
-start() {
+    start() {
         const socket = wsModule?.getSocket?.();
         if (socket && !originalSend) {
             originalSend = socket.send;
@@ -291,7 +335,7 @@ start() {
 
         if (settings.store.userAreaButton) {
             try {
-                (window as any).Vencord?.Api?.UserArea?.addUserAreaButton("fake-mute-deafen", () => <FakeMuteDeafenButton />);
+                (window as any).Vencord?.Api?.UserArea?.addUserAreaButton("fake-mute-deafen", FakeMuteDeafenButton);
             } catch (e) {
                 console.warn("[FakeMuteDeafen] Failed to add user area button:", e);
             }
@@ -300,6 +344,56 @@ start() {
         document.addEventListener("keydown", handleKeydown);
         if (SelectedChannelStore?.addChangeListener) {
             SelectedChannelStore.addChangeListener(handleVoiceChannelChange);
+        }
+
+        if (!isPluginEnabled("FakeVoicePremium")) {
+            registerCommand({
+                inputType: ApplicationCommandInputType.BUILT_IN,
+                name: "fakemute",
+                description: "Toggle fake mute",
+                execute: (_, ctx) => {
+                    if (!settings.store.slashCommands) {
+                        sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
+                        return;
+                    }
+                    fakeVoiceState.selfMute = !fakeVoiceState.selfMute;
+                    refreshVoiceState();
+                    sendBotMessage(ctx.channel.id, { content: `🎤 Fake mute is now ${fakeVoiceState.selfMute ? "enabled" : "disabled"}.` });
+                }
+            }, "FakeMuteDeafen");
+            registerCommand({
+                inputType: ApplicationCommandInputType.BUILT_IN,
+                name: "fakedeafen",
+                description: "Toggle fake deafen",
+                execute: (_, ctx) => {
+                    if (!settings.store.slashCommands) {
+                        sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
+                        return;
+                    }
+                    fakeVoiceState.selfDeaf = !fakeVoiceState.selfDeaf;
+                    if (settings.store.autoMute) fakeVoiceState.selfMute = fakeVoiceState.selfDeaf;
+                    refreshVoiceState();
+                    const muteNote = (fakeVoiceState.selfDeaf && settings.store.autoMute) ? " (+ fake mute)" : "";
+                    sendBotMessage(ctx.channel.id, { content: `🔇 Fake deafen is now ${fakeVoiceState.selfDeaf ? "enabled" : "disabled"}${muteNote}.` });
+                }
+            }, "FakeMuteDeafen");
+            registerCommand({
+                inputType: ApplicationCommandInputType.BUILT_IN,
+                name: "fakedeafen_mute",
+                description: "Toggle fake deafen and fake mute together",
+                execute: (_, ctx) => {
+                    if (!settings.store.slashCommands) {
+                        sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
+                        return;
+                    }
+                    const next = !(fakeVoiceState.selfMute && fakeVoiceState.selfDeaf);
+                    fakeVoiceState.selfMute = next;
+                    fakeVoiceState.selfDeaf = next;
+                    refreshVoiceState();
+                    sendBotMessage(ctx.channel.id, { content: `👻 Fake mute and deafen are now ${next ? "enabled" : "disabled"}.` });
+                }
+            }, "FakeMuteDeafen");
+            commandsRegistered = true;
         }
     },
 
@@ -315,59 +409,21 @@ start() {
         } catch (e) { }
 
         document.removeEventListener("keydown", handleKeydown);
+        if (refreshVoiceStateTimer) {
+            clearTimeout(refreshVoiceStateTimer);
+            refreshVoiceStateTimer = null;
+        }
         if (SelectedChannelStore?.removeChangeListener) {
             SelectedChannelStore.removeChangeListener(handleVoiceChannelChange);
         }
-    },
 
-commands: [
-        {
-            inputType: ApplicationCommandInputType.BUILT_IN,
-            name: "fakemute",
-            description: "Toggle fake mute",
-            execute: (_, ctx) => {
-                if (!settings.store.slashCommands) {
-                    sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
-                    return;
-                }
-                fakeVoiceState.selfMute = !fakeVoiceState.selfMute;
-                refreshVoiceState();
-                sendBotMessage(ctx.channel.id, { content: `🎤 Fake mute is now ${fakeVoiceState.selfMute ? "enabled" : "disabled"}.` });
-            }
-        },
-        {
-            inputType: ApplicationCommandInputType.BUILT_IN,
-            name: "fakedeafen",
-            description: "Toggle fake deafen",
-            execute: (_, ctx) => {
-                if (!settings.store.slashCommands) {
-                    sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
-                    return;
-                }
-                fakeVoiceState.selfDeaf = !fakeVoiceState.selfDeaf;
-                if (settings.store.autoMute) fakeVoiceState.selfMute = fakeVoiceState.selfDeaf;
-                refreshVoiceState();
-                const muteNote = (fakeVoiceState.selfDeaf && settings.store.autoMute) ? " (+ fake mute)" : "";
-                sendBotMessage(ctx.channel.id, { content: `🔇 Fake deafen is now ${fakeVoiceState.selfDeaf ? "enabled" : "disabled"}${muteNote}.` });
-            }
-        },
-        {
-            inputType: ApplicationCommandInputType.BUILT_IN,
-            name: "fakedeafen_mute",
-            description: "Toggle fake deafen and fake mute together",
-            execute: (_, ctx) => {
-                if (!settings.store.slashCommands) {
-                    sendBotMessage(ctx.channel.id, { content: "Slash commands are disabled. Enable them in FakeMuteDeafen settings." });
-                    return;
-                }
-                const next = !(fakeVoiceState.selfMute && fakeVoiceState.selfDeaf);
-                fakeVoiceState.selfMute = next;
-                fakeVoiceState.selfDeaf = next;
-                refreshVoiceState();
-                sendBotMessage(ctx.channel.id, { content: `👻 Fake mute and deafen are now ${next ? "enabled" : "disabled"}.` });
-            }
+        if (commandsRegistered) {
+            unregisterCommand("fakemute");
+            unregisterCommand("fakedeafen");
+            unregisterCommand("fakedeafen_mute");
+            commandsRegistered = false;
         }
-    ],
+    },
 
     contextMenus: {
         "audio-device-context"(children: any[], d: any) {

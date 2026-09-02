@@ -23,51 +23,6 @@ export default definePlugin({
         }
     ],
 
-    patches: [
-        {
-            find: "#{intl::AGE_GATE_AGE_VERIFIED}",
-            replacement: {
-                match: /return (\i)\.ageVerified\b/,
-                replace: "return ($1.ageVerified,true)",
-            },
-        },
-        {
-            find: "#{intl::AGE_GATE_NSFW_BODY}",
-            replacement: {
-                match: /if\s*\((\i\.isNSFW\b[^)]{0,60})\)/,
-                replace: "if(($1,false))",
-            },
-        },
-        {
-            find: "useAgeGateVerifyContentForGuild",
-            replacement: {
-                match: /null==(\i)\.nsfwAllowed/g,
-                replace: " false",
-            },
-        },
-        {
-            find: "#{intl::AGE_GATE_NSFW_BODY}",
-            replacement: {
-                match: /(\i)\.nsfwLevel\s*>=\s*(\i)\b/,
-                replace: "$1.nsfwLevel>=($2,Infinity)",
-            },
-        },
-        {
-            find: "#{intl::AGE_GATE_FAMILY_CENTER_BODY}",
-            replacement: {
-                match: /(\i)\.isFamilyCenterEnabled\b/,
-                replace: "($1.isFamilyCenterEnabled,false)",
-            },
-        },
-        {
-            find: "useAgeGateVerifyContentForGuild",
-            replacement: {
-                match: /((?:\i\.)*\i)\.getCurrentUser\(\)\?\.nsfwAllowed===!1/g,
-                replace: "($1.getCurrentUser()?.nsfwAllowed,false)",
-            },
-        },
-    ],
-
     _patchRestores: [] as Array<() => void>,
     _userOriginalFlags: null as number | null,
     _userOriginalDescriptors: null as Record<string, PropertyDescriptor> | null,

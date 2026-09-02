@@ -8,8 +8,7 @@ import "./tooltip.css";
 
 import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
-import { Tooltip } from "@webpack/common";
-import { React } from "@webpack/common";
+import { React, Tooltip } from "@webpack/common";
 
 const test = (data, output) => {
     return <span>{output(data.content)} skiibid</span>;

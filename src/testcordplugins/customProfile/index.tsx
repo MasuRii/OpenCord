@@ -175,7 +175,7 @@ const LS_ALL_ENABLED = "NightcordCP_allEnabled";
 
 let storedData: CustomProfileData = {};
 let isEnabled = false;
-let domObserver: MutationObserver | null = null;
+let domObserver: ReturnType<typeof setInterval> | null = null;
 
 let cachedOriginalUser: any = null;
 let cachedFakeUser: any = null;
@@ -444,8 +444,9 @@ async function copyUserProfile(userId: string) {
 
         if (hasNitro) {
             const premiumSince = profile.premiumSince ?? user.premiumSince ?? null;
-            if (premiumSince) {
-                const months = Math.floor((Date.now() - new Date(premiumSince).getTime()) / (1000 * 60 * 60 * 24 * 30));
+            const pTs = new Date(premiumSince).getTime();
+            if (!isNaN(pTs)) {
+                const months = Math.floor((Date.now() - pTs) / (1000 * 60 * 60 * 24 * 30));
                 if (months >= 72) newData.nitroLevel = 8;
                 else if (months >= 36) newData.nitroLevel = 7;
                 else if (months >= 24) newData.nitroLevel = 6;
@@ -462,16 +463,19 @@ async function copyUserProfile(userId: string) {
 
         const boostSince = profile.premiumGuildSince ?? null;
         if (boostSince) {
-            const bMonths = Math.floor((Date.now() - new Date(boostSince).getTime()) / (1000 * 60 * 60 * 24 * 30));
-            if (bMonths >= 24) newData.boostMonths = 8;
-            else if (bMonths >= 18) newData.boostMonths = 7;
-            else if (bMonths >= 15) newData.boostMonths = 6;
-            else if (bMonths >= 12) newData.boostMonths = 5;
-            else if (bMonths >= 9) newData.boostMonths = 4;
-            else if (bMonths >= 6) newData.boostMonths = 3;
-            else if (bMonths >= 3) newData.boostMonths = 2;
-            else if (bMonths >= 2) newData.boostMonths = 1;
-            else newData.boostMonths = 0;
+            const bTs = new Date(boostSince).getTime();
+            if (!isNaN(bTs)) {
+                const bMonths = Math.floor((Date.now() - bTs) / (1000 * 60 * 60 * 24 * 30));
+                if (bMonths >= 24) newData.boostMonths = 8;
+                else if (bMonths >= 18) newData.boostMonths = 7;
+                else if (bMonths >= 15) newData.boostMonths = 6;
+                else if (bMonths >= 12) newData.boostMonths = 5;
+                else if (bMonths >= 9) newData.boostMonths = 4;
+                else if (bMonths >= 6) newData.boostMonths = 3;
+                else if (bMonths >= 3) newData.boostMonths = 2;
+                else if (bMonths >= 2) newData.boostMonths = 1;
+                else newData.boostMonths = 0;
+            }
         }
 
         const bannerId = profile.banner ?? user.banner ?? null;
@@ -564,10 +568,14 @@ function getRealNames(): { username: string | null; globalName: string | null; }
     } catch { return { username: null, globalName: null }; }
 }
 
+let _realDateKey: string | null = null;
+let _realDateVariants: string[] = [];
 function getRealDateVariants(): string[] {
     try {
         const u = UserStore.getCurrentUser();
         if (!u?.id) return [];
+        if (u.id === _realDateKey) return _realDateVariants;
+        _realDateKey = u.id;
         const ms = Number(BigInt(u.id) >> 22n) + 1420070400000;
         const d = new Date(ms);
         const variants = new Set<string>();
@@ -592,12 +600,16 @@ function getRealDateVariants(): string[] {
         const mS = monthsShort[d.getMonth()]; const mL = monthsLong[d.getMonth()];
         const patterns = [`${day} ${mS} ${year}`, `${day} ${mL} ${year}`, `${mS} ${day}, ${year}`, `${mL} ${day}, ${year}`, d.toISOString().slice(0, 10)];
         for (const p of patterns) { variants.add(p); variants.add(p.replace(/ /g, "\u00a0")); variants.add(p.replace(/\u00a0/g, " ")); }
-        variants.add(year.toString()); return [...variants].filter(v => v.length >= 4);
+        variants.add(year.toString()); _realDateVariants = [...variants].filter(v => v.length >= 4); return _realDateVariants;
     } catch { return []; }
 }
 
+let _fakeDateKey: string | null = null;
+let _fakeDateVariants: string[] = [];
 function getFakeDateVariants(isoDate: string): string[] {
     try {
+        if (isoDate === _fakeDateKey) return _fakeDateVariants;
+        _fakeDateKey = isoDate;
         const d = new Date(isoDate + "T12:00:00Z");
         const variants = new Set<string>();
         const fmtSpecs: Intl.DateTimeFormatOptions[] = [
@@ -607,20 +619,19 @@ function getFakeDateVariants(isoDate: string): string[] {
             { month: "long", day: "numeric", year: "numeric" },
         ];
         for (const fmt of fmtSpecs) { try { variants.add(new Intl.DateTimeFormat(navigator.language, fmt).format(d)); } catch { } }
-        return [...variants];
+        _fakeDateVariants = [...variants];
+        return _fakeDateVariants;
     } catch { return []; }
 }
 
 let _cachedMyId: string | null = null;
 let _realUsername = "";
 let _realGlobalName = "";
+let customProfileGeneration = 0;
 
 function updateCachedRealData() {
     try { const myId = AuthenticationStore?.getId?.(); if (myId) _cachedMyId = myId; } catch { }
 }
-
-let _domQueued = false;
-let _domMutations: MutationRecord[] = [];
 
 function scanTextNode(node: Text) {
     if (!isEnabled || !node.nodeValue) return;
@@ -651,30 +662,27 @@ function scanNode(node: Node) {
     while ((n = walker.nextNode())) scanTextNode(n as Text);
 }
 
-function processDomBatch() {
-    try {
-        if (!isEnabled) { _domMutations = []; return; }
-        const batch = _domMutations; _domMutations = [];
-        for (const m of batch) for (const n of m.addedNodes) scanNode(n);
-    } finally {
-        _domQueued = false;
-    }
+// Walking every text node in the client is expensive, so only do it when there is
+// actually a string to swap. With no fake name and no fake creation date configured
+// the walk could never change anything, and it was still running every 5 seconds.
+function hasTextReplacements(): boolean {
+    if (storedData.createdAt) return true;
+    if (storedData.username && _realUsername) return true;
+    if (storedData.globalName && _realGlobalName) return true;
+    return false;
 }
 
 function startDomObserver() {
     stopDomObserver(); if (!isEnabled) return;
     scanNode(document.body);
-    domObserver = new MutationObserver(mutations => {
-        if (!isEnabled || !mutations.length) return;
-        _domMutations.push(...mutations);
-        if (_domMutations.length > 5000) _domMutations = _domMutations.slice(-5000);
-        if (!_domQueued) { _domQueued = true; setTimeout(() => requestAnimationFrame(processDomBatch), 10); }
-    });
-    domObserver.observe(document.body, { childList: true, subtree: true });
+    domObserver = setInterval(() => {
+        if (!isEnabled || !hasTextReplacements()) return;
+        scanNode(document.body);
+    }, 5000);
 }
 
 function stopDomObserver() {
-    domObserver?.disconnect(); domObserver = null;
+    if (domObserver) { clearInterval(domObserver); domObserver = null; }
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let n: Node | null;
     while ((n = walker.nextNode())) { if ((n as any).__cp_orig !== undefined) { n.nodeValue = (n as any).__cp_orig; delete (n as any).__cp_orig; } }
@@ -1149,13 +1157,6 @@ export default definePlugin({
         // VIEW_CHANNEL and other permissions. virtualMerge with premiumType:2 corrupted
         // these calculations even with isMe() guard. DomObserver + fakeCurrentUser are enough.
         {
-            find: ".WIDGETS_RTC_UPSELL_COACHMARK)",
-            replacement: {
-                match: /currentUser:(\i)(?=.{0,200}voiceDb)/,
-                replace: "currentUser:$self.fakeCurrentUser($1)"
-            }
-        },
-        {
             find: "DISPLAY_NAME",
             noWarn: true,
             replacement: {
@@ -1164,61 +1165,12 @@ export default definePlugin({
             }
         },
         {
-            find: "obfuscatedEmail",
-            noWarn: true,
-            replacement: [
-                {
-                    match: /obfuscatedEmail:(\i)/,
-                    replace: "obfuscatedEmail:$self.fakeObfuscatedEmail($1)"
-                },
-                {
-                    match: /obfuscatedPhone:(\i)/,
-                    replace: "obfuscatedPhone:$self.fakeObfuscatedPhone($1)"
-                }
-            ]
-        },
-        {
             find: "isHoveringOrFocusing",
             replacement: [
                 {
                     noWarn: true,
                     match: /user:([A-Za-z_$][\w$]*),displayProfile:([A-Za-z_$][\w$]*),themeType/,
                     replace: "user:$self.fakeCurrentUser($1),displayProfile:$2,themeType"
-                }
-            ]
-        },
-        {
-            find: "AccountPanel",
-            replacement: [
-                {
-                    match: /user:([a-zA-Z0-9_]+),/,
-                    replace: "user:$self.fakeCurrentUser($1),"
-                }
-            ]
-        },
-        {
-            find: "UserAccountSettings",
-            replacement: [
-                {
-                    match: /user:([a-zA-Z0-9_]+),/,
-                    replace: "user:$self.fakeCurrentUser($1),"
-                },
-                {
-                    match: /email:([^,}]+),/,
-                    replace: "email:$self.fakeObfuscatedEmail($1),"
-                }
-            ]
-        },
-        {
-            find: "getObfuscatedEmail",
-            replacement: [
-                {
-                    match: /obfuscatedEmail:([^,}]+)/g,
-                    replace: "obfuscatedEmail:$self.fakeObfuscatedEmail($1)"
-                },
-                {
-                    match: /obfuscatedPhone:([^,}]+)/g,
-                    replace: "obfuscatedPhone:$self.fakeObfuscatedPhone($1)"
                 }
             ]
         }
@@ -1302,12 +1254,15 @@ export default definePlugin({
         // We redefine it directly on the clone so Discord displays the fake date
         // without needing to scan the DOM.
         if (storedData.createdAt) {
-            const fakeCreatedAt = new Date(storedData.createdAt + "T12:00:00Z");
-            Object.defineProperty(clone, "createdAt", {
-                get: () => fakeCreatedAt,
-                configurable: true,
-                enumerable: true
-            });
+            const dateStr = storedData.createdAt.includes("T") ? storedData.createdAt : storedData.createdAt + "T12:00:00Z";
+            const fakeCreatedAt = new Date(dateStr);
+            if (!isNaN(fakeCreatedAt.getTime())) {
+                Object.defineProperty(clone, "createdAt", {
+                    get: () => fakeCreatedAt,
+                    configurable: true,
+                    enumerable: true
+                });
+            }
         }
 
         if (storedData.decorationAsset) {
@@ -1462,6 +1417,7 @@ export default definePlugin({
     _forceNative: false, // Tool variable for local reset
 
     async start() {
+        const generation = ++customProfileGeneration;
         applyAvatarPatchEarly();
         patchPresence();
         addHeaderBarButton("custom-profile-btn", () => <CustomProfileButton />, 10);
@@ -1599,7 +1555,9 @@ export default definePlugin({
                 const origExtract = this._origExtractTimestamp;
                 (SnowflakeUtils as any).extractTimestamp = (snowflake: string) => {
                     if (isEnabled && storedData.createdAt && isMe(snowflake)) {
-                        return new Date(storedData.createdAt + "T12:00:00Z").getTime();
+                        const dateStr = storedData.createdAt.includes("T") ? storedData.createdAt : storedData.createdAt + "T12:00:00Z";
+                        const ts = new Date(dateStr).getTime();
+                        if (!isNaN(ts)) return ts;
                     }
                     return origExtract(snowflake);
                 };
@@ -1607,6 +1565,7 @@ export default definePlugin({
         } catch { }
 
         loadData().then(() => {
+            if (generation !== customProfileGeneration) return;
             updateCachedRealData();
             applyAvatarPatchEarly();
             if (isEnabled) {
@@ -1820,6 +1779,7 @@ export default definePlugin({
     ] as ProfileBadge[],
 
     stop() {
+        customProfileGeneration++;
         unpatchPresence();
         removeHeaderBarButton("custom-profile-btn");
         removeContextMenuPatch("user-context", userContextMenuPatch);

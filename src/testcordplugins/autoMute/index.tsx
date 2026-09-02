@@ -9,8 +9,7 @@ import { definePluginSettings } from "@api/Settings";
 import { debounce } from "@shared/debounce";
 import { TestcordDevs } from "@utils/constants";
 import { humanFriendlyJoin } from "@utils/text";
-import definePlugin, { OptionType } from "@utils/types";
-import { makeRange } from "@utils/types";
+import definePlugin, { makeRange, OptionType } from "@utils/types";
 import { User } from "@vencord/discord-types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import { ChannelStore, GuildMemberStore, Menu, RelationshipStore, SelectedChannelStore, Toasts, UserStore } from "@webpack/common";
@@ -91,8 +90,12 @@ const settings = definePluginSettings({
     }
 });
 
+const AUTO_MUTE_KEYS = ["isEnabled", "timeout", "nonFriendJoinsChannel"];
+
 const AudioDeviceContextMenuPatch: NavContextMenuPatchCallback = (children, props: { renderInputVolume?: boolean; }) => {
-    const { isEnabled, timeout, nonFriendJoinsChannel } = settings.use(["isEnabled", "timeout", "nonFriendJoinsChannel"]);
+    const { isEnabled } = settings.store;
+    const { timeout } = settings.store;
+    const { nonFriendJoinsChannel } = settings.store;
 
     if ("renderInputVolume" in props) {
         children.splice(children.length - 1, 0,

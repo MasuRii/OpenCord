@@ -6,8 +6,7 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { TestcordDevs } from "@utils/constants";
-import definePlugin, { OptionType, } from "@utils/types";
-import { makeRange } from "@utils/types";
+import definePlugin, { makeRange, OptionType, } from "@utils/types";
 
 const settings = definePluginSettings({
     clipLength: {
@@ -28,15 +27,14 @@ export default definePlugin({
         {
             find: '"Save clip keybind unset"',
             replacement: {
-                match: /\)}](?<={value:.{14,17},label:(.{35,55}:).{3,7})/,
-                replace: "$&.concat({value:$self.getClipLength(true),label:$1$self.getClipLength(false)})})"
+                match: /(\{value:\i,label:.+?\}\])/,
+                replace: "$1.concat({value:$self.getClipLength(true),label:$self.getClipLength(false)})"
             }
         },
     ],
     settings,
     getClipLength(millis: boolean) {
         const minutes = settings.store.clipLength;
-        return millis ? minutes * 6e4 : minutes;
-
+        return millis ? minutes * 6e4 : `${minutes} minutes`;
     }
 });

@@ -8,7 +8,6 @@ import { definePluginSettings } from "@api/Settings";
 import { BaseText } from "@components/BaseText";
 import { Flex } from "@components/Flex";
 import { TestcordDevs } from "@utils/constants";
-import { openModal } from "@utils/modal";
 import {
     ModalCloseButton,
     ModalContent,
@@ -17,6 +16,7 @@ import {
     ModalProps,
     ModalRoot,
     ModalSize,
+    openModal,
 } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import {

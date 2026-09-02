@@ -13,7 +13,7 @@ import { Button, TextInput, Toasts, UserStore } from "@webpack/common";
 import { useUsersProfileStore } from "../lib/stores/UsersProfileStore";
 import { settings } from "../settings";
 
-const CustomizationSection = findComponentByCodeLazy(".customizationSectionBackground");
+const CustomizationSection = findComponentByCodeLazy(".DESCRIPTION", "hasBackground:");
 export const cl = classNameFactory("vc-decor-");
 const STATUS_KEYS = ["fakeStatusEnabled", "fakeStatusText", "fakeStatusEmojiName", "fakeStatusEmojiId", "fakeStatusEmojiAnimated"] as const;
 

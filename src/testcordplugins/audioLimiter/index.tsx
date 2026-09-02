@@ -6,6 +6,7 @@
 
 import { showNotification } from "@api/Notifications";
 import { definePluginSettings } from "@api/Settings";
+import { FormSwitch } from "@components/FormSwitch";
 import { TestcordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
@@ -66,6 +67,8 @@ const limiterState = {
   peakLevel: 0,
   limitingCount: 0,
   lastNotification: 0,
+  rafId: 0,
+  volumeTimerId: 0,
 };
 
 // Function to get current volume
@@ -96,12 +99,20 @@ function setVolume(volume: number) {
   }
 }
 
+// Reused across frames. Allocating a fresh Uint8Array inside the rAF loop meant a
+// new heap buffer 60 times a second for the entire time the limiter was running,
+// which kept the GC busy for no reason.
+let levelBuffer: Uint8Array<ArrayBuffer> | null = null;
+
 // Function to analyze audio level
 function analyzeAudioLevel(): number {
   if (!limiterState.analyser) return 0;
 
   const bufferLength = limiterState.analyser.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
+  if (!levelBuffer || levelBuffer.length !== bufferLength) {
+    levelBuffer = new Uint8Array(bufferLength);
+  }
+  const dataArray = levelBuffer;
   limiterState.analyser.getByteFrequencyData(dataArray);
 
   // Calculate RMS level
@@ -234,26 +245,17 @@ function startLevelMonitoring() {
     }
 
     // Continue monitoring
-    requestAnimationFrame(monitorLevels);
+    limiterState.rafId = requestAnimationFrame(monitorLevels);
   }
 
-  monitorLevels();
+  limiterState.rafId = requestAnimationFrame(monitorLevels);
 }
 
 // Function to start volume monitoring
 function startVolumeMonitoring() {
   if (!settings.store.enableVolumeLimiting) return;
 
-  function monitorVolume() {
-    if (!limiterState.isActive || !settings.store.enableVolumeLimiting) return;
-
-    checkAndLimitVolume();
-
-    // Continue monitoring
-    setTimeout(monitorVolume, 100); // Check every 100ms
-  }
-
-  monitorVolume();
+  limiterState.volumeTimerId = window.setInterval(checkAndLimitVolume, 100);
 }
 
 // Function to start the limiter
@@ -288,6 +290,11 @@ function stopLimiter() {
   try {
     limiterState.isActive = false;
 
+    cancelAnimationFrame(limiterState.rafId);
+    limiterState.rafId = 0;
+    clearInterval(limiterState.volumeTimerId);
+    limiterState.volumeTimerId = 0;
+
     // Clean up audio context
     if (limiterState.audioContext) {
       limiterState.audioContext.close();
@@ -301,8 +308,6 @@ function stopLimiter() {
     limiterState.currentLevel = 0;
     limiterState.peakLevel = 0;
     limiterState.limitingCount = 0;
-
-    console.log("Audio Limiter: Limiter stopped");
   } catch (error) {
     console.error("Audio Limiter: Error stopping limiter:", error);
   }
@@ -386,7 +391,6 @@ function VisualIndicator() {
 }
 
 // Settings component
-const _Forms = Forms as any;
 const _Slider = Slider as any;
 
 function SettingsPanel() {
@@ -403,73 +407,54 @@ function SettingsPanel() {
 
       <Forms.FormDivider />
 
-      <_Forms.FormItem>
-        <_Forms.FormLabel>Maximum Volume (%)</_Forms.FormLabel>
-        <_Slider
-          initialValue={settings.store.maxVolume}
-          onValueChange={(value: any) => (settings.store.maxVolume = value)}
-          min={10}
-          max={100}
-          markers={[50, 60, 70, 80, 90, 100]}
-          stickToMarkers={false}
-        />
-        <Forms.FormText>
-          Maximum allowed volume: {settings.store.maxVolume}%
-        </Forms.FormText>
-      </_Forms.FormItem>
+      <Forms.FormTitle>Maximum Volume (%)</Forms.FormTitle>
+      <_Slider
+        initialValue={settings.store.maxVolume}
+        onValueChange={(value: any) => (settings.store.maxVolume = value)}
+        min={10}
+        max={100}
+        markers={[50, 60, 70, 80, 90, 100]}
+        stickToMarkers={false}
+      />
+      <Forms.FormText>
+        Maximum allowed volume: {settings.store.maxVolume}%
+      </Forms.FormText>
 
-      <_Forms.FormItem>
-        <_Forms.FormLabel>Maximum Decibels (dB)</_Forms.FormLabel>
-        <_Slider
-          initialValue={settings.store.maxDecibels}
-          onValueChange={(value: any) => (settings.store.maxDecibels = value)}
-          min={-20}
-          max={0}
-          markers={[-20, -15, -10, -6, -3, 0]}
-          stickToMarkers={false}
-        />
-        <Forms.FormText>
-          Maximum audio level: {settings.store.maxDecibels} dB
-        </Forms.FormText>
-      </_Forms.FormItem>
+      <Forms.FormTitle>Maximum Decibels (dB)</Forms.FormTitle>
+      <_Slider
+        initialValue={settings.store.maxDecibels}
+        onValueChange={(value: any) => (settings.store.maxDecibels = value)}
+        min={-20}
+        max={0}
+        markers={[-20, -15, -10, -6, -3, 0]}
+        stickToMarkers={false}
+      />
+      <Forms.FormText>
+        Maximum audio level: {settings.store.maxDecibels} dB
+      </Forms.FormText>
 
       <Forms.FormDivider />
 
-      <_Forms.FormItem>
-        <_Forms.FormSwitch
-          value={settings.store.enableVolumeLimiting}
-          onChange={(value: any) => (settings.store.enableVolumeLimiting = value)}
-        >
-          Enable volume limiting
-        </_Forms.FormSwitch>
-      </_Forms.FormItem>
-
-      <_Forms.FormItem>
-        <_Forms.FormSwitch
-          value={settings.store.enableDbLimiting}
-          onChange={(value: any) => (settings.store.enableDbLimiting = value)}
-        >
-          Enable decibel limiting
-        </_Forms.FormSwitch>
-      </_Forms.FormItem>
-
-      <_Forms.FormItem>
-        <_Forms.FormSwitch
-          value={settings.store.showNotifications}
-          onChange={(value: any) => (settings.store.showNotifications = value)}
-        >
-          Show notifications
-        </_Forms.FormSwitch>
-      </_Forms.FormItem>
-
-      <_Forms.FormItem>
-        <_Forms.FormSwitch
-          value={settings.store.showVisualIndicator}
-          onChange={(value: any) => (settings.store.showVisualIndicator = value)}
-        >
-          Show visual indicator
-        </_Forms.FormSwitch>
-      </_Forms.FormItem>
+      <FormSwitch
+        title="Enable volume limiting"
+        value={settings.store.enableVolumeLimiting}
+        onChange={value => (settings.store.enableVolumeLimiting = value)}
+      />
+      <FormSwitch
+        title="Enable decibel limiting"
+        value={settings.store.enableDbLimiting}
+        onChange={value => (settings.store.enableDbLimiting = value)}
+      />
+      <FormSwitch
+        title="Show notifications"
+        value={settings.store.showNotifications}
+        onChange={value => (settings.store.showNotifications = value)}
+      />
+      <FormSwitch
+        title="Show visual indicator"
+        value={settings.store.showVisualIndicator}
+        onChange={value => (settings.store.showVisualIndicator = value)}
+      />
 
       <Forms.FormDivider />
 

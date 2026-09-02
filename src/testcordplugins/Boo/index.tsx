@@ -5,7 +5,7 @@
  */
 
 import ErrorBoundary from "@components/ErrorBoundary";
-import { Devs, TestcordDevs } from "@utils/constants";
+import { TestcordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 
 import Boo from "./components/Boo";
@@ -34,8 +34,3 @@ export default definePlugin({
         );
     }
 });
-
-
-
-
-

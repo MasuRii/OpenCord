@@ -15,20 +15,22 @@ import type { MessageDecorationProps } from "../../api/MessageDecorations";
 const ActivityCard = findComponentByCodeLazy(".USER_PROFILE_LIVE_ACTIVITY_CARD),{themeType:");
 
 function ListeningCover({ message }: MessageDecorationProps) {
-    const activities = useStateFromStores([PresenceStore], () =>
+    const ref = useRef<HTMLDivElement>(null);
+    // find, not filter: getActivities keeps the same objects until that user's presence
+    // changes, so this stays reference-stable and the default identity check holds. A fresh
+    // array never compared equal, so every row re-rendered on every presence emit.
+    const activity = useStateFromStores([PresenceStore], () =>
         PresenceStore.getActivities(message.author.id)
-            .filter(a => a.type === ActivityType.LISTENING && a.assets?.large_image)
+            .find(a => a.type === ActivityType.LISTENING && a.assets?.large_image) ?? null,
+        [message.author.id]
     );
 
-    const activity = activities[0];
     if (!activity) return null;
 
     const largeImage = activity.assets!.large_image!;
     const url = largeImage.startsWith("spotify:")
         ? largeImage.replace("spotify:", "https://i.scdn.co/image/")
         : largeImage.replace("mp:", "https://media.discordapp.net/");
-
-    const ref = useRef<HTMLDivElement>(null);
 
     return <Popout
         position="top"

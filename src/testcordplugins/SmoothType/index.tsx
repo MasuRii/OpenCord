@@ -14,7 +14,7 @@ const settings = definePluginSettings({
     transitionDelay: {
         type: OptionType.NUMBER,
         description: "Transition Delay (ms)",
-        default: 60,
+        default: 75,
         onChange: () => applyCSS(),
     },
     animationType: {
@@ -84,13 +84,15 @@ function buildCSS(): string {
 #vc-smoothtype-caret {
     position: fixed;
     top: 0; left: 0;
+    transform: translate3d(0, 0, 0);
     width: 2px;
     border-radius: 2px;
     background: ${color};
     pointer-events: none;
     z-index: 99999;
     display: none;
-    transition: left ${ms}ms ${easing}, top ${ms}ms ${easing}, height ${ms}ms ${easing};
+    will-change: transform, height;
+    transition: transform ${ms}ms ${easing}, height ${ms}ms ${easing};
 }
 [data-slate-editor] { caret-color: transparent !important; }
 `;
@@ -126,55 +128,105 @@ function applyCaretPosition() {
     const range = sel.getRangeAt(0).cloneRange();
     range.collapse(false);
     const rects = range.getClientRects();
-    let rect: DOMRect | null = rects.length > 0 ? rects[0] : null;
+    let rect: DOMRect | null = rects.length > 0 ? rects[rects.length - 1] : null;
     if (!rect || rect.height === 0) {
         const node = range.startContainer;
         const parent = (node.nodeType === Node.TEXT_NODE ? node.parentElement : node) as HTMLElement | null;
         if (parent) rect = parent.getBoundingClientRect();
     }
     if (!rect || rect.height === 0) { el.style.display = "none"; return; }
-    const newLeft = rect.right + "px";
-    const newTop = rect.top + "px";
-    if (el.style.left !== newLeft || el.style.top !== newTop) {
+    const newTransform = `translate3d(${rect.right}px, ${rect.top}px, 0)`;
+    if (el.style.transform !== newTransform) {
         if (el.style.display !== "none") stopBlink();
     }
     el.style.display = "block";
-    el.style.left = newLeft;
-    el.style.top = rect.top + "px";
+    el.style.transform = newTransform;
     el.style.height = rect.height + "px";
 }
 
 let observer: MutationObserver | null = null;
-let caretScanQueued = false;
+let scanQueued = false;
+let scanFrame: number | null = null;
+let caretQueued = false;
+let caretFrame: number | null = null;
+
+let observedEditor: Element | null = null;
+
+function hideCaret() {
+    const el = document.getElementById("vc-smoothtype-caret") as HTMLDivElement | null;
+    if (el) el.style.display = "none";
+}
+
+function scheduleApplyCaretPosition() {
+    if (!document.activeElement?.closest("[data-slate-editor]")) {
+        hideCaret();
+        return;
+    }
+    if (caretQueued) return;
+
+    caretQueued = true;
+    caretFrame = requestAnimationFrame(() => {
+        caretFrame = null;
+        caretQueued = false;
+        applyCaretPosition();
+    });
+}
+
+// The caret moves on selection changes (typing, arrows, clicks), which the direct
+// listeners already handle synchronously. The observer only needs to catch the rarer
+// case where the editor reflows without a selection change (line wrap, input growth).
+// Observing the focused editor element instead of document.body means Discord's constant
+// body-subtree churn (typing indicators, message list, popouts) never wakes it, which is
+// what caused the typing lag spikes.
+function observeEditor() {
+    const editor = document.activeElement?.closest("[data-slate-editor]") ?? null;
+    if (editor === observedEditor) return;
+    observer?.disconnect();
+    observedEditor = editor;
+    if (editor) observer?.observe(editor, { childList: true, subtree: true, characterData: true });
+}
 
 function startObserver() {
-    // The caret only matters while a slate editor is focused. Bail immediately
-    // otherwise, and coalesce a burst of mutations into a single rAF-scoped pass
-    // instead of running getSelection + getClientRects on every DOM mutation.
     observer = new MutationObserver(() => {
-        if (caretScanQueued) return;
-        if (!document.activeElement?.closest("[data-slate-editor]")) return;
-        caretScanQueued = true;
-        requestAnimationFrame(() => {
-            caretScanQueued = false;
-            applyCaretPosition();
+        if (scanQueued) return;
+        scanQueued = true;
+        scanFrame = requestAnimationFrame(() => {
+            scanFrame = null;
+            scanQueued = false;
+            if (observer) applyCaretPosition();
         });
     });
-    observer.observe(document.body, { childList: true, subtree: true });
 }
 
 function stopObserver() {
     observer?.disconnect();
     observer = null;
-    caretScanQueued = false;
+    observedEditor = null;
+    if (scanFrame !== null) {
+        cancelAnimationFrame(scanFrame);
+        scanFrame = null;
+    }
+    if (caretFrame !== null) {
+        cancelAnimationFrame(caretFrame);
+        caretFrame = null;
+    }
+    scanQueued = false;
+    caretQueued = false;
 }
 
 const handlers = {
-    sel:   () => applyCaretPosition(),
-    focus: () => applyCaretPosition(),
-    blur:  () => { getCaret().style.display = "none"; },
-    key:   () => applyCaretPosition(),
-    click: () => applyCaretPosition(),
+    sel:   () => scheduleApplyCaretPosition(),
+    focus: () => { observeEditor(); scheduleApplyCaretPosition(); },
+    blur:  () => { observeEditor(); hideCaret(); },
+    key:   () => scheduleApplyCaretPosition(),
+    click: (e: MouseEvent) => {
+        if (!(e.target instanceof Element) || !e.target.closest("[data-slate-editor]")) {
+            hideCaret();
+            return;
+        }
+        observeEditor();
+        scheduleApplyCaretPosition();
+    },
 };
 
 function startListeners() {

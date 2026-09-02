@@ -17,6 +17,8 @@ import { formatBytes, MetadataResult, parseMetadata } from "./parser";
 import { getMimeFromExtension } from "./utils";
 
 const logger = new Logger("MetadataScanner");
+const MAX_SCAN_BYTES = 50 * 1024 * 1024;
+const FETCH_TIMEOUT_MS = 15000;
 
 interface ThemeStoreShape {
     theme: "light" | "dark";
@@ -204,11 +206,12 @@ export function MetadataScannerModal({ rootProps, url, name, mimeType, size }: {
     };
 
     const downloadImage = async () => {
+        let blobUrl: string | null = null;
         try {
             showToast("Downloading image...", Toasts.Type.MESSAGE);
             const response = await fetch(url);
             const blob = await response.blob();
-            const blobUrl = URL.createObjectURL(blob);
+            blobUrl = URL.createObjectURL(blob);
 
             const a = document.createElement("a");
             a.href = blobUrl;
@@ -216,11 +219,12 @@ export function MetadataScannerModal({ rootProps, url, name, mimeType, size }: {
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            URL.revokeObjectURL(blobUrl);
             showToast("Image download started!", Toasts.Type.SUCCESS);
         } catch (err) {
             logger.error("Failed to download image", err);
             showToast("Failed to download: " + String(err), Toasts.Type.FAILURE);
+        } finally {
+            if (blobUrl) URL.revokeObjectURL(blobUrl);
         }
     };
 
@@ -317,10 +321,13 @@ export function MetadataScannerModal({ rootProps, url, name, mimeType, size }: {
         if (confirmScanLargeFile) return;
 
         const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         let active = true;
 
         async function fetchAndParse() {
             try {
+                if (size && size > MAX_SCAN_BYTES) throw new Error("File exceeds size limit (50MB)");
+
                 let buffer: ArrayBuffer;
                 let resolvedMimeType = mimeType || "";
                 if (Native) {
@@ -330,12 +337,18 @@ export function MetadataScannerModal({ rootProps, url, name, mimeType, size }: {
                         throw new Error(res.error || "Failed to fetch attachment via native helper");
                     }
                     const uint8 = res.data;
-                    buffer = uint8.buffer.slice(uint8.byteOffset, uint8.byteOffset + uint8.byteLength) as ArrayBuffer;
+                    if (uint8.byteLength > MAX_SCAN_BYTES) throw new Error("File exceeds size limit (50MB)");
+                    buffer = uint8.byteOffset === 0 && uint8.byteLength === uint8.buffer.byteLength
+                        ? uint8.buffer as ArrayBuffer
+                        : uint8.buffer.slice(uint8.byteOffset, uint8.byteOffset + uint8.byteLength) as ArrayBuffer;
                 } else {
                     const response = await fetch(url, { signal: controller.signal });
                     if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+                    const contentLength = Number(response.headers.get("content-length"));
+                    if (contentLength > MAX_SCAN_BYTES) throw new Error("File exceeds size limit (50MB)");
                     resolvedMimeType = resolvedMimeType || response.headers.get("Content-Type") || "";
                     buffer = await response.arrayBuffer();
+                    if (buffer.byteLength > MAX_SCAN_BYTES) throw new Error("File exceeds size limit (50MB)");
                 }
 
                 if (!active) return;
@@ -356,6 +369,8 @@ export function MetadataScannerModal({ rootProps, url, name, mimeType, size }: {
                     setError((e instanceof Error ? e.message : String(e)) || "Failed to fetch file. CORS restrictions might apply.");
                     setLoading(false);
                 }
+            } finally {
+                clearTimeout(timeout);
             }
         }
 
@@ -363,6 +378,7 @@ export function MetadataScannerModal({ rootProps, url, name, mimeType, size }: {
 
         return () => {
             active = false;
+            clearTimeout(timeout);
             controller.abort();
         };
     }, [url, confirmScanLargeFile]);

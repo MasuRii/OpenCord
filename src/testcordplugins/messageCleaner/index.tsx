@@ -78,6 +78,9 @@ const settings = definePluginSettings({
 // Global variables for control
 let isCleaningInProgress = false;
 let shouldStopCleaning = false;
+let cleaningGeneration = 0;
+let cleaningDelayTimeout: ReturnType<typeof setTimeout> | null = null;
+let cleaningDelayResolve: (() => void) | null = null;
 let cleaningStats = {
     total: 0,
     deleted: 0,
@@ -101,6 +104,27 @@ function log(message: string, level: "info" | "warn" | "error" = "info") {
         default:
             console.log(prefix, message);
     }
+}
+
+function waitCleaningDelay(ms: number) {
+    if (shouldStopCleaning) return Promise.resolve();
+    return new Promise<void>(resolve => {
+        cleaningDelayResolve = resolve;
+        cleaningDelayTimeout = setTimeout(() => {
+            cleaningDelayTimeout = null;
+            cleaningDelayResolve = null;
+            resolve();
+        }, ms);
+    });
+}
+
+function clearCleaningDelay() {
+    if (cleaningDelayTimeout) {
+        clearTimeout(cleaningDelayTimeout);
+        cleaningDelayTimeout = null;
+    }
+    cleaningDelayResolve?.();
+    cleaningDelayResolve = null;
 }
 
 // Debug log
@@ -297,6 +321,7 @@ function updateProgress() {
 
 // Main cleaning function
 async function cleanChannel(channelId: string) {
+    const generation = cleaningGeneration;
     if (!settings.store.enabled) {
         log("Plugin disabled", "warn");
         return;
@@ -351,6 +376,7 @@ async function cleanChannel(channelId: string) {
         for (let i = 0; i < 10; i++) {
             // Maximum 10 batches for estimation
             const messages = await getChannelMessages(channelId, lastMessageId);
+            if (generation !== cleaningGeneration || shouldStopCleaning) return;
             if (messages.length === 0) break;
 
             const validMessages = messages.filter(msg =>
@@ -405,6 +431,7 @@ async function cleanChannel(channelId: string) {
         while (!shouldStopCleaning) {
             try {
                 const messages = await getChannelMessages(channelId, lastMessageId);
+                if (generation !== cleaningGeneration || shouldStopCleaning) break;
 
                 if (messages.length === 0) {
                     log("No more messages to process");
@@ -436,6 +463,7 @@ async function cleanChannel(channelId: string) {
                     }
 
                     const success = await deleteMessage(channelId, message.id);
+                    if (generation !== cleaningGeneration || shouldStopCleaning) break;
 
                     if (success) {
                         cleaningStats.deleted++;
@@ -449,9 +477,8 @@ async function cleanChannel(channelId: string) {
 
                     // Anti-rate-limit delay
                     if (settings.store.delayBetweenDeletes > 0) {
-                        await new Promise(resolve =>
-                            setTimeout(resolve, settings.store.delayBetweenDeletes)
-                        );
+                        await waitCleaningDelay(settings.store.delayBetweenDeletes);
+                        if (generation !== cleaningGeneration || shouldStopCleaning) break;
                     }
 
                     // Update progress every 10 messages
@@ -489,11 +516,12 @@ async function cleanChannel(channelId: string) {
                 // Specific handling for rate limiting errors
                 if (statusCode === 429) {
                     log("Rate limit reached, extended pause...", "warn");
-                    await new Promise(resolve => setTimeout(resolve, 30000)); // 30 seconds
+                    await waitCleaningDelay(30000); // 30 seconds
                 } else {
                     // Wait a bit before continuing on normal error
-                    await new Promise(resolve => setTimeout(resolve, 5000)); // 5 seconds
+                    await waitCleaningDelay(5000); // 5 seconds
                 }
+                if (generation !== cleaningGeneration || shouldStopCleaning) break;
 
                 // If too many consecutive errors, stop
                 if (cleaningStats.failed > 15) {
@@ -562,7 +590,9 @@ async function cleanChannel(channelId: string) {
 // Function to stop cleaning
 function stopCleaning() {
     if (isCleaningInProgress) {
+        cleaningGeneration++;
         shouldStopCleaning = true;
+        clearCleaningDelay();
         log("⏹️ Cleaning stop requested");
 
         showNotification({
@@ -691,7 +721,9 @@ export default definePlugin({
 
         // Stop cleaning in progress
         if (isCleaningInProgress) {
+            cleaningGeneration++;
             shouldStopCleaning = true;
+            clearCleaningDelay();
         }
 
         showNotification({

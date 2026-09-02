@@ -6,7 +6,7 @@
 
 import { localStorage } from "@utils/localStorage";
 import { ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalProps, ModalRoot, ModalSize } from "@utils/modal";
-import { findByProps } from "@webpack";
+import { findByPropsLazy } from "@webpack";
 import { Button, FluxDispatcher, Forms, React, showToast, Text, TextInput, Toasts, useState } from "@webpack/common";
 
 interface AppIcon {
@@ -15,12 +15,21 @@ interface AppIcon {
     name: string,
     isPremium: boolean;
 }
+
+interface AppIconData {
+    UZ: AppIcon[];
+    QA: Record<string, AppIcon>;
+}
+
+const AppIconStore = findByPropsLazy("getCurrentDesktopIcon");
+const AppIconData = findByPropsLazy("UZ", "QA") as AppIconData;
+
 function AppIconModal(props: ModalProps) {
     const [name, setName] = useState("");
     const [imageUrl, setimageUrl] = useState("");
 
-    function addAppIcon(name, url) {
-        const appIcons = JSON.parse(localStorage.getItem("vc_app_icons") ?? "[]");
+    function addAppIcon(name: string, url: string) {
+        const appIcons = JSON.parse(localStorage.getItem("vc_app_icons") ?? "[]") as AppIcon[];
         const id = `${name.replaceAll(" ", "")}_${Date.now()}`; // avoid crashing if repeated name
         const icon = {
             "id": id,
@@ -30,13 +39,13 @@ function AppIconModal(props: ModalProps) {
         } as AppIcon;
 
         appIcons.push(icon);
-        findByProps("UZ", "QA").UZ.push(icon);
-        findByProps("UZ", "QA").QA[icon.id] = icon;
+        AppIconData.UZ.push(icon);
+        AppIconData.QA[icon.id] = icon;
         showToast("Added custom app icon!", Toasts.Type.SUCCESS);
         props.onClose();
-        const oldIcon = findByProps("getCurrentDesktopIcon").getCurrentDesktopIcon();
+        const oldIcon = AppIconStore.getCurrentDesktopIcon();
 
-        let random_icon = Object.keys(findByProps("UZ")).filter(icon => icon !== oldIcon) as [];
+        let random_icon = AppIconData.UZ.map(icon => icon.id).filter(icon => icon !== oldIcon) as [];
         random_icon = random_icon[Math.floor(Math.random() * random_icon.length)];
 
         FluxDispatcher.dispatch({

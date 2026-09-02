@@ -8,10 +8,10 @@ import { showNotification } from "@api/Notifications";
 import { classNameFactory } from "@utils/css";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, ModalSize, RenderModalProps } from "@utils/modal";
 import { saveFile } from "@utils/web";
-import { ChannelStore, GuildStore, NavigationRouter, React, SelectedGuildStore, useCallback, useEffect, useRef, useState } from "@webpack/common";
+import { ChannelStore, GuildStore, IconUtils, NavigationRouter, React, SelectedChannelStore, SelectedGuildStore, useCallback, useEffect, useRef, UserStore, useState } from "@webpack/common";
 
 import { settings } from "./index";
-import { deepSearch, FilterState, loadLastQuery, saveLastQuery, SearchResult } from "./search";
+import { deepSearch, FilterState, loadLastQuery, saveLastQuery, SearchResult, SearchTarget } from "./search";
 
 const cl = classNameFactory("vc-deepsearch-");
 
@@ -54,10 +54,24 @@ function FilterInput({ label, value, placeholder, onChange }: { label: string; v
     );
 }
 
+const highlightRegexCache = new Map<string, RegExp>();
+function getHighlightRegex(highlight: string): RegExp {
+    let rx = highlightRegexCache.get(highlight);
+    if (!rx) {
+        const escaped = highlight.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        rx = new RegExp(`(${escaped})`, "gi");
+        highlightRegexCache.set(highlight, rx);
+        if (highlightRegexCache.size > 64) {
+            const oldest = highlightRegexCache.keys().next().value;
+            if (oldest !== undefined) highlightRegexCache.delete(oldest);
+        }
+    }
+    return rx;
+}
+
 function highlightText(text: string, highlight: string): React.ReactNode {
     if (!highlight || !text) return text;
-    const escaped = highlight.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+    const parts = text.split(getHighlightRegex(highlight));
     return parts.map((part, i) =>
         part.toLowerCase() === highlight.toLowerCase() ? (
             <mark key={i} className={cl("highlight")}>{part}</mark>
@@ -159,6 +173,8 @@ function SearchResultItem({
     const { message, user, channel, matchedUrls } = result;
     const channelObj = ChannelStore.getChannel(message.channel_id);
     const channelName = channelObj?.name || "Unknown Channel";
+    const authorUser = user || (message.author?.id ? UserStore.getUser(message.author.id) : null) || message.author;
+    const avatarUrl = authorUser ? IconUtils.getUserAvatarURL(authorUser, true, 80) : null;
 
     return (
         <div
@@ -167,22 +183,22 @@ function SearchResultItem({
             onMouseEnter={onSelect}
         >
             <div className={cl("result-avatar")}>
-                {user?.avatar ? (
+                {avatarUrl ? (
                     <img
                         className={cl("result-avatar-img")}
-                        src={user.getAvatarURL?.(channel.guild_id, 80) ?? undefined}
+                        src={avatarUrl}
                         alt=""
                     />
                 ) : (
                     <div className={cl("result-avatar-fallback")}>
-                        {(user?.username || "?")[0].toUpperCase()}
+                        {(authorUser?.username || "?")[0].toUpperCase()}
                     </div>
                 )}
             </div>
             <div className={cl("result-body")}>
                 <div className={cl("result-header")}>
                     <span className={cl("result-author")}>
-                        {user?.globalName || user?.username || "Unknown"}
+                        {authorUser?.globalName || authorUser?.username || "Unknown"}
                     </span>
                     <span className={cl("result-channel")}>
                         #{channelName}
@@ -228,8 +244,13 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
     const searchInputRef = useRef<HTMLInputElement>(null);
     const resultsRef = useRef<HTMLDivElement>(null);
     const searchRunIdRef = useRef(0);
+    const abortRef = useRef<AbortController | null>(null);
 
     const currentGuildId = SelectedGuildStore.getGuildId() as string | undefined;
+    const currentChannelId = SelectedChannelStore.getChannelId() as string | undefined;
+
+    const targetGuildId = currentGuildId && currentGuildId !== "@me" ? currentGuildId : undefined;
+    const targetChannelId = currentChannelId;
 
     // Load saved query on mount
     useEffect(() => {
@@ -249,7 +270,10 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
     }, []);
 
     const doSearch = useCallback(async (q: string, f: FilterState) => {
-        if (!currentGuildId) return;
+        if (!targetGuildId && !targetChannelId) return;
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         const searchRunId = ++searchRunIdRef.current;
         const trimmed = q.trim();
         const hasAnyFilter = f.authorId || f.channelId || f.mentions ||
@@ -266,9 +290,10 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
         setSelectedIndex(-1);
         setResults([]);
         try {
-            const res = await deepSearch(currentGuildId, trimmed, f, settings.store.maxResults ?? 100, progress => {
+            const target: SearchTarget = targetGuildId ? { guildId: targetGuildId } : { channelId: targetChannelId };
+            const res = await deepSearch(target, trimmed, f, settings.store.maxResults ?? 100, progress => {
                 if (searchRunIdRef.current === searchRunId) setResults(progress);
-            });
+            }, controller.signal);
             if (searchRunIdRef.current === searchRunId) setResults(res);
         } catch (e) {
             console.error("[DeepSearch] Search failed:", e);
@@ -276,7 +301,12 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
         } finally {
             if (searchRunIdRef.current === searchRunId) setLoading(false);
         }
-    }, [currentGuildId]);
+    }, [targetGuildId, targetChannelId]);
+
+    useEffect(() => () => {
+        searchRunIdRef.current++;
+        abortRef.current?.abort();
+    }, []);
 
     const exportResults = useCallback(async () => {
         if (results.length === 0) {
@@ -285,7 +315,7 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
         }
 
         const filename = `deepsearch-results-${new Date().toISOString().split("T")[0]}.txt`;
-        const content = formatSearchResultsForExport(results, query, currentGuildId);
+        const content = formatSearchResultsForExport(results, query, targetGuildId);
 
         try {
             if (IS_DISCORD_DESKTOP) {
@@ -299,13 +329,15 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
         } catch {
             showNotification({ title: "Deep Search", body: "Failed to export search results." });
         }
-    }, [currentGuildId, query, results]);
+    }, [targetGuildId, query, results]);
 
     // Save query and run search on changes (debounced)
     useEffect(() => {
         if (!loaded) return;
-        saveLastQuery(query, filters);
-        const timeout = setTimeout(() => doSearch(query, filters), settings.store.searchTimeout ?? 300);
+        const timeout = setTimeout(() => {
+            saveLastQuery(query, filters);
+            doSearch(query, filters);
+        }, settings.store.searchTimeout ?? 300);
         return () => clearTimeout(timeout);
     }, [query, filters, loaded, doSearch]);
 
@@ -358,11 +390,15 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
         <ModalRoot {...rootProps} size={ModalSize.LARGE} className={cl("modal-root")}>
             <ModalHeader className={cl("header")}>
                 <span className={cl("header-title")}>Deep Search</span>
-                {currentGuildId && (
+                {targetGuildId ? (
                     <span className={cl("header-guild")}>
-                        {GuildStore.getGuild(currentGuildId)?.name || "Server"}
+                        {GuildStore.getGuild(targetGuildId)?.name || "Server"}
                     </span>
-                )}
+                ) : targetChannelId ? (
+                    <span className={cl("header-guild")}>
+                        #{ChannelStore.getChannel(targetChannelId)?.name || "Direct Message"}
+                    </span>
+                ) : null}
                 <ModalCloseButton onClick={rootProps.onClose} />
             </ModalHeader>
             <ModalContent className={cl("content")}>
@@ -388,6 +424,7 @@ export function DeepSearchModal({ rootProps }: { rootProps: RenderModalProps; })
                                     className={cl("search-clear")}
                                     onClick={() => {
                                         searchRunIdRef.current++;
+                                        abortRef.current?.abort();
                                         setQuery("");
                                         setResults([]);
                                         setSelectedIndex(-1);

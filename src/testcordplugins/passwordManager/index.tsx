@@ -11,8 +11,16 @@ import { Flex } from "@components/Flex";
 import SettingsPlugin from "@plugins/_core/settings";
 import { TestcordDevs } from "@utils/constants";
 import * as Modal from "@utils/modal";
-import definePlugin from "@utils/types";
+import definePlugin, { type IconProps } from "@utils/types";
 import { Button, React, Text, TextInput } from "@webpack/common";
+
+function LockIcon({ height = 20, width = 20, className }: IconProps) {
+    return (
+        <svg className={className} aria-hidden="true" role="img" xmlns="http://www.w3.org/2000/svg" width={width} height={height} fill="none" viewBox="0 0 24 24">
+            <path fill="currentColor" fillRule="evenodd" d="M6 9h1V6a5 5 0 0 1 10 0v3h1a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3Zm9-3v3H9V6a3 3 0 1 1 6 0Zm-1 8a2 2 0 0 1-1 1.73V18a1 1 0 1 1-2 0v-2.27A2 2 0 1 1 14 14Z" clipRule="evenodd" />
+        </svg>
+    );
+}
 
 interface PasswordEntry {
     id: string;
@@ -287,6 +295,9 @@ const SetMasterPasswordModal = ({ manager, onSuccess, ...props }: Modal.ModalPro
     const [password, setPassword] = React.useState("");
     const [confirmPassword, setConfirmPassword] = React.useState("");
     const [error, setError] = React.useState("");
+    const mountedRef = React.useRef(true);
+
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
 
     return (
         <Modal.ModalRoot {...props}>
@@ -323,6 +334,7 @@ const SetMasterPasswordModal = ({ manager, onSuccess, ...props }: Modal.ModalPro
                                 return;
                             }
                             await manager.setMasterPassword(password);
+                            if (!mountedRef.current) return;
                             onSuccess?.();
                             props.onClose();
                         }}
@@ -355,6 +367,9 @@ const DeletePasswordModal = ({
 }) => {
     const [masterPassword, setMasterPassword] = React.useState("");
     const [error, setError] = React.useState("");
+    const mountedRef = React.useRef(true);
+
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
 
     return (
         <Modal.ModalRoot {...props}>
@@ -381,6 +396,7 @@ const DeletePasswordModal = ({
                         disabled={!masterPassword}
                         onClick={async () => {
                             const success = await manager.deletePassword(passwordId, masterPassword);
+                            if (!mountedRef.current) return;
                             if (success) {
                                 onSuccess();
                                 props.onClose();
@@ -414,9 +430,13 @@ const ViewPasswordModal = ({
     const [masterPassword, setMasterPassword] = React.useState("");
     const [showPassword, setShowPassword] = React.useState(false);
     const [error, setError] = React.useState("");
+    const mountedRef = React.useRef(true);
+
+    React.useEffect(() => () => { mountedRef.current = false; }, []);
 
     const verifyAndShow = async () => {
         const isValid = await manager.verifyMasterPassword(masterPassword);
+        if (!mountedRef.current) return;
         if (isValid) {
             setShowPassword(true);
         } else {
@@ -501,15 +521,17 @@ const PasswordEntryComponent = ({ entry, manager, onDelete }: {
 
     React.useEffect(() => {
         if (entry.twoFactorSecret && entry.twoFactorType === "2fa_totp") {
+            let cancelled = false;
             const updateCode = async () => {
                 const code = await manager.generateTOTPCode(entry.twoFactorSecret!);
+                if (cancelled) return;
                 setTotpCode(code);
             };
             updateCode();
             const interval = setInterval(updateCode, 1000);
-            return () => clearInterval(interval);
+            return () => { cancelled = true; clearInterval(interval); };
         }
-    }, [entry.twoFactorSecret]);
+    }, [entry.twoFactorSecret, entry.twoFactorType, manager]);
 
     const copyToClipboard = async (text: string) => {
         try {
@@ -678,7 +700,7 @@ export default definePlugin({
                 key: "passwordManager",
                 title: "Password Manager",
                 Component: () => this.ui!.render(),
-                Icon: () => React.createElement("div", {}, "🔒") // Placeholder icon
+                Icon: LockIcon
             });
         }
     },

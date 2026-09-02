@@ -49,8 +49,12 @@ const ComposeModeIcon = ({ width = 24, height = 24 }: { width?: number; height?:
     </svg>
 );
 
+const COMPOSE_CTX_KEYS = ["isEnabled", "contextMenu"] as const;
+const COMPOSE_BUTTON_KEYS = ["isEnabled", "showIcon"] as const;
+
 const ContextMenuPatch: NavContextMenuPatchCallback = (children, props: any) => {
-    const { isEnabled, contextMenu } = settings.use(["isEnabled", "contextMenu"]);
+    const { isEnabled } = settings.store;
+    const { contextMenu } = settings.store;
     const container = findGroupChildrenByChildId("submit-button", children);
     if (container && contextMenu) {
         const idx = container.findIndex(c => c?.props?.id === "submit-button");
@@ -66,7 +70,7 @@ const ContextMenuPatch: NavContextMenuPatchCallback = (children, props: any) => 
 };
 
 const ComposeModeToggleButton: ChatBarButtonFactory = ({ isMainChat }) => {
-    const { isEnabled, showIcon } = settings.use(["isEnabled", "showIcon"]);
+    const { isEnabled, showIcon } = settings.use(COMPOSE_BUTTON_KEYS);
 
     if (!isMainChat || !showIcon || settings.store.location !== "chatbar") return null;
 
@@ -91,15 +95,7 @@ export default definePlugin({
     dependencies: ["CommandsAPI", "ChatInputButtonAPI", "HeaderBarAPI"],
     settings,
 
-    patches: [
-        {
-            find: ".NO_SEND_MESSAGES_PERMISSION_PLACEHOLDER:",
-            replacement: {
-                match: /(disableEnterToSubmit:)([^,]{0,100},)/g,
-                replace: "$1$self.settings.store.isEnabled||$2"
-            }
-        },
-    ],
+    patches: [],
 
     contextMenus: {
         "textarea-context": ContextMenuPatch

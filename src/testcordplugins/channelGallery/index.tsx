@@ -38,8 +38,8 @@ export const settings = definePluginSettings({
     pageSize: {
         type: OptionType.NUMBER,
         default: 100,
-        description: "Messages fetched per page (50–200 recommended)",
-        isValid: (v: any) => Number.isFinite(v) && v >= 25 && v <= 200,
+        description: "Messages fetched per page (max 100 allowed by Discord API)",
+        isValid: (v: any) => Number.isFinite(v) && v >= 10 && v <= 100,
     },
     preloadPages: {
         type: OptionType.NUMBER,
@@ -54,7 +54,7 @@ function GalleryIcon(props: React.SVGProps<SVGSVGElement>) {
         <svg viewBox="0 0 24 24" width={20} height={20} fill="currentColor" aria-hidden="true" {...props}>
             <path d="M4 5a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v10a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V5Zm3-1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H7Z" />
             <path d="M8 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm11 12H7a5 5 0 0 1-5-5V8h2v7a3 3 0 0 0 3 3h12v2Z" />
-            <path d="M8 14.5 10.25 12a1 1 0 0 1 1.5 0L14 14.5l1.25-1.25a1 1 0 0 1 1.5 0L18 14.5V15a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-.5l2-2Z" />
+            <path d="M8 14.5L10.25 12a1 1 0 0 1 1.5 0L14 14.5l1.25-1.25a1 1 0 0 1 1.5 0L18 14.5V15a1 1 0 0 1-1 1 H7 a1 1 0 0 1-1-1 v-.5 l2-2Z" />
         </svg>
     );
 }
@@ -65,29 +65,34 @@ let modalChannelId: string | null = null;
 function isSupportedChannel(channel: any): boolean {
     if (!channel) return false;
 
-    // Exclude DMs/group DMs explicitly (requirement).
+    // Exclude DMs/group DMs explicitly.
     if (typeof channel.isDM === "function" && channel.isDM()) return false;
     if (typeof channel.isGroupDM === "function" && channel.isGroupDM()) return false;
     if (typeof channel.isMultiUserDM === "function" && channel.isMultiUserDM()) return false;
 
-    // Prefer Discord's own channel type sets when available.
     const { type } = channel;
     if (ChannelTypes?.DM != null && type === ChannelTypes.DM) return false;
+    if (ChannelTypes?.GROUP_DM != null && type === ChannelTypes.GROUP_DM) return false;
     if (ChannelTypesSets?.ALL_DMS?.has?.(type)) return false;
+
+    if (typeof channel.isGuildTextual === "function" && channel.isGuildTextual()) return true;
+    if (typeof channel.isThread === "function" && channel.isThread()) return true;
 
     if (ChannelTypesSets?.GUILD_TEXTUAL?.has?.(type) || ChannelTypesSets?.THREADS?.has?.(type)) return true;
 
-    // Fallback for environments where the type sets aren't present.
-    if (ChannelTypes?.GUILD_TEXT != null && type === ChannelTypes.GUILD_TEXT) return true;
-    if (ChannelTypes?.PUBLIC_THREAD != null && type === ChannelTypes.PUBLIC_THREAD) return true;
-    if (ChannelTypes?.PRIVATE_THREAD != null && type === ChannelTypes.PRIVATE_THREAD) return true;
+    // Fallback for numeric channel types: 0 (GUILD_TEXT), 2 (GUILD_VOICE), 5 (ANNOUNCEMENT), 10, 11, 12 (THREADS), 15 (FORUM), 16 (MEDIA)
+    if (typeof type === "number" && [0, 2, 5, 10, 11, 12, 15, 16].includes(type)) return true;
 
     return false;
 }
 
 function canUseGallery(channel: any): boolean {
     if (!isSupportedChannel(channel)) return false;
-    if (channel.guild_id && !PermissionStore.can(PermissionsBits.VIEW_CHANNEL, channel)) return false;
+    if (channel?.guild_id && PermissionStore?.can && PermissionsBits?.VIEW_CHANNEL) {
+        try {
+            if (!PermissionStore.can(PermissionsBits.VIEW_CHANNEL, channel)) return false;
+        } catch {}
+    }
     return true;
 }
 
@@ -153,25 +158,7 @@ export default definePlugin({
 
     // Patch the built-in media viewer so clicking left/right halves navigates.
     // This complements the existing arrow-key navigation in Discord's viewer.
-    patches: [
-        {
-            find: ".dimensionlessImage,",
-            replacement: [
-                // If another plugin already wrapped the media with a stopPropagation onClick, replace it.
-                {
-                    match: /onClick:e=>e\.stopPropagation\(\)/,
-                    replace: "onClick:e=>$self.handleMediaViewerClick(e)",
-                    noWarn: true
-                },
-                // Otherwise, wrap the media content in our own onClick handler.
-                {
-                    match: /(?<=null!=(\i)\?.{0,20})\i\.\i,{children:\1/,
-                    replace: "'div',{onClick:e=>$self.handleMediaViewerClick(e),children:$1",
-                    noWarn: true
-                }
-            ]
-        }
-    ],
+    patches: [],
 
     handleMediaViewerClick(e: any) {
         if (!e || e.button !== 0) return;

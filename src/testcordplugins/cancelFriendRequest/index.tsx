@@ -49,7 +49,7 @@ function getUserIdFromOutgoingRelationships(): string | null {
     return null;
 }
 
-let observer: MutationObserver | null = null;
+let observer: ReturnType<typeof setInterval> | null = null;
 const patchedButtons = new Set<HTMLElement>();
 
 function patchBtn(btn: HTMLElement, userId: string) {
@@ -129,25 +129,31 @@ export default definePlugin({
     authors: [{ name: "Nightcord", id: 0n }],
 
     start() {
-        observer = new MutationObserver(() => {
+        this.observer = new MutationObserver(() => {
             if (scanTimer) return;
+            if (!hasOutgoingRequests()) return;
             scanTimer = setTimeout(() => {
                 scanTimer = null;
                 scan(document);
             }, 300);
         });
-        observer.observe(document.body, { childList: true, subtree: true });
+        if (document.body) {
+            this.observer.observe(document.body, { childList: true, subtree: true });
+        }
+        observer = setInterval(() => {
+            if (!hasOutgoingRequests()) return;
+            scan(document);
+        }, 5000);
         scan(document);
-        console.log("[CancelFriendRequest] Started ✓");
     },
 
     stop() {
+        if (this.observer) { this.observer.disconnect(); this.observer = null; }
         if (scanTimer) {
             clearTimeout(scanTimer);
             scanTimer = null;
         }
-        observer?.disconnect();
-        observer = null;
+        if (observer) { clearInterval(observer); observer = null; }
         for (const btn of patchedButtons) {
             const handler = (btn as any)._cfpHandler;
             if (handler) {

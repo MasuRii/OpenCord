@@ -12,6 +12,7 @@ import { Message } from "@vencord/discord-types";
 import { Button, Forms, MessageStore, Parser, Toasts, useEffect, UserStore, useState } from "@webpack/common";
 
 const DATA_STORE_KEY = "huskchart";
+const MAX_HUSKS = 5000;
 type Husk = {
     userId: string;
     channelId: string;
@@ -21,37 +22,50 @@ type SortedHusk = {
     id: string;
     count: number;
 };
-const messageCache = new Map<string, {
-    message?: Message;
-    fetched: boolean;
-}>();
+interface StoredHusks {
+    version: 1;
+    husks: Husk[];
+    userCounts: Record<string, number>;
+    channelCounts: Record<string, number>;
+}
+
+function normalizeStoredHusks(value: unknown): StoredHusks {
+    const husks = Array.isArray(value)
+        ? value.filter((husk): husk is Husk => typeof husk?.userId === "string" && typeof husk.channelId === "string" && typeof husk.messageId === "string")
+        : value && typeof value === "object" && Array.isArray((value as Partial<StoredHusks>).husks)
+            ? (value as Partial<StoredHusks>).husks!.filter((husk): husk is Husk => typeof husk?.userId === "string" && typeof husk.channelId === "string" && typeof husk.messageId === "string")
+            : [];
+    const data: StoredHusks = { version: 1, husks: husks.slice(-MAX_HUSKS), userCounts: {}, channelCounts: {} };
+    for (const husk of data.husks) {
+        data.userCounts[husk.userId] = (data.userCounts[husk.userId] ?? 0) + 1;
+        data.channelCounts[husk.channelId] = (data.channelCounts[husk.channelId] ?? 0) + 1;
+    }
+    return data;
+}
+
+function sortedCounts(counts: Record<string, number>) {
+    return Object.entries(counts)
+        .map(([id, count]) => ({ id, count }))
+        .sort((a, b) => b.count - a.count);
+}
+
+function decrementCount(counts: Record<string, number>, id: string) {
+    const next = (counts[id] ?? 0) - 1;
+    if (next > 0) counts[id] = next;
+    else delete counts[id];
+}
 
 function getMessage(channelId: string, messageId: string): Message | undefined {
     return MessageStore.getMessage(channelId, messageId);
 }
 const UserData = () => {
-    const [data, setData] = useState([]);
+    const [data, setData] = useState<SortedHusk[]>([]);
     const [collapsed, collapse] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
-            const rawHusks: Husk[] = await DataStore.get(DATA_STORE_KEY) || [];
-            const unsortedHuskCountPerUser: SortedHusk[] = [];
-            for (const husk of rawHusks) {
-                let shouldAddInitialHusk = true;
-                for (const [i, hc] of unsortedHuskCountPerUser.entries()) {
-                    const unsortedHusker: SortedHusk = hc;
-                    if (unsortedHusker.id === husk.userId) {
-                        unsortedHuskCountPerUser[i].count++;
-                        shouldAddInitialHusk = false;
-                    }
-                }
-                if (!shouldAddInitialHusk) continue;
-                unsortedHuskCountPerUser.push({ id: husk.userId, count: 1 });
-            }
-            const sortedHuskers = unsortedHuskCountPerUser.sort((a, b) => b.count - a.count);
-            // @ts-ignore EXPLODEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-            setData(sortedHuskers);
+            const stored = normalizeStoredHusks(await DataStore.get(DATA_STORE_KEY));
+            setData(sortedCounts(stored.userCounts));
         };
         fetchData();
     }, []);
@@ -64,13 +78,12 @@ const UserData = () => {
                     data.length === 0 && <Forms.FormText style={{ marginTop: "7px" }}>Nothing to see here.</Forms.FormText>
                 }
                 {
-                    data && data.map(user => <>
+                    data.map((user, index) => <>
                         {
                             collapsed && <>
                                 {
-                                    data.indexOf(user) < 6 &&
-                                    <div style={{ marginTop: data.indexOf(user) < 2 ? "0" : "7px" }}>
-                                        {/* @ts-ignore */}
+                                    index < 6 &&
+                                    <div style={{ marginTop: index < 2 ? "0" : "7px" }}>
                                         {Parser.parse(`<@${user.id}>`)} <Forms.FormText style={{ marginTop: "4px" }}>with {user.count} {user.count > 1 ? "husks" : "husk"}</Forms.FormText>
                                     </div>
                                 }
@@ -79,8 +92,7 @@ const UserData = () => {
                         {
                             !collapsed && <>
                                 {
-                                    <div style={{ marginTop: data.indexOf(user) < 2 ? "0" : "7px" }}>
-                                        {/* @ts-ignore */}
+                                    <div style={{ marginTop: index < 2 ? "0" : "7px" }}>
                                         {Parser.parse(`<@${user.id}>`)} <Forms.FormText style={{ marginTop: "4px" }}>with {user.count} {user.count > 1 ? "husks" : "husk"}</Forms.FormText>
                                     </div>
                                 }
@@ -93,28 +105,13 @@ const UserData = () => {
     );
 };
 const ChannelData = () => {
-    const [data, setData] = useState([]);
+    const [data, setData] = useState<SortedHusk[]>([]);
     const [collapsed, collapse] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
-            const rawHusks: Husk[] = await DataStore.get(DATA_STORE_KEY) || [];
-            const unsortedHuskCountPerChannel: SortedHusk[] = [];
-            for (const husk of rawHusks) {
-                let shouldAddInitialHusk = true;
-                for (const [i, hc] of unsortedHuskCountPerChannel.entries()) {
-                    const unsortedHusker: SortedHusk = hc;
-                    if (unsortedHusker.id === husk.channelId) {
-                        unsortedHuskCountPerChannel[i].count++;
-                        shouldAddInitialHusk = false;
-                    }
-                }
-                if (!shouldAddInitialHusk) continue;
-                unsortedHuskCountPerChannel.push({ id: husk.channelId, count: 1 });
-            }
-            const sortedHuskers = unsortedHuskCountPerChannel.sort((a, b) => b.count - a.count);
-            // @ts-ignore EXPLODEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE
-            setData(sortedHuskers);
+            const stored = normalizeStoredHusks(await DataStore.get(DATA_STORE_KEY));
+            setData(sortedCounts(stored.channelCounts));
         };
         fetchData();
     }, []);
@@ -127,13 +124,12 @@ const ChannelData = () => {
                     data.length === 0 && <Forms.FormText style={{ marginTop: "7px" }}>Nothing to see here.</Forms.FormText>
                 }
                 {
-                    data && data.map(channel => <>
+                    data.map((channel, index) => <>
                         {
                             collapsed && <>
                                 {
-                                    data.indexOf(channel) < 6 &&
-                                    <div style={{ marginTop: data.indexOf(channel) < 2 ? "0" : "7px" }}>
-                                        {/* @ts-ignore */}
+                                    index < 6 &&
+                                    <div style={{ marginTop: index < 2 ? "0" : "7px" }}>
                                         {Parser.parse(`<#${channel.id}>`)} <Forms.FormText style={{ marginTop: "4px" }}>with {channel.count} {channel.count > 1 ? "husks" : "husk"}</Forms.FormText>
                                     </div>
                                 }
@@ -142,8 +138,7 @@ const ChannelData = () => {
                         {
                             !collapsed && <>
                                 {
-                                    <div style={{ marginTop: data.indexOf(channel) < 2 ? "0" : "7px" }}>
-                                        {/* @ts-ignore */}
+                                    <div style={{ marginTop: index < 2 ? "0" : "7px" }}>
                                         {Parser.parse(`<#${channel.id}>`)} <Forms.FormText style={{ marginTop: "4px" }}>with {channel.count} {channel.count > 1 ? "husks" : "husk"}</Forms.FormText>
                                     </div>
                                 }
@@ -177,7 +172,7 @@ const settings = definePluginSettings({
         description: "clear",
         component: () => (
             <Button color={Button.Colors.RED} onClick={() => {
-                DataStore.set(DATA_STORE_KEY, []); Toasts.show({
+                DataStore.set(DATA_STORE_KEY, { version: 1, husks: [], userCounts: {}, channelCounts: {} } satisfies StoredHusks); Toasts.show({
                     id: Toasts.genId(),
                     message: "Cleared all data, reopen settings to see changes",
                     type: Toasts.Type.SUCCESS,
@@ -199,22 +194,28 @@ export default definePlugin({
     authors: [TestcordDevs.x2b],
     flux: {
         async MESSAGE_REACTION_ADD(event) {
-            try {
-                const msg = getMessage(event.channelId, event.messageId);
-                if (!msg) return;
-                if (msg.author.id !== UserStore.getCurrentUser().id) return;
-                if (!event.emoji.name.includes(settings.store.emojiToTrack)) return;
-                const husks: Husk[] = await DataStore.get(DATA_STORE_KEY) || [];
-                husks.push({
+            const msg = getMessage(event.channelId, event.messageId);
+            if (!msg) return;
+            if (msg.author.id !== UserStore.getCurrentUser().id) return;
+            if (!event.emoji.name.includes(settings.store.emojiToTrack)) return;
+            await DataStore.update<unknown>(DATA_STORE_KEY, value => {
+                const data = normalizeStoredHusks(value);
+                const husk = {
                     userId: event.userId,
                     channelId: event.channelId,
                     messageId: event.messageId
-                });
-                await DataStore.set(DATA_STORE_KEY, husks);
-            }
-            catch {
-                // explode
-            }
+                };
+                data.husks.push(husk);
+                data.userCounts[husk.userId] = (data.userCounts[husk.userId] ?? 0) + 1;
+                data.channelCounts[husk.channelId] = (data.channelCounts[husk.channelId] ?? 0) + 1;
+                while (data.husks.length > MAX_HUSKS) {
+                    const removed = data.husks.shift();
+                    if (!removed) break;
+                    decrementCount(data.userCounts, removed.userId);
+                    decrementCount(data.channelCounts, removed.channelId);
+                }
+                return data;
+            });
         }
     },
     settings,
