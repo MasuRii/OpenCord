@@ -7,20 +7,13 @@
 import { Devs, MallCordDevs } from "@utils/constants";
 import { getIntlMessage } from "@utils/discord";
 import definePlugin from "@utils/types";
-import { Embed } from "@vencord/discord-types";
-import { proxyLazyWebpack } from "@webpack";
-import { React } from "@webpack/common";
 import { ComponentType, ReactNode } from "react";
 
-import { AttachmentAccessory, EmbedAccessory, FilePicker } from "./components";
+import { AttachmentAccessory, AttachmentContextProvider, EmbedAccessory, EmbedContext, EmbedMosaicContext, FilePicker } from "./components";
 import { SignedUrlsStore } from "./stores";
 import managedStyle from "./style.css?managed";
-import { AttachmentItem, EmbedComponent, ExpressionPickerTabProps, ExpressionPickerView, FavouriteItem, FavouriteItemFormat } from "./types";
+import { AttachmentContextProviderProps, EmbedComponent, ExpressionPickerTabProps, ExpressionPickerView, FavouriteItem, FavouriteItemFormat } from "./types";
 import { getThumbnailUrl } from "./utils";
-
-export const EmbedContext = proxyLazyWebpack(() => React.createContext<null | Embed>(null));
-export const EmbedMosaicContext = proxyLazyWebpack(() => React.createContext<null | number>(null));
-export const AttachmentContext = proxyLazyWebpack(() => React.createContext<null | AttachmentItem>(null));
 
 export default definePlugin({
     name: "FavouriteAnything",
@@ -50,7 +43,7 @@ export default definePlugin({
             // Override the default renderAdjacentContent prop value for all types of embed components (renderImageComponent, renderVideoComponent...)
             find: "#{intl::MEDIA_MOSAIC_ALT_TEXT_POPOUT_TITLE}",
             replacement: {
-                match: /renderAdjacentContent:(\i)/g,
+                match: /renderAdjacentContent:\i/g,
                 replace: "$&=$self.renderEmbedAccessory"
             }
         },
@@ -69,6 +62,14 @@ export default definePlugin({
                     replace: "=[$self.renderAttachmentAccessory()];"
                 }
             ]
+        },
+        // COMPONENTS V2
+        {
+            find: "#{intl::ATTACHMENT_FILENAME_UNKNOWN}",
+            replacement: {
+                match: /(?<=case \i\.\i\.FILE:)return(\(0,\i\.jsx\)\(\i,\{\.\.\.(\i)\},(\i)\))/,
+                replace: "return $self.renderCV2File($1,$3,$2)"
+            }
         },
         // EXPRESSION PICKER
         {
@@ -115,7 +116,7 @@ export default definePlugin({
                     isActive={activeView === ExpressionPickerView.GIF}
                     viewType={ExpressionPickerView.GIF}
                 >
-                    Media
+                    {getIntlMessage("QUICKSEARCH_MEDIA")}
                 </Tab>
                 <Tab
                     id="files-picker-tab"
@@ -125,7 +126,7 @@ export default definePlugin({
                     isActive={activeView === ExpressionPickerView.FILES}
                     viewType={ExpressionPickerView.FILES}
                 >
-                    {getIntlMessage("FILES")}
+                    {getIntlMessage("QUICKSEARCH_FILES")}
                 </Tab>
             </>
         );
@@ -133,8 +134,11 @@ export default definePlugin({
     renderFilePicker(activeView: ExpressionPickerView, onSelectGIF: (item: { url: string; }) => void) {
         return activeView === ExpressionPickerView.FILES ? <FilePicker onSelectItem={onSelectGIF} /> : null;
     },
-    renderAttachment(children: ReactNode, props: { item: AttachmentItem; }) {
-        return <AttachmentContext.Provider value={props.item}>{children}</AttachmentContext.Provider>;
+    renderAttachment(children: ReactNode, { item }: { item: AttachmentContextProviderProps["attachment"] }) {
+        return <AttachmentContextProvider attachment={item}>{children}</AttachmentContextProvider>;
+    },
+    renderCV2File(children: ReactNode, key: React.Key, component: AttachmentContextProviderProps["component"]) {
+        return <AttachmentContextProvider component={component} key={key}>{children}</AttachmentContextProvider>;
     },
     renderEmbed(this: EmbedComponent) {
         return <EmbedContext.Provider value={this.props.embed}>{this.__render()}</EmbedContext.Provider>;
