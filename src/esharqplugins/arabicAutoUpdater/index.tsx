@@ -9,7 +9,7 @@ import { Devs } from "@utils/constants";
 import { t } from "@utils/esharqI18n";
 import { Logger } from "@utils/Logger";
 import definePlugin from "@utils/types";
-import { Alerts } from "@webpack/common";
+import { Alerts, SettingsRouter } from "@webpack/common";
 
 import gitHash from "~git-hash";
 
@@ -37,13 +37,21 @@ async function checkForUpdate() {
         const releaseName: string = data.name ?? "";
         const remoteHash = releaseName.slice(releaseName.lastIndexOf(" ") + 1);
 
-        if (!remoteHash || remoteHash === gitHash) return;
+        // The release title carries a SHORT hash (e.g. "Esharq 6153823") while ~git-hash
+        // is the full commit sha. A bare `===` therefore never matches and fires a spurious
+        // "update available" on the very build we're already running. Compare as a prefix so
+        // the current build is recognised as up-to-date.
+        if (!remoteHash || gitHash.startsWith(remoteHash)) return;
 
-        // Migrate old localStorage value to DataStore on first run
-        const legacyValue = localStorage.getItem(SEEN_KEY);
-        if (legacyValue) {
-            await DataStore.set(SEEN_KEY, legacyValue);
-            localStorage.removeItem(SEEN_KEY);
+        // Migrate any old localStorage value to DataStore on first run. Discord removes
+        // window.localStorage in the renderer (anti-token-theft), so a bare reference throws
+        // ReferenceError — guard with typeof so the update check never fails because of it.
+        if (typeof localStorage !== "undefined") {
+            const legacyValue = localStorage.getItem(SEEN_KEY);
+            if (legacyValue) {
+                await DataStore.set(SEEN_KEY, legacyValue);
+                localStorage.removeItem(SEEN_KEY);
+            }
         }
 
         const lastSeen = await DataStore.get<string>(SEEN_KEY);
@@ -63,13 +71,21 @@ async function checkForUpdate() {
             ),
             confirmText: t("تحديث الآن", "Update now"),
             cancelText: t("لاحقاً", "Later"),
-            onConfirm() {
-                VencordNative.native.openExternal(RELEASES_PAGE);
-            }
+            onConfirm: openUpdaterTab
         });
     } catch (e) {
         logger.error("فشل فحص التحديثات:", e);
     }
+}
+
+// "تحديث الآن" يفتح قسم "مُحدِّث اشراق" داخل الإعدادات (لا يفتح المتصفّح) حيث يُطبّق المستخدم
+// التحديث بنفسه عبر المحدّث المدمج. يرجع لصفحة الإصدارات فقط إن كان المحدّث معطّلاً أو على الويب.
+function openUpdaterTab() {
+    if (IS_WEB || IS_UPDATER_DISABLED) {
+        VencordNative.native.openExternal(RELEASES_PAGE);
+        return;
+    }
+    SettingsRouter.openUserSettings("equicord_updater_panel");
 }
 
 export default definePlugin({
