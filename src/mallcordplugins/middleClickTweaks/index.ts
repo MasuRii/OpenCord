@@ -101,9 +101,9 @@ export default definePlugin({
     patches: [
         {
             // Detects paste events triggered by the "browser" outside of input fields.
-            find: "document.addEventListener(\"paste\",",
+            find: 'document.addEventListener("paste",',
             replacement: {
-                match: /(?<=paste",(\i)=>{)/,
+                match: /(?<=\.getMigrationStatus\(\)\);.{0,50}\i\((\i)\)\{)/,
                 replace: "if($1.target.tagName===\"BUTTON\"||$self.isPastingDisabled(false)){$1.preventDefault?.();$1.stopPropagation?.();return;};"
             }
         },
@@ -116,12 +116,12 @@ export default definePlugin({
             }
         },
         {
-            // Detects paste events triggered inside of Discord's search box.
-            find: "props.handlePastedText&&",
+            // Detects paste events triggered inside Discord's channel search editor.
+            find: "onPasteCapture:function",
             replacement: {
-                match: /(?<=clipboardData\);)/,
-                replace: "if($self.isPastingDisabled(true)){arguments[1].preventDefault?.();arguments[1].stopPropagation?.();return;};"
+                match: /(?<=onPasteCapture:function\((\i)\){)(?=\i\.insertData\(\1\.clipboardData\))/,
+                replace: "if($self.isPastingDisabled(true)){$1.preventDefault?.();$1.stopPropagation?.();return;}"
             }
-        },
+        }
     ],
 });
