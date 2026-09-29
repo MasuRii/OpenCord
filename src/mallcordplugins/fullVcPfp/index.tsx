@@ -44,11 +44,4 @@ export default definePlugin({
             "--full-res-avatar": `url(${avatarUrl})`
         };
     },
-
-    start() {
-        enableStyle(style);
-    },
-    stop() {
-        disableStyle(style);
-    },
 });
