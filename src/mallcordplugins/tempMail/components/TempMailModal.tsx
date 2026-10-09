@@ -1,5 +1,6 @@
 /*
- * MallCord TempMail — Modal UI
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -7,7 +8,7 @@ import "../styles.css";
 
 import { copyToClipboard } from "@utils/clipboard";
 import type { RenderModalProps } from "@vencord/discord-types";
-import { Button, Modal, React, showToast, TextInput, Toasts, useEffect, useRef, useState } from "@webpack/common";
+import { Modal, React, showToast, TextInput, useEffect, useRef, useState } from "@webpack/common";
 
 import {
     createAccount, deleteAccount, deleteMessage,
@@ -15,9 +16,9 @@ import {
     randomString, TmAttachment, TmMessage, TmMessageFull,
 } from "../api";
 import {
+deleteMessageFromStore,
     getActiveId, getDataStorePath, getSavedAccounts, getSavedMessages,
-    mergeAndSaveMessages, deleteMessageFromStore,
-    removeAccount, SavedAccount, saveAccount, setActiveId,
+    mergeAndSaveMessages, removeAccount, saveAccount, SavedAccount, setActiveId,
 } from "../store";
 
 type View = "inbox" | "message" | "new" | "accounts";
@@ -145,7 +146,7 @@ export function TempMailModal({ modalProps }: { modalProps: RenderModalProps; })
             fetchInbox(acc);
             setView("inbox");
             setCustomUser("");
-            showToast("Created: " + address, Toasts.Type.SUCCESS);
+            showToast("Created: " + address, "success");
         } catch (e: any) {
             setError(e.message);
         } finally {
@@ -231,7 +232,7 @@ export function TempMailModal({ modalProps }: { modalProps: RenderModalProps; })
                         <div className="tm-active-addr">
                             <div className="tm-active-label">Active</div>
                             <div className="tm-active-text">{active.address}</div>
-                            <button className="tm-copy-btn" onClick={() => { copyToClipboard(active.address); showToast("Copied!", Toasts.Type.SUCCESS); }}>
+                            <button className="tm-copy-btn" onClick={() => { copyToClipboard(active.address); showToast("Copied!", "success"); }}>
                                 Copy address
                             </button>
                         </div>
@@ -380,7 +381,7 @@ export function TempMailModal({ modalProps }: { modalProps: RenderModalProps; })
                                                 <button
                                                     className="tm-meta-copy"
                                                     title="Copy sender email"
-                                                    onClick={() => { copyToClipboard(openMsg.from.address); showToast("Copied!", Toasts.Type.SUCCESS); }}
+                                                    onClick={() => { copyToClipboard(openMsg.from.address); showToast("Copied!", "success"); }}
                                                 >
                                                     <svg viewBox="0 0 24 24" width={12} height={12} fill="currentColor"><path d="M16 1H4C2.9 1 2 1.9 2 3v14h2V3h12V1zm3 4H8C6.9 5 6 5.9 6 7v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" /></svg>
                                                 </button>
@@ -474,7 +475,7 @@ export function TempMailModal({ modalProps }: { modalProps: RenderModalProps; })
                                             {active?.id !== acc.id && (
                                                 <button className="tm-btn-primary-sm" onClick={() => switchTo(acc)}>Use</button>
                                             )}
-                                            <button className="tm-icon-btn" title="Copy" onClick={() => { copyToClipboard(acc.address); showToast("Copied!", Toasts.Type.SUCCESS); }}>
+                                            <button className="tm-icon-btn" title="Copy" onClick={() => { copyToClipboard(acc.address); showToast("Copied!", "success"); }}>
                                                 <svg viewBox="0 0 24 24" width={14} height={14} fill="currentColor"><path d="M16 1H4C2.9 1 2 1.9 2 3v14h2V3h12V1zm3 4H8C6.9 5 6 5.9 6 7v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" /></svg>
                                             </button>
                                             <button className="tm-icon-btn tm-icon-btn-danger" title="Delete account" onClick={() => deleteAcc(acc)}>

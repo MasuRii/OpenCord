@@ -7,7 +7,7 @@
 import { get as dsGet, set as dsSet } from "@api/DataStore";
 import { MallCordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
-import { React, showToast, Toasts } from "@webpack/common";
+import { React, showToast } from "@webpack/common";
 
 const SEEN_KEY = "RecRoomTribute_shown";
 
@@ -46,7 +46,7 @@ export default definePlugin({
         setTimeout(() => {
             showToast(
                 "🎮 In memory of Rec Room (2016–2026). Gone but not forgotten.",
-                Toasts.Type.MESSAGE
+                "message"
             );
         }, 3000);
     },
