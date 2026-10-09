@@ -5,10 +5,10 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
-import { Logger } from "@utils/Logger";
 import { MallCordDevs } from "@utils/constants";
+import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
-import { FluxDispatcher, Toasts, UserStore } from "@webpack/common";
+import { FluxDispatcher, showToast, UserStore } from "@webpack/common";
 
 const logger = new Logger("GhostPingAlert");
 
@@ -63,12 +63,7 @@ function onMessageDelete({ id }: any) {
         ? hit.content.slice(0, 80) + "…"
         : hit.content || "(no text)";
 
-    Toasts.show({
-        message: `👻 Ghost ping from ${hit.authorName}: "${preview}"`,
-        type: Toasts.Type.FAILURE,
-        id: Toasts.genId(),
-        options: { duration: 6000 },
-    });
+    showToast(`👻 Ghost ping from ${hit.authorName}: "${preview}"`, "failure", { duration: 6000 });
 }
 
 export default definePlugin({

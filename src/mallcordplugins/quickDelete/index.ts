@@ -7,7 +7,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { MallCordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { MessageStore, RestAPI, SelectedChannelStore, showToast, Toasts, UserStore } from "@webpack/common";
+import { MessageStore, RestAPI, SelectedChannelStore, showToast, UserStore } from "@webpack/common";
 
 const settings = definePluginSettings({
     keybind: {
@@ -52,9 +52,9 @@ async function onKeyDown(e: KeyboardEvent) {
     try {
         await RestAPI.del({ url: `/channels/${channelId}/messages/${lastMine.id}` });
         if (settings.store.showConfirmToast)
-            showToast("Last message deleted.", Toasts.Type.SUCCESS);
+            showToast("Last message deleted.", "success");
     } catch {
-        showToast("Failed to delete message.", Toasts.Type.FAILURE);
+        showToast("Failed to delete message.", "failure");
     }
 }
 

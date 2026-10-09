@@ -11,8 +11,7 @@ import { Button } from "@components/Button";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { MallCordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
-import { Constants, Modal, openModal, RestAPI, SelectedChannelStore, showToast, Toasts, UserStore } from "@webpack/common";
-import { React, useState } from "@webpack/common";
+import { Constants, Modal, openModal, React, RestAPI, SelectedChannelStore, showToast, useState, UserStore } from "@webpack/common";
 
 function TrashIcon({ size = 20, color = "currentColor" }: { size?: number; color?: string; }) {
     return (
@@ -238,7 +237,7 @@ const ClearButton: ChatBarButtonFactory = ({ isAnyChat }) => {
             onClick={() => {
                 const channelId = SelectedChannelStore.getChannelId();
                 if (!channelId) {
-                    showToast("No channel open", Toasts.Type.FAILURE);
+                    showToast("No channel open", "failure");
                     return;
                 }
                 openModal(props => <ClearModal modalProps={props} channelId={channelId} />);

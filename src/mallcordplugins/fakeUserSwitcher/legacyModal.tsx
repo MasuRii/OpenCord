@@ -16,7 +16,7 @@ import {
     ModalSize,
 } from "@utils/modal";
 import { RenderModalProps as ModalProps } from "@vencord/discord-types";
-import { Button, Forms, IconUtils, React, showToast, Text, TextInput, Toasts, UserStore, useState } from "@webpack/common";
+import { Button, Forms, IconUtils, React, showToast, Text, TextInput, UserStore, useState } from "@webpack/common";
 
 const ModalRoot = ModalRoot_ as React.ComponentType<any>;
 const ModalHeader = ModalHeader_ as React.ComponentType<any>;
@@ -42,12 +42,12 @@ export function FakeUserProfileModal({ modalProps }: { modalProps: ModalProps; }
     async function apply() {
         const id = value.trim();
         if (!ID_RE.test(id)) {
-            showToast("Enter a valid Discord user ID.", Toasts.Type.FAILURE);
+            showToast("Enter a valid Discord user ID.", "failure");
             return;
         }
         const me = UserStore.getCurrentUser();
         if (me && me.id === id) {
-            showToast("You cannot spoof as yourself!", Toasts.Type.FAILURE);
+            showToast("You cannot spoof as yourself!", "failure");
             return;
         }
         setBusy(true);
@@ -57,10 +57,10 @@ export function FakeUserProfileModal({ modalProps }: { modalProps: ModalProps; }
             settings.store.manualMode = false;
             setEnabled(true);
             setEnabledLocal(true);
-            showToast(`Spoofing as ${next.user.username}.`, Toasts.Type.SUCCESS);
+            showToast(`Spoofing as ${next.user.username}.`, "success");
         } catch (e: any) {
             logger.error("apply failed", e);
-            showToast(e?.message || "Failed to load that user.", Toasts.Type.FAILURE);
+            showToast(e?.message || "Failed to load that user.", "failure");
         } finally {
             setBusy(false);
         }
@@ -72,12 +72,12 @@ export function FakeUserProfileModal({ modalProps }: { modalProps: ModalProps; }
         setTarget(null);
         setEnabledLocal(false);
         setValue("");
-        showToast("Cleared spoof target.", Toasts.Type.MESSAGE);
+        showToast("Cleared spoof target.", "message");
     }
 
     function toggle(v: boolean) {
         if (v && !target) {
-            showToast("Pick a target user first.", Toasts.Type.FAILURE);
+            showToast("Pick a target user first.", "failure");
             return;
         }
         setEnabled(v);
@@ -132,7 +132,7 @@ export function FakeUserProfileModal({ modalProps }: { modalProps: ModalProps; }
                                 }}
                                 onClick={() => {
                                     navigator.clipboard.writeText(target.id);
-                                    showToast("Copied ID to clipboard", Toasts.Type.SUCCESS);
+                                    showToast("Copied ID to clipboard", "success");
                                 }}
                                 title="Click to copy ID"
                             >
