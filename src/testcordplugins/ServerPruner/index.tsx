@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { TestcordRequestCoordinator } from "@api/index";
 import { classNameFactory, disableStyle, enableStyle } from "@api/Styles";
 import { Devs, TestcordDevs } from "@utils/constants";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot, ModalSize, openModal } from "@utils/modal";
@@ -81,16 +82,26 @@ function PruneModal(props: ModalProps) {
     useAwaiter(async () => {
         const srv = joinedServers[index];
         if (!srv) return;
-        const response = await RestAPI.get(
-            {
-                url: `/guilds/${srv.id}/messages/search?author_id=${UserStore.getCurrentUser().id}`
-            });
-        const recentResponse = await RestAPI.get(
-            {
-                url: `/guilds/${srv.id}/messages/search?author_id=${UserStore.getCurrentUser().id}&min_id=${SnowflakeUtils.fromTimestamp(Date.now() - (7 * 24 * 60 * 60 * 1000))}`
-            });
-        setMessages(response.body.total_results.toString());
-        setRecentMessages(recentResponse.body.total_results.toString());
+        const userId = UserStore.getCurrentUser().id;
+        const totalUrl = `/guilds/${srv.id}/messages/search?author_id=${userId}`;
+        const recentUrl = `/guilds/${srv.id}/messages/search?author_id=${userId}&min_id=${SnowflakeUtils.fromTimestamp(Date.now() - (7 * 24 * 60 * 60 * 1000))}`;
+
+        // The two counts are independent; with the TestcordHelper network
+        // optimizations on we fire them in parallel (one RTT instead of two).
+        // Default stays sequential, byte-for-byte unchanged.
+        if (TestcordRequestCoordinator.networkOptimizationsEnabled()) {
+            const [response, recentResponse] = await Promise.all([
+                RestAPI.get({ url: totalUrl }),
+                RestAPI.get({ url: recentUrl }),
+            ]);
+            setMessages(response.body.total_results.toString());
+            setRecentMessages(recentResponse.body.total_results.toString());
+        } else {
+            const response = await RestAPI.get({ url: totalUrl });
+            const recentResponse = await RestAPI.get({ url: recentUrl });
+            setMessages(response.body.total_results.toString());
+            setRecentMessages(recentResponse.body.total_results.toString());
+        }
     },
         {
             deps: [index],

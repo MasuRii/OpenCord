@@ -9,7 +9,3 @@ import { Channel } from "@vencord/discord-types";
 export interface BooProps {
     channel: Channel;
 }
-
-
-
-

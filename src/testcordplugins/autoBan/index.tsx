@@ -10,13 +10,22 @@ import { TestcordDevs } from "@utils/constants";
 import { ModalContent, ModalFooter, ModalHeader, ModalRoot, ModalSize,openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { findStoreLazy } from "@webpack";
-import { FluxDispatcher, GuildMemberStore,GuildStore, Toasts, UserStore } from "@webpack/common";
-import { Button, ChannelStore, Forms,Menu, React, RestAPI, TextInput } from "@webpack/common";
+import { Button, ChannelStore, FluxDispatcher, Forms, GuildMemberStore,GuildStore, Menu, React, RestAPI, TextInput, Toasts, UserStore } from "@webpack/common";
 
 const VoiceStateStore = findStoreLazy("VoiceStateStore");
 let isCurrentlyVcOwner = false;
 let currentVcChannel: string | null = null;
 let currentVcGuild: string | null = null;
+let pluginActive = false;
+const pendingTimeouts = new Set<ReturnType<typeof setTimeout>>();
+
+function scheduleTimeout(callback: () => void, ms: number) {
+    const timeout = setTimeout(() => {
+        pendingTimeouts.delete(timeout);
+        if (pluginActive) callback();
+    }, ms);
+    pendingTimeouts.add(timeout);
+}
 
 const settings = definePluginSettings({
     users: {
@@ -251,7 +260,7 @@ function banAllUsersInCurrentVc(): void {
         const channel = ChannelStore.getChannel(currentVoiceState.channelId);
         if (channel?.guild_id && forceCheckVcOwnership(channel.guild_id, currentVoiceState.channelId)) {
             newUsers.forEach((userId, index) => {
-                setTimeout(() => banninguser(userId), (index + 1) * Math.random() * 1000);
+                scheduleTimeout(() => banninguser(userId), (index + 1) * Math.random() * 1000);
             });
         }
     }
@@ -260,11 +269,39 @@ function banAllUsersInCurrentVc(): void {
 function makeUserContextMenuPatch(): NavContextMenuPatchCallback {
     return (children, props) => {
         if (!props) return;
+        const { id } = props.user;
+        if (UserStore.getCurrentUser().id === id) return;
 
-        const ban = MenuItem(props.user.id);
-        if (ban) {
-            children.splice(-1, 0, <Menu.MenuGroup>{ban}</Menu.MenuGroup>);
-        }
+        const isChecked = settings.store.users.split("/").filter(item => item !== "").includes(id);
+        children.splice(-1, 0,
+            <Menu.MenuGroup>
+                <Menu.MenuCheckboxItem
+                    id="auto-ban"
+                    label="Auto-Ban"
+                    checked={isChecked}
+                    action={async () => {
+                        openModal(props => <EncModals {...props} userId={id} />);
+                        const updatedList = [...settings.store.users.split("/").filter(item => item !== "")];
+                        const index = updatedList.indexOf(id);
+                        const wasAdded = index === -1;
+
+                        if (index === -1) updatedList.push(id);
+                        else updatedList.splice(index, 1);
+                        settings.store.users = updatedList.join("/");
+
+                        if (wasAdded) {
+                            banninguser(id);
+                        } else {
+                            Toasts.show({
+                                message: `Removed ${id} from Auto-Ban List`,
+                                type: Toasts.Type.MESSAGE,
+                                options: { position: Toasts.Position.BOTTOM }
+                            });
+                        }
+                    }}
+                />
+            </Menu.MenuGroup>
+        );
     };
 }
 
@@ -311,39 +348,6 @@ function BulkAutoBanSubmenu() {
                 color={actuallyIsOwner ? "brand" : "default"}
             />
         </Menu.MenuItem>
-    );
-}
-
-function MenuItem(id: string) {
-    if (UserStore.getCurrentUser().id === id) return;
-    const [isChecked, setIsChecked] = React.useState(settings.store.users.split("/").filter(item => item !== "").includes(id));
-    return (
-        <Menu.MenuCheckboxItem
-            id="auto-ban"
-            label="Auto-Ban"
-            checked={isChecked}
-            action={async () => {
-                openModal(props => <EncModals {...props} userId={id} />);
-                const updatedList = [...settings.store.users.split("/").filter(item => item !== "")];
-                const index = updatedList.indexOf(id);
-                const wasAdded = index === -1;
-
-                if (index === -1) updatedList.push(id);
-                else updatedList.splice(index, 1);
-                setIsChecked(!isChecked);
-                settings.store.users = updatedList.join("/");
-
-                if (wasAdded) {
-                    banninguser(id);
-                } else {
-                    Toasts.show({
-                        message: `Removed ${id} from Auto-Ban List`,
-                        type: Toasts.Type.MESSAGE,
-                        options: { position: Toasts.Position.BOTTOM }
-                    });
-                }
-            }}
-        />
     );
 }
 
@@ -405,7 +409,7 @@ function banninguser(id) {
         options: { position: Toasts.Position.BOTTOM }
     });
 
-    setTimeout(() => {
+    scheduleTimeout(() => {
         RestAPI.post({
             url: `/channels/${channelId}/messages`,
             body: { content: `!voice-ban ${id}`, nonce: (Math.floor(Math.random() * 10000000000000)) }
@@ -432,7 +436,7 @@ function checkExistingUsersInVC(channelId: string) {
             options: { position: Toasts.Position.BOTTOM }
         });
 
-        setTimeout(() => {
+        scheduleTimeout(() => {
             RestAPI.post({
                 url: `/channels/${channelId}/messages`,
                 body: { content: `!voice-ban ${userId}`, nonce: (Math.floor(Math.random() * 10000000000000)) }
@@ -497,19 +501,23 @@ export default definePlugin({
         "channel-context": makeChannelContextMenuPatch()
     },
     start() {
+        pluginActive = true;
         FluxDispatcher.subscribe("VOICE_STATE_UPDATES", cb);
         this.vcOwnershipInterval = setInterval(checkVcOwnershipStatus, 1500);
-        setTimeout(() => {
+        scheduleTimeout(() => {
             checkVcOwnershipStatus();
             forceCheckVcOwnership();
         }, 1000);
     },
 
     stop() {
+        pluginActive = false;
         FluxDispatcher.unsubscribe("VOICE_STATE_UPDATES", cb);
         if (this.vcOwnershipInterval) {
             clearInterval(this.vcOwnershipInterval);
         }
+        for (const timeout of pendingTimeouts) clearTimeout(timeout);
+        pendingTimeouts.clear();
     }
 });
 
@@ -523,7 +531,7 @@ const cb = async e => {
     // Handle current user VC changes
     if (state.userId === currentUserId) {
         if (state?.channelId !== state?.oldChannelId && state?.channelId) {
-            setTimeout(() => {
+            scheduleTimeout(() => {
                 const channel = ChannelStore.getChannel(state.channelId);
                 if (channel?.guild_id) {
                     forceCheckVcOwnership(channel.guild_id, state.channelId);
@@ -541,7 +549,7 @@ const cb = async e => {
     }
 
     // Handle other users joining
-    if (state?.channelId == state?.oldChannelId) return;
+    if (state?.channelId === state?.oldChannelId) return;
     if (!Object.keys(Cvcstates).includes(currentUserId)) return;
 
     if (state?.channelId && settings.store.users.split("/").filter(item => item !== "").includes(state.userId)) {
@@ -565,7 +573,7 @@ const cb = async e => {
             options: { position: Toasts.Position.BOTTOM }
         });
 
-        setTimeout(() => {
+        scheduleTimeout(() => {
             RestAPI.post({
                 url: `/channels/${state.channelId}/messages`,
                 body: { content: `!voice-ban ${state.userId}`, nonce: (Math.floor(Math.random() * 10000000000000)) }

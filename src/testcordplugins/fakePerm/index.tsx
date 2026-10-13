@@ -15,6 +15,25 @@ import { Button, GuildChannelStore, GuildMemberStore, GuildRoleStore, GuildStore
 // Context menu patches are always registered, they check isEnabled at runtime
 let isEnabled = false;
 
+let domInterval: ReturnType<typeof setInterval> | null = null;
+let domTimer: ReturnType<typeof setTimeout> | null = null;
+let pluginSelf: { applyDomOverrides: () => void; } | null = null;
+
+function ensureDomObserver() {
+    if (domInterval || !isEnabled || typeof document === "undefined") return;
+    domInterval = setInterval(() => {
+        if (!isEnabled) return;
+        if (fakeNicks.size === 0 && disconnectedUsers.size === 0 && kickedUsers.size === 0) return;
+        if (domTimer) return;
+        domTimer = setTimeout(() => { domTimer = null; if (isEnabled) pluginSelf?.applyDomOverrides(); }, 150);
+    }, 3000);
+}
+
+function destroyDomObserver() {
+    if (domInterval) { clearInterval(domInterval); domInterval = null; }
+    if (domTimer) { clearTimeout(domTimer); domTimer = null; }
+}
+
 const DS_KEY = "FakePerm.options.enabled"; // Standard Equicord key for plugin options
 
 // injectHideStyle / removeHideStyle removed — caused display bugs
@@ -129,12 +148,30 @@ function getVoiceChannelId(userId: string, guildId: string | null): string | nul
 function getGuildRoles(guildId: string | null): Array<{ id: string; name: string; color: number; }> {
     if (!guildId) return [];
     try {
-        return (GuildRoleStore as any)?.getSortedRoles?.(guildId)?.filter((r: any) => r.id !== guildId).map((r: any) => ({ id: r.id, name: r.name, color: r.color })) ?? [];
+        const sortedRoles = (GuildRoleStore as any)?.getSortedRoles?.(guildId);
+        if (sortedRoles) {
+            const out: Array<{ id: string; name: string; color: number; }> = [];
+            for (const r of sortedRoles) {
+                if (r.id !== guildId) out.push({ id: r.id, name: r.name, color: r.color });
+            }
+            return out;
+        }
+        return [];
     } catch {
         try {
             const guild = getGuild(guildId);
             if (!guild?.roles) return [];
-            return Object.values(guild.roles as Record<string, any>).filter((r: any) => r.id !== guildId).sort((a: any, b: any) => b.position - a.position).map((r: any) => ({ id: r.id, name: r.name, color: r.color }));
+            const vals = Object.values(guild.roles as Record<string, any>);
+            const filtered: any[] = [];
+            for (const r of vals) {
+                if (r.id !== guildId) filtered.push(r);
+            }
+            filtered.sort((a: any, b: any) => b.position - a.position);
+            const out2: Array<{ id: string; name: string; color: number; }> = [];
+            for (const r of filtered) {
+                out2.push({ id: r.id, name: r.name, color: r.color });
+            }
+            return out2;
         } catch { return []; }
     }
 }
@@ -544,15 +581,6 @@ export default definePlugin({
                 match: /(#{intl::GUILD_MEMBER_MOD_VIEW_HIGHEST_ROLE}.{0,80})role:\i(?<=\[\i\.roles,\i\.highestRoleId,(\i)\].+?)/,
                 replace: (_, rest, roles) => `${rest}role:$self.getHighestRole(arguments[0],${roles})`,
             }
-        },
-        // allows you to open mod view on yourself
-        {
-            find: 'action:"PRESS_MOD_VIEW",icon:',
-            predicate: () => isEnabled,
-            replacement: {
-                match: /\i(?=\?null)/,
-                replace: "false"
-            }
         }
     ],
 
@@ -572,6 +600,7 @@ export default definePlugin({
             onChange(v: boolean) {
                 isEnabled = Boolean(v);
                 if (!isEnabled) {
+                    destroyDomObserver();
                     // Full cleanup when disabling
                     document.querySelectorAll("[id^='fp-ibadge-']").forEach(el => el.remove());
                     document.querySelectorAll("[data-fp-hidden='true']").forEach(el => {
@@ -586,17 +615,15 @@ export default definePlugin({
                     bannedUsers.clear();
                     deletedMessages.clear();
                     notifyBadgeChange();
+                } else {
+                    ensureDomObserver();
                 }
                 toast(isEnabled ? "FakePerm enabled ✓" : "FakePerm disabled ✓");
             }
         }
     },
 
-    _domObserver: null as MutationObserver | null,
-    _domTimer: null as ReturnType<typeof setTimeout> | null,
-
-    applyDomOverrides() {
-        if (!isEnabled) return;
+    applyDomOverrides() { if (!isEnabled) return;
         for (const [userId, fakeNick] of fakeNicks) {
             document.querySelectorAll(`[data-user-id="${userId}"]`).forEach(el => {
                 const nickEl = el.querySelector("[class*='nick'], [class*='Nick'], [class*='username'], [class*='Username']") as HTMLElement | null;
@@ -626,6 +653,7 @@ export default definePlugin({
         } catch {
             isEnabled = false;
         }
+        pluginSelf = this;
 
         // Patches are ALWAYS registered — they check isEnabled at runtime
         addContextMenuPatch("user-context", userContextPatch);
@@ -637,20 +665,13 @@ export default definePlugin({
         style.textContent = "[class*='submenu']::-webkit-scrollbar{display:none!important}[class*='submenu']{scrollbar-width:none!important} .fp-footer-fix { display: flex; gap: 8px; padding: 16px; }";
         document.head.appendChild(style);
 
-        // MutationObserver for DOM overrides
-        this._domObserver = new MutationObserver(() => {
-            if (!isEnabled) return;
-            if (fakeNicks.size === 0 && disconnectedUsers.size === 0 && kickedUsers.size === 0) return;
-            if (this._domTimer) return;
-            this._domTimer = setTimeout(() => { this._domTimer = null; if (isEnabled) this.applyDomOverrides(); }, 150);
-        });
-        this._domObserver.observe(document.body, { childList: true, subtree: true });
+        // MutationObserver for DOM overrides — only active while enabled
+        ensureDomObserver();
     },
 
     stop() {
-        this._domObserver?.disconnect();
-        this._domObserver = null;
-        if (this._domTimer) { clearTimeout(this._domTimer); this._domTimer = null; }
+        destroyDomObserver();
+        pluginSelf = null;
         removeHideStyle();
         removeContextMenuPatch("user-context", userContextPatch);
         removeContextMenuPatch("message", messageContextPatch);

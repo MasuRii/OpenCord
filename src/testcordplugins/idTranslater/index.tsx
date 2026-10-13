@@ -110,7 +110,7 @@ function isIdInContext(content: string, id: string, index: number): boolean {
   }
 
   // Ignore if ID is part of a URL
-  if (before.match(/[:\/\.]/) || after.match(/[:\/\.]/)) {
+  if (before.match(/[:/.]/) || after.match(/[:/.]/)) {
     return true;
   }
 
@@ -250,7 +250,7 @@ export default definePlugin({
     {
       find: "!1,hideSimpleEmbedContent",
       replacement: {
-        match: /(let{toAST:.{0,125}?)\(null!=\i\?\i:\i\).content/,
+        match: /(let{toAST:.{0,125}?)(?:\(null!=\i\?\i:\i\)|\(\i\?\?\i\))\.content/,
         replace:
           "const idTranslaterContent=$self.modifyIncomingMessage(arguments[2]?.contentMessage??arguments[1]);$1idTranslaterContent",
       },

@@ -247,6 +247,25 @@ function generateReviewPluginContent(meta: {
     return `data:text/html;base64,${buf}`;
 }
 
+const escapeHtml = (s: string) => s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+// The page title is written by the untrusted commit log rendered inside the window, so it
+// can name any protocol the OS knows how to launch.
+function openExternalLink(url: string) {
+    try {
+        const { protocol } = new URL(url);
+        if (protocol !== "https:" && protocol !== "http:") return;
+    } catch {
+        return;
+    }
+    return shell.openExternal(url);
+}
+
 function generateUpdatePluginContent(meta: {
     name: string;
     description: string;
@@ -259,22 +278,32 @@ function generateUpdatePluginContent(meta: {
 }
 
 export async function getUserplugins() {
-    const folderContents = await readdir(join(__dirname, "..", "src", "userplugins"), {
-        withFileTypes: true
-    });
-    const plugins = await Promise.allSettled(
-        folderContents
-            .filter(item => item.isDirectory())
-            .map(item => ({
-                path: join(item.parentPath, item.name),
-                directory: item.name
-            }))
-            .map(({ path, directory }) => getPluginMeta(path, { directory }))
-    );
+    const userpluginsDir = existsSync(join(__dirname, "..", "src", "userplugins"))
+        ? join(__dirname, "..", "src", "userplugins")
+        : join(process.cwd(), "src", "userplugins");
 
-    return plugins
-        .filter(p => p.status === "fulfilled")
-        .map(p => p.value);
+    if (!existsSync(userpluginsDir)) return [];
+
+    try {
+        const folderContents = await readdir(userpluginsDir, {
+            withFileTypes: true
+        });
+        const plugins = await Promise.allSettled(
+            folderContents
+                .filter(item => item.isDirectory())
+                .map(item => ({
+                    path: join(item.parentPath || userpluginsDir, item.name),
+                    directory: item.name
+                }))
+                .map(({ path, directory }) => getPluginMeta(path, { directory }))
+        );
+
+        return plugins
+            .filter(p => p.status === "fulfilled")
+            .map((p: any) => p.value);
+    } catch {
+        return [];
+    }
 }
 
 export async function updatePlugin(_, directory: string) {
@@ -319,11 +348,11 @@ export async function updatePlugin(_, directory: string) {
                     name: pluginMeta.name,
                     description: pluginMeta.description,
                     remote: pluginMeta.remote,
-                    commit: rawOutput.split("\n").map(line => line.split("////////")).map(([user, shortCommit, longCommit, message]) => `${user} (<a href="${pluginMeta.remote.replace("plugins.nin0.dev", "git.nin0.dev/userplugins")}/commit/${longCommit}" style="font-family: monospace;">${shortCommit}</a>) ~ ${message}`).join("\n")
+                    commit: rawOutput.split("\n").map(line => line.split("////////")).map(([user, shortCommit, longCommit, message]) => `${escapeHtml(user)} (<a href="${escapeHtml(pluginMeta.remote.replace("plugins.nin0.dev", "git.nin0.dev/userplugins"))}/commit/${encodeURIComponent(longCommit ?? "")}" style="font-family: monospace;">${escapeHtml(shortCommit ?? "")}</a>) ~ ${escapeHtml(message ?? "")}`).join("\n")
                 }));
                 win.on("page-title-updated", async e => {
                     if (win.webContents.getTitle().startsWith("openLink:")) {
-                        await shell.openExternal(win.webContents.getTitle().replace("openLink:", ""));
+                        await openExternalLink(win.webContents.getTitle().replace("openLink:", ""));
                     }
                     switch (win.webContents.getTitle() as "abortInstall" | "install") {
                         case "abortInstall": {

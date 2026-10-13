@@ -21,6 +21,7 @@ const PORT = 47821;
 let serverProc: childProcess.ChildProcess | null = null;
 let serverReady = false;
 let startPromise: Promise<boolean> | null = null;
+let stopRequested = false;
 
 // ── Find ghost-server/server.js ────────────────────────────────────────────
 function findServerScript(): string | null {
@@ -94,6 +95,16 @@ function ping(): Promise<boolean> {
     });
 }
 
+function stopServer() {
+    stopRequested = true;
+    serverReady = false;
+    startPromise = null;
+    if (serverProc) {
+        try { serverProc.kill(); } catch { }
+        serverProc = null;
+    }
+}
+
 async function killZombieServer(): Promise<void> {
     // If a zombie ghost-server is running from a previous crash, kill it cleanly
     try {
@@ -125,12 +136,14 @@ async function killZombieServer(): Promise<void> {
 }
 
 async function ensureServer(): Promise<boolean> {
+    stopRequested = false;
     if (serverReady && await ping()) return true;
     if (startPromise) return startPromise;
 
     startPromise = (async () => {
         // Kill zombies before starting
         await killZombieServer();
+        if (stopRequested) { startPromise = null; return false; }
         if (await ping()) { serverReady = true; return true; }
 
         const script = findServerScript();
@@ -156,6 +169,10 @@ async function ensureServer(): Promise<boolean> {
                 ...process.env,
             }
         });
+        if (stopRequested) {
+            stopServer();
+            return false;
+        }
 
         // Limit ghost-server logs in the main Electron process
         // Too many logs = I/O on the main thread = freezes
@@ -203,6 +220,7 @@ async function ensureServer(): Promise<boolean> {
 
         // Poll every 200ms for 60s max
         for (let i = 0; i < 300; i++) {
+            if (stopRequested) { startPromise = null; return false; }
             await new Promise(r => setTimeout(r, 200));
             if (await ping()) {
                 console.log("[GhostNative] ghost-server ready ✓");
@@ -302,7 +320,10 @@ export async function listAudioInputDevices(_: any): Promise<{ label: string; ds
             proc.stderr?.on("data", (d: Buffer) => chunks.push(d));
             proc.stdout?.on("data", (d: Buffer) => chunks.push(d));
 
+            const timeout = setTimeout(() => { try { proc.kill(); } catch { } resolve([]); }, 5000);
+
             proc.on("exit", () => {
+                clearTimeout(timeout);
                 // Decode UTF-8, fallback to latin1 if replacement characters present
                 // (ffmpeg on Windows uses the system codepage, not UTF-8)
                 const raw = Buffer.concat(chunks);
@@ -320,9 +341,7 @@ export async function listAudioInputDevices(_: any): Promise<{ label: string; ds
                 resolve(names.map((n: string) => ({ label: n, dshowName: n })));
             });
 
-            proc.on("error", () => resolve([]));
-            // FIX: timeout reduced to 5s (instead of 8s) — reduces UI freeze by 37%
-            setTimeout(() => { try { proc.kill(); } catch { } resolve([]); }, 5000);
+            proc.on("error", () => { clearTimeout(timeout); resolve([]); });
         } catch { resolve([]); }
     });
 }
@@ -382,10 +401,11 @@ export async function init(_: any): Promise<void> {
     console.log("[GhostNative] ghost-server HTTP ready ✓");
 }
 
+export async function stop(_: any): Promise<void> {
+    stopServer();
+}
+
 // ── Cleanup ───────────────────────────────────────────────────────────────────
 app.on("before-quit", () => {
-    if (serverProc) {
-        try { serverProc.kill(); } catch { }
-        serverProc = null;
-    }
+    stopServer();
 });

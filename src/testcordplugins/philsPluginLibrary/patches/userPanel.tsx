@@ -45,7 +45,7 @@ export const useButtons = () => {
 
     React.useEffect(() => {
         settingsPanelButtonsSubscriptions.add(forceUpdate);
-        return () => void settingsPanelButtonsSubscriptions.delete(() => forceUpdate);
+        return () => void settingsPanelButtonsSubscriptions.delete(forceUpdate);
     }, []);
 
     return settingsPanelButtons;

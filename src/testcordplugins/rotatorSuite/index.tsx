@@ -6,7 +6,7 @@
 
 import { DataStore } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
-import { UserAreaButton } from "@api/UserArea";
+import { UserAreaButton, UserAreaRenderProps } from "@api/UserArea";
 import { getUserSettingLazy } from "@api/UserSettings";
 import { Logger } from "@utils/Logger";
 import { ModalContent, ModalFooter, ModalHeader, ModalRoot, openModal,RenderModalProps } from "@utils/modal";
@@ -223,6 +223,7 @@ async function bcrApplyColor(hex: string): Promise<void> {
     const p = (async () => {
         try {
             await RestAPI.patch({ url: "/users/@me", body: { banner_color: hex } });
+            if (!pluginActive) return;
             bcrCurrentColor = hex; bcrOnColorApplied?.(hex);
             if (settings.store.bannerShowToast) Toasts.show({ message: `Banner → ${hex}`, type: Toasts.Type.SUCCESS, id: Toasts.genId() });
             await bcrSaveData();
@@ -233,13 +234,12 @@ async function bcrApplyColor(hex: string): Promise<void> {
     bcrApplyPromise = p;
     await p;
 }
-async function bcrRotateNext(): Promise<void> { if (!pluginActive || isManualStop || wasInvisible) return; await bcrApplyColor(await bcrPickNextColor()); bcrSchedule(); }
+async function bcrRotateNext(): Promise<void> { if (!pluginActive || isManualStop || wasInvisible) return; await bcrApplyColor(await bcrPickNextColor()); if (!pluginActive || isManualStop || wasInvisible) return; bcrSchedule(); }
 function bcrSchedule() { if (bcrRotatorTimer) clearTimeout(bcrRotatorTimer); if (!pluginActive || isManualStop || wasInvisible) return; bcrRotatorTimer = setTimeout(bcrRotateNext, Math.max(1, settings.store.bannerIntervalSeconds ?? BCR_DEFAULT_S) * 1000); }
 function bcrStartRotator(immediate = false) {
     if (!pluginActive) return;
     if (bcrRotatorTimer) clearTimeout(bcrRotatorTimer);
     bcrRandomBatch = []; bcrSeqBatch = []; bcrUsedFavs = []; bcrGradientState = null; bcrMonoBaseHue = null; bcrSeqBaseHue = 0; bcrShadeStep = 0; bcrShadeDir = 1;
-    bcrRotatorTimer = setTimeout(() => {}, 0);
     if (immediate) void bcrRotateNext(); else bcrRotatorTimer = setTimeout(bcrRotateNext, Math.max(1, settings.store.bannerIntervalSeconds ?? BCR_DEFAULT_S) * 1000);
 }
 function bcrStopRotator() { if (bcrRotatorTimer) { clearTimeout(bcrRotatorTimer); bcrRotatorTimer = null; } void bcrSaveData(); }
@@ -380,6 +380,25 @@ let isManualStop = false;
 let invisibleWatchInterval: ReturnType<typeof setInterval> | null = null;
 let wasInvisible = false;
 let cachedPresenceStore: any = null;
+const sleepTimers = new Map<ReturnType<typeof setTimeout>, () => void>();
+
+function rsSleep(ms: number): Promise<void> {
+    return new Promise(resolve => {
+        const timeout = setTimeout(() => {
+            sleepTimers.delete(timeout);
+            resolve();
+        }, ms);
+        sleepTimers.set(timeout, resolve);
+    });
+}
+
+function clearSleepTimers() {
+    for (const [timeout, resolve] of sleepTimers) {
+        clearTimeout(timeout);
+        resolve();
+    }
+    sleepTimers.clear();
+}
 
 let closeStatusEnabled = false;
 let closeStatusText = "";
@@ -785,11 +804,15 @@ async function applyStatus(entry: StatusEntry, retries = 3): Promise<void> {
             const st = e?.status ?? e?.response?.status ?? 0;
             if (st === 429) {
                 const ra = Math.max(parseFloat(e?.body?.retry_after ?? e?.retry_after ?? "3") || 3, 1);
-                await new Promise(r => setTimeout(r, ra * 1000 + 200));
+                await rsSleep(ra * 1000 + 200);
+                if (!pluginActive) return;
                 continue;
             }
             if (settings.store.enableLogs) console.error(`[RS/Status] attempt=${attempt + 1} err:`, e);
-            if (attempt < retries - 1) await new Promise(r => setTimeout(r, 1500));
+            if (attempt < retries - 1) {
+                await rsSleep(1500);
+                if (!pluginActive) return;
+            }
         }
     }
 }
@@ -861,15 +884,22 @@ async function applyClan(id: string, retries = 4, signal?: AbortSignal): Promise
                 const json = await res.json().catch(() => ({}));
                 if (signal?.aborted) return;
                 const ra = Math.max((json?.retry_after ?? 3), 1);
-                await new Promise(r => setTimeout(r, ra * 1000 + 300));
+                await rsSleep(ra * 1000 + 300);
+                if (signal?.aborted || !pluginActive) return;
                 continue;
             }
             if (settings.store.enableLogs) console.error(`[RS/Clan] HTTP ${res.status} attempt=${attempt + 1}`);
-            if (attempt < retries - 1) await new Promise(r => setTimeout(r, 1500));
+            if (attempt < retries - 1) {
+                await rsSleep(1500);
+                if (signal?.aborted || !pluginActive) return;
+            }
         } catch (e) {
             if (signal?.aborted) return;
             if (settings.store.enableLogs) console.error(`[RS/Clan] attempt=${attempt + 1} err:`, e);
-            if (attempt < retries - 1) await new Promise(r => setTimeout(r, 1500));
+            if (attempt < retries - 1) {
+                await rsSleep(1500);
+                if (signal?.aborted || !pluginActive) return;
+            }
         }
     }
 }
@@ -919,11 +949,15 @@ async function applyGlobalNick(displayName: string, retries = 3): Promise<void> 
             if (st === 429) {
                 const ra = Math.max(parseFloat(e?.body?.retry_after ?? e?.retry_after ?? "300") || 300, 10);
                 if (settings.store.enableLogs) console.warn(`[RS/GlobalNick] 429 retry ${ra}s`);
-                await new Promise(r => setTimeout(r, ra * 1000 + 500));
+                await rsSleep(ra * 1000 + 500);
+                if (!pluginActive) return;
                 continue;
             }
             if (settings.store.enableLogs) console.error(`[RS/GlobalNick] attempt=${attempt + 1}:`, e);
-            if (attempt < retries - 1) await new Promise(r => setTimeout(r, 2000));
+            if (attempt < retries - 1) {
+                await rsSleep(2000);
+                if (!pluginActive) return;
+            }
         }
     }
 }
@@ -939,7 +973,8 @@ async function applyGuildPronoun(guildId: string, pronouns: string): Promise<voi
             if (st === 300) {
                 const ra = Math.max(parseFloat(e?.body?.retry_after ?? e?.retry_after ?? "5") || 5, 1);
                 if (settings.store.enableLogs) console.warn(`[RS/GuildPronouns] 429 [${guildId}] retry ${ra}s`);
-                await new Promise(r => setTimeout(r, ra * 1000 + 300));
+                await rsSleep(ra * 1000 + 300);
+                if (!pluginActive) return;
                 continue;
             }
             if (st === 403 || st === 404) {
@@ -2813,6 +2848,7 @@ async function arApplyAvatar(entry: AvatarEntry): Promise<void> {
             }
             try {
                 await RestAPI.patch({ url: "/users/@me", body: { avatar: uploadData } });
+                if (!pluginActive) return;
                 arToast(`Avatar → ${entry.label}`);
                 return;
             } catch (gifErr: any) {
@@ -2820,14 +2856,18 @@ async function arApplyAvatar(entry: AvatarEntry): Promise<void> {
                 const isNitroErr = code === 50035 || code === 10002 || String(gifErr?.body?.message ?? "").toLowerCase().includes("nitro");
                 if (!isNitroErr) throw gifErr;
                 const fb = await arGifFirstFramePng(entry.data, entry.cropParams);
+                if (!pluginActive) return;
                 await RestAPI.patch({ url: "/users/@me", body: { avatar: fb } });
+                if (!pluginActive) return;
                 arToast(`Avatar → ${entry.label} (static, Nitro required for animated)`);
                 return;
             }
         }
         const data = await arPrepareForDiscord(entry.data);
+        if (!pluginActive) return;
         if (!data?.split(",")[1] || data.split(",")[1].length < 10) throw new Error("Invalid image data");
         await RestAPI.patch({ url: "/users/@me", body: { avatar: data } });
+        if (!pluginActive) return;
         arToast(`Avatar → ${entry.label}`);
     } catch (e: any) {
         const msg = e?.body?.errors?.avatar?._errors?.[0]?.message ?? e?.body?.message ?? e?.message ?? "Unknown";
@@ -2849,7 +2889,9 @@ async function arRotateNext(): Promise<void> {
     else { idx = arSeqIndex % active.length; arSeqIndex = (arSeqIndex + 1) % active.length; }
     if (idx >= active.length) idx = 0;
     await arApplyAvatar(active[idx]);
+    if (!pluginActive) return;
     await arSaveData();
+    if (!pluginActive) return;
     arSchedule();
 }
 
@@ -2883,7 +2925,12 @@ function arExportJSON() {
 async function arImportJSON(file: File): Promise<AvatarEntry[]> {
     const obj = JSON.parse(await file.text());
     const raw = Array.isArray(obj) ? obj : (obj.avatars ?? []);
-    return raw.filter((x: any) => typeof x.data === "string" && typeof x.label === "string").map((x: any) => ({ id: arUid(), label: x.label, data: x.data }));
+    const out: AvatarEntry[] = [];
+    for (const x of raw) {
+        if (typeof x.data === "string" && typeof x.label === "string")
+            out.push({ id: arUid(), label: x.label, data: x.data });
+    }
+    return out;
 }
 
 function ArExtBadge({ ext, excluded }: { ext: string; excluded?: boolean }) {
@@ -3093,7 +3140,8 @@ async function gifDecode(data: string): Promise<{ frames: Array<{ canvas: HTMLCa
             fc.getContext("2d")!.drawImage(vf, 0, 0, W, H);
             vf.close();
             frames.push({ canvas: fc, delay });
-            await new Promise<void>(r2 => setTimeout(r2, 0));
+            await rsSleep(0);
+            if (!pluginActive) return null;
         }
         dec.close();
         return frames.length ? { frames, w: W, h: H, loops: 0 } : null;
@@ -3202,7 +3250,8 @@ async function gifApplyCrop(src: string, ox: number, oy: number, zoom: number, r
     const S = 256, ratio = S / AR_CIRC_D;
     const encFrames: Array<{ imageData: ImageData; delay: number }> = [];
     for (let fi = 0; fi < frames.length; fi++) {
-        await new Promise<void>(r => setTimeout(r, 0));
+        await rsSleep(0);
+        if (!pluginActive) return null;
         const { canvas, delay } = frames[fi];
         const oc = document.createElement("canvas"); oc.width = S; oc.height = S;
         const ctx = oc.getContext("2d")!;
@@ -5019,7 +5068,7 @@ function RotatorSuiteModal({ modalProps }: { modalProps: RenderModalProps }) {
     );
 }
 
-function RSUserAreaButton() {
+function RSUserAreaButton({ iconForeground, hideTooltips, nameplate }: UserAreaRenderProps) {
     const [active, setActive] = React.useState(false);
     React.useEffect(() => {
         const id = setInterval(() => {
@@ -5030,13 +5079,52 @@ function RSUserAreaButton() {
     }, []);
 
     if (!settings.store.showButton) return null;
+
+    const lineLength = 30;
+    const lineStyle: React.CSSProperties = {
+        strokeDasharray: lineLength,
+        strokeDashoffset: active ? lineLength : 0,
+        transition: "stroke-dashoffset 0.1s ease-in-out",
+    };
+
     return (
         <UserAreaButton
-            tooltipText={active ? "Rotator Suite - [Running]" : "Rotator Suite"}
+            tooltipText={hideTooltips ? void 0 : active ? "Rotator Suite - [Running]" : "Rotator Suite"}
+            redGlow={!active}
+            plated={nameplate != null}
             icon={
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
-                    {active && <circle cx="18" cy="6" r="4" fill="#9c67ff" stroke="none" />}
+                <svg className={iconForeground} width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <mask id="rotatorSuiteLine">
+                        <rect width="100%" height="100%" fill="#ffffff" />
+                        <line
+                            className="blackLine"
+                            x1="22"
+                            y1="2"
+                            x2="2"
+                            y2="22"
+                            stroke="#000000"
+                            strokeWidth="6"
+                            strokeLinecap="round"
+                            style={lineStyle}
+                        />
+                    </mask>
+
+                    <path mask="url(#rotatorSuiteLine)" fill={!active ? "var(--status-danger)" : "currentColor"} d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/>
+
+                    <line
+                        x1="22"
+                        y1="2"
+                        x2="2"
+                        y2="22"
+                        stroke="var(--status-danger, currentColor)"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        style={lineStyle}
+                    />
+
+                    {active &&
+                        <circle cx="18" cy="6" r="4" fill="#9c67ff" stroke="none" />
+                    }
                 </svg>
             }
             onClick={() => openModal(props => <RotatorSuiteModal modalProps={props} />)}
@@ -5154,7 +5242,7 @@ export default definePlugin({
         closeBannerColor = closeStored.closeBannerColor ?? "#111214";
         try { localStorage.setItem(RS_CLOSE_LS, JSON.stringify({ closeStatusEnabled, closeStatusText, closeStatusEmoji, closeStatusType, closeClanEnabled, closeClanId, closeBannerEnabled, closeBannerColor })); } catch {}
 
-        Vencord.Api.UserArea.addUserAreaButton("rotator-suite", () => <RSUserAreaButton />);
+        Vencord.Api.UserArea.addUserAreaButton("rotator-suite", RSUserAreaButton);
 
         if (settings.store.autoStart) {
             startAllRotators();
@@ -5177,6 +5265,7 @@ export default definePlugin({
         stopNitroWatcher();
         stopAvatarNitroWatcher();
         stopAllRotators();
+        clearSleepTimers();
         arAvatars = []; arSeqIndex = 0; arShuffleQueue = [];
         bcrFavorites = []; bcrUsedFavs = []; bcrRandomBatch = []; bcrSeqBatch = [];
         bcrCachedHue = null; bcrGradientState = null; bcrMonoBaseHue = null;

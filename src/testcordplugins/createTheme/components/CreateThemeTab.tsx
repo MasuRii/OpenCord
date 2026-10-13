@@ -19,8 +19,7 @@ function relativeLuminance(hex: string): number {
 import { classNameFactory } from "@utils/css";
 import { Margins } from "@utils/margins";
 import { findByCodeLazy, findStoreLazy } from "@webpack";
-import { Button, ThemeStore, useStateFromStores } from "@webpack/common";
-import { React, useEffect, useRef, useState } from "@webpack/common";
+import { Button, React, ThemeStore, useEffect, useRef, useState, useStateFromStores } from "@webpack/common";
 
 const saveClientTheme = findByCodeLazy('type:"UNSYNCED_USER_SETTINGS_UPDATE', '"system"===');
 const NitroThemeStore = findStoreLazy("ClientThemesBackgroundStore");

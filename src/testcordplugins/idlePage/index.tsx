@@ -39,14 +39,14 @@ export const settings = definePluginSettings({
 );
 let c = 0;
 function openThing() {
-    openModalLazy(async() => {
-        return ()=> (
+    openModalLazy(async () => {
+        return () => (
             <div className="custom-idle-div-page" style={{
                 backgroundColor: settings.store.BackgroundColor
             }}
-            onClick={()=>{
-                closeModal("idle-modal");
-            }}
+                onClick={() => {
+                    closeModal("idle-modal");
+                }}
             >
                 <h1>{settings.store.text}</h1>
             </div>
@@ -58,14 +58,14 @@ function openThing() {
 export default definePlugin({
     settings,
     flux: {
-        IDLE: () =>{
+        IDLE: () => {
             if (settings.store.onIdle)
                 openThing();
         }
     },
     name: "IdlePage",
     description: "Shows a blank page when you go idle",
-    tags: ["Fun", "Customisation"],
+    tags: ["Appearance", "Customisation"],
     patches: [
         {
             find: ".Messages.DISCODO_DISABLED",
@@ -80,26 +80,27 @@ export default definePlugin({
     ],
 
     authors: [TestcordDevs.x2b],
-    start(){
+    interval: undefined as ReturnType<typeof setInterval> | undefined,
+    start() {
         if (settings.store.onHomeClick)
             this.interval = setInterval(() => c = 0, 1000);
     },
     stop() {
-        if (settings.store.onHomeClick)
-            clearInterval(this.interval);
+        clearInterval(this.interval);
+        this.interval = undefined;
     },
-    startIdle(){
+    startIdle() {
         c++;
-        if(c === 3){
+        if (c === 3) {
             c = 0;
             openThing();
         }
     },
     commands: [
         {
-            name:"test",
-            description:"test command",
-            execute(){
+            name: "test",
+            description: "test command",
+            execute() {
                 openThing();
             }
         }
