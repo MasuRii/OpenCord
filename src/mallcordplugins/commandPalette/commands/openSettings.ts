@@ -5,7 +5,7 @@
  */
 
 import { Logger } from "@utils/Logger";
-import { SettingsRouter, showToast, Toasts } from "@webpack/common";
+import { SettingsRouter, showToast } from "@webpack/common";
 
 export interface SettingsRoute {
     route: string;
@@ -29,11 +29,11 @@ export const DISCORD_SETTINGS_ROUTES: SettingsRoute[] = [
     { route: "authorized_apps", label: "Authorized Apps", keywords: ["oauth", "apps"] },
     { route: "family_center", label: "Family Center", keywords: ["family", "safety"] },
     { route: "advanced", label: "Advanced", keywords: ["developer"] },
-    { route: "equicord_main", label: "Equicord", keywords: ["vencord"] },
-    { route: "equicord_plugins", label: "Equicord Plugins", keywords: ["plugins"] },
-    { route: "equicord_themes", label: "Equicord Themes", keywords: ["themes", "css"] },
-    { route: "equicord_updater", label: "Equicord Updater", keywords: ["update"] },
-    { route: "equicord_changelog", label: "Equicord Changelog", keywords: ["changelog", "news"] }
+    { route: "mallcord_main", label: "MallCord", keywords: ["vencord"] },
+    { route: "mallcord_plugins", label: "MallCord Plugins", keywords: ["plugins"] },
+    { route: "mallcord_themes", label: "MallCord Themes", keywords: ["themes", "css"] },
+    { route: "mallcord_updater", label: "MallCord Updater", keywords: ["update"] },
+    { route: "mallcord_changelog", label: "MallCord Changelog", keywords: ["changelog", "news"] }
 ];
 
 const ROUTE_ALIASES = new Map<string, string[]>([
@@ -52,11 +52,11 @@ const ROUTE_ALIASES = new Map<string, string[]>([
     ["chat", ["chat_panel"]],
     ["authorized_apps", ["authorized_apps_panel"]],
     ["family_center", ["family_center_panel"]],
-    ["equicord_main", ["equicord_main_panel"]],
-    ["equicord_plugins", ["equicord_plugins_panel"]],
-    ["equicord_themes", ["equicord_themes_panel"]],
-    ["equicord_updater", ["equicord_updater_panel"]],
-    ["equicord_changelog", ["equicord_changelog_panel"]]
+    ["mallcord_main", ["mallcord_main_panel"]],
+    ["mallcord_plugins", ["mallcord_plugins_panel"]],
+    ["mallcord_themes", ["mallcord_themes_panel"]],
+    ["mallcord_updater", ["mallcord_updater_panel"]],
+    ["mallcord_changelog", ["mallcord_changelog_panel"]]
 ]);
 
 const ROUTE_LOOKUP = (() => {
@@ -110,7 +110,7 @@ const logger = new Logger("CommandPalette");
 export async function openSettingsPage(route: string, label?: string) {
     const candidates = resolveRouteCandidates(route);
     if (candidates.length === 0) {
-        showToast("No settings page was provided.", Toasts.Type.FAILURE);
+        showToast("No settings page was provided.", "failure");
         return false;
     }
 
@@ -124,6 +124,6 @@ export async function openSettingsPage(route: string, label?: string) {
         }
     }
 
-    showToast(`Unable to open ${label ?? "that settings page"}.`, Toasts.Type.FAILURE);
+    showToast(`Unable to open ${label ?? "that settings page"}.`, "failure");
     return false;
 }

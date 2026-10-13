@@ -10,6 +10,7 @@ import { BadgePosition, ProfileBadge } from "@api/Badges";
 import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
 import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
 import { DataStore } from "@api/index";
+import { MallCordDevs } from "@utils/constants";
 import {
     ModalCloseButton as ModalCloseButton_,
     ModalContent as ModalContent_,
@@ -19,7 +20,6 @@ import {
     openModal
 } from "@utils/modal";
 import definePlugin from "@utils/types";
-import { MallCordDevs } from "@utils/constants";
 import { AuthenticationStore, Button, FluxDispatcher, IconUtils, Menu, React, Select, SnowflakeUtils, UserStore } from "@webpack/common";
 import virtualMerge from "virtual-merge";
 
@@ -1253,7 +1253,7 @@ export default definePlugin({
     name: "CustomProfile",
     enabledByDefault: true,
     description: t("Visually customize your Discord profile (username, PFP, banner, badges, bio...) — persistent, only visible to you."),
-    authors: [MallCordDevs.pepsify],
+    authors: [MallCordDevs.Sharp],
     dependencies: ["HeaderBarAPI", "ContextMenuAPI"],
 
     patches: [
