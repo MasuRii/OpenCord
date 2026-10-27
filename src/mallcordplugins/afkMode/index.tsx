@@ -4,13 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { definePluginSettings } from "@api/Settings";
 import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
-import { Logger } from "@utils/Logger";
+import { definePluginSettings } from "@api/Settings";
 import { MallCordDevs } from "@utils/constants";
+import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { FluxDispatcher, React, RestAPI, Toasts, UserStore } from "@webpack/common";
+import { FluxDispatcher, React, RestAPI, showToast, UserStore } from "@webpack/common";
 
 const logger = new Logger("AfkMode");
 const ChannelStore = findByPropsLazy("getChannel", "getDMFromUserId");
@@ -72,11 +72,7 @@ function AfkButton() {
         afkEnabled = !afkEnabled;
         setEnabled(afkEnabled);
         repliedChannels.clear();
-        Toasts.show({
-            message: afkEnabled ? "AFK Mode ON — auto-replying to DMs" : "AFK Mode OFF",
-            type: afkEnabled ? Toasts.Type.SUCCESS : Toasts.Type.MESSAGE,
-            id: Toasts.genId(),
-        });
+        showToast(afkEnabled ? "AFK Mode ON — auto-replying to DMs" : "AFK Mode OFF", afkEnabled ? "success" : "message");
     }
 
     return (
