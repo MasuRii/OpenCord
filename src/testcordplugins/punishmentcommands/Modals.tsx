@@ -7,8 +7,7 @@
 import ErrorBoundary from "@components/ErrorBoundary";
 import { classNameFactory } from "@utils/css";
 import { closeAllModals,ModalContent, ModalHeader, ModalRoot, ModalSize, openModal } from "@utils/modal";
-import { Button, Forms, TextInput } from "@webpack/common";
-import { SelectedChannelStore } from "@webpack/common";
+import { Button, Forms, SelectedChannelStore, TextInput } from "@webpack/common";
 
 const cl = classNameFactory("vc-membercount-");
 import "./style.css";

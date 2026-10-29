@@ -21,7 +21,7 @@ function Icon(iconProps: IconProps) {
                     {...props}
                     fill="none" viewBox={iconProps.viewBox??"0 0 24 24"}>
                     {iconProps.paths.map(path => (
-                        <path fill={path.fill} d={path.path} />
+                        <path key={path.path} fill={path.fill} d={path.path} />
                     ))}
                 </svg>
             )}

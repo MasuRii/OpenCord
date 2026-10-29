@@ -71,7 +71,7 @@ function getTickVersion() {
 
 function useGlobalTick() {
     const [, forceUpdate] = useReducer((n: number) => n + 1, 0);
-    useEffect(() => subscribeTick(forceUpdate), []);
+    useEffect(() => { return subscribeTick(forceUpdate); }, []);
 }
 
 // ─── Renderers called by the patches ─────────────────────────────────────────
@@ -158,7 +158,7 @@ export default definePlugin({
 
         // ─── Timestamp markdown <t:unix:t> — hover tooltip ────────────────────
         {
-            find: /.full,.{0,15}children:/,
+            find: /\.full,.{0,15}children:/,
             replacement: {
                 match: /(__unsupportedReactNodeAsText:)\i\.full/,
                 replace: "$1$self.renderTimestamp(new Date(arguments[0].node.timestamp*1000),'tooltip')",

@@ -8,6 +8,7 @@ import "./styles.css";
 
 import { addContextMenuPatch, NavContextMenuPatchCallback, removeContextMenuPatch } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
+import { sleep } from "@utils/misc";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalRoot, openModal } from "@utils/modal";
 import definePlugin, { OptionType } from "@utils/types";
 import { findByProps, findByPropsLazy, findStoreLazy } from "@webpack";
@@ -101,7 +102,7 @@ function LeaveAllServersModal({ rootProps }: { rootProps: any; }) {
             } catch (e) {
                 console.error(`[LeaveAllServers] Failed to leave ${guild.name}:`, e);
             }
-            await new Promise(r => setTimeout(r, 800));
+            await sleep(800);
         }
 
         setStatus("done");
@@ -235,6 +236,7 @@ export default definePlugin({
     description: "Leaves all selected servers. Accessible via right-click on a server.",
     tags: ["Servers", "Nightcord"],
     authors: [{ name: "Nightcord", id: 0n }],
+    dependencies: ["ContextMenuAPI"],
     settings,
 
     start() {

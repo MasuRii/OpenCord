@@ -7,9 +7,10 @@
 import "./style.css";
 
 import { definePluginSettings } from "@api/Settings";
+import ErrorBoundary from "@components/ErrorBoundary";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { ChannelStore, GuildMemberStore, useStateFromStores } from "@webpack/common";
+import { ChannelStore, GuildMemberStore } from "@webpack/common";
 
 const settings = definePluginSettings({
     indicatorStyle: {
@@ -32,17 +33,10 @@ export default definePlugin({
 
     patches: [
         {
-            find: ']="BADGES"',
+            find: '"data-username-has-gradient"',
             replacement: {
                 match: /(?<=onContextMenu:\i,children:)(.{0,300}?)(?=,"data-text":)/,
                 replace: "$self.wrapMessageAuthor(arguments[0],$&)"
-            }
-        },
-        {
-            find: "Messages.FORUM_POST_AUTHOR_A11Y_LABEL",
-            replacement: {
-                match: /(?<=\}=(\i),\{(user:\i,author:\i)\}=.{0,400}?\(\i\.Fragment,{children:)\i(?=}\),)/,
-                replace: "$self.wrapForumAuthor({...$1,$2},$&)"
             }
         },
     ],
@@ -58,28 +52,17 @@ export default definePlugin({
             />
         );
     },
-
-    wrapForumAuthor({ channel, user }: any, text: any) {
-        if (!user) return text;
-        return (
-            <DeadIndicator
-                channel={channel}
-                userId={user.id}
-                text={text}
-            />
-        );
-    },
 });
 
-function DeadIndicator({ channel, userId, text }: { channel: any; userId: string; text: any; }) {
-    const isMember = useStateFromStores(
-        [GuildMemberStore],
-        () => GuildMemberStore.isMember(channel?.guild_id, userId),
-    );
-    if (!channel?.guild_id || isMember) return text;
+const DeadIndicator = ErrorBoundary.wrap(function DeadIndicator({ channel, userId, text }: { channel: any; userId: string; text: any; }) {
+    const guildId = channel?.guild_id;
+    if (!guildId) return text;
+
+    const isMember = GuildMemberStore.isMember(guildId, userId);
+    if (isMember) return text;
 
     if (settings.store.indicatorStyle === "badge") {
         return <span className="c98-author-dead-badge">{text}</span>;
     }
     return <s className="c98-author-dead">{text}</s>;
-}
+}, { noop: true });

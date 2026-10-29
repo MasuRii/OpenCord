@@ -34,7 +34,18 @@ export default function AuditLogPage({ guildId }: { guildId: string; }) {
 
     const theme = useStateFromStores([ThemeStore], () => ThemeStore.theme);
     const streamerMode = useStateFromStores([StreamerModeStore], () => StreamerModeStore.enabled);
-    const logs = useStateFromStores([GuildSettingsAuditLogStore], () => GuildSettingsAuditLogStore.logs);
+    const auditLogState = useStateFromStores([GuildSettingsAuditLogStore, UserStore], () => ({
+        actionFilter: GuildSettingsAuditLogStore.actionFilter,
+        groupedFetchCount: GuildSettingsAuditLogStore.groupedFetchCount,
+        hasError: GuildSettingsAuditLogStore.hasError,
+        hasOlderLogs: GuildSettingsAuditLogStore.hasOlderLogs,
+        isInitialLoading: GuildSettingsAuditLogStore.isInitialLoading,
+        isLoading: GuildSettingsAuditLogStore.isLoading,
+        isLoadingNextPage: GuildSettingsAuditLogStore.isLoadingNextPage,
+        logs: GuildSettingsAuditLogStore.logs,
+        moderators: GuildSettingsAuditLogStore.userIds.map(e => UserStore.getUser(e)).filter(i => i !== null),
+        userIdFilter: GuildSettingsAuditLogStore.userIdFilter,
+    }));
     const AuditLogComponent = getAuditLog();
 
     if (!AuditLogComponent) return null;
@@ -55,16 +66,16 @@ export default function AuditLogPage({ guildId }: { guildId: string; }) {
         <AuditLogComponent
             guildId={guildId}
             guild={guild}
-            moderators={GuildSettingsAuditLogStore.userIds.map(e => UserStore.getUser(e)).filter(i => i !== null)}
-            isInitialLoading={GuildSettingsAuditLogStore.isInitialLoading}
-            isLoading={GuildSettingsAuditLogStore.isLoading}
-            isLoadingNextPage={GuildSettingsAuditLogStore.isLoadingNextPage}
-            showLoadMore={GuildSettingsAuditLogStore.groupedFetchCount > 2}
-            hasError={GuildSettingsAuditLogStore.hasError}
-            hasOlderLogs={GuildSettingsAuditLogStore.hasOlderLogs}
-            logs={logs !== null && guild !== null ? logsParser(logs, guild) : []}
-            actionFilter={GuildSettingsAuditLogStore.actionFilter}
-            userIdFilter={GuildSettingsAuditLogStore.userIdFilter}
+            moderators={auditLogState.moderators}
+            isInitialLoading={auditLogState.isInitialLoading}
+            isLoading={auditLogState.isLoading}
+            isLoadingNextPage={auditLogState.isLoadingNextPage}
+            showLoadMore={auditLogState.groupedFetchCount > 2}
+            hasError={auditLogState.hasError}
+            hasOlderLogs={auditLogState.hasOlderLogs}
+            logs={auditLogState.logs !== null && guild !== null ? logsParser(auditLogState.logs, guild) : []}
+            actionFilter={auditLogState.actionFilter}
+            userIdFilter={auditLogState.userIdFilter}
             theme={theme}
             hide={streamerMode}
         />

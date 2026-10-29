@@ -43,6 +43,8 @@ interface SearchQueryRequest {
     content?: string;
     include_nsfw?: boolean;
     mentions?: string;
+    has?: string | string[];
+    pinned?: boolean;
     offset: number;
     sort_by: "timestamp";
     sort_order: "desc";
@@ -55,14 +57,22 @@ function buildApiQuery(filters: FilterState, content: string, offset: number): S
         sort_order: "desc"
     };
 
-    // ponytail: Discord guild search needs a term; if none typed, seed it from the
-    // link filter so the API returns candidates that messagePassesLinkFilters refines.
     const term = content.trim() || filters.linkContains?.trim() || filters.linkDomain?.trim() || "";
     if (term) query.content = term;
     if (filters.authorId) query.author_id = filters.authorId;
     if (filters.channelId) query.channel_id = filters.channelId;
     if (filters.mentions) query.mentions = filters.mentions;
     if (filters.includeNSFW) query.include_nsfw = true;
+    if (filters.isPinned) query.pinned = true;
+
+    const hasFilters: string[] = [];
+    if (filters.hasAttachments) hasFilters.push("file");
+    if (filters.hasEmbeds) hasFilters.push("embed");
+    if (filters.linkDomain || filters.linkContains) hasFilters.push("link");
+
+    if (hasFilters.length > 0) {
+        query.has = hasFilters;
+    }
 
     return query;
 }
@@ -142,7 +152,7 @@ function messagePassesClientFilters(message: Message, filters: FilterState): boo
     return true;
 }
 
-function getCacheKey(guildId: string, content: string, filters: FilterState): string {
+function getCacheKey(targetId: string, content: string, filters: FilterState): string {
     const filterStr = JSON.stringify({
         a: filters.authorId,
         c: filters.channelId,
@@ -158,7 +168,7 @@ function getCacheKey(guildId: string, content: string, filters: FilterState): st
         df: filters.dateFrom,
         dt: filters.dateTo
     });
-    return CACHE_PREFIX + guildId + "-" + content.toLowerCase().trim() + "-" + filterStr;
+    return CACHE_PREFIX + targetId + "-" + content.toLowerCase().trim() + "-" + filterStr;
 }
 
 async function getCachedResults(key: string): Promise<SearchResult[] | null> {
@@ -199,16 +209,33 @@ export async function loadLastQuery(): Promise<{ query: string; filters: FilterS
     }
 }
 
+export interface SearchTarget {
+    guildId?: string;
+    channelId?: string;
+}
+
 export async function deepSearch(
-    guildId: string,
+    target: SearchTarget,
     content: string,
     filters: FilterState,
     limit: number = 100,
-    onProgress?: (results: SearchResult[]) => void
+    onProgress?: (results: SearchResult[]) => void,
+    signal?: AbortSignal
 ): Promise<SearchResult[]> {
-    const cacheKey = getCacheKey(guildId, content, filters);
+    if (signal?.aborted) return [];
+    const targetId = target.guildId || target.channelId || "global";
+    const cacheKey = getCacheKey(targetId, content, filters);
     const cached = await getCachedResults(cacheKey);
+    if (signal?.aborted) return [];
     if (cached) return cached;
+
+    const endpoint = target.guildId
+        ? Constants.Endpoints.SEARCH_GUILD(target.guildId)
+        : target.channelId
+            ? Constants.Endpoints.SEARCH_CHANNEL(target.channelId)
+            : null;
+
+    if (!endpoint) return [];
 
     const results: SearchResult[] = [];
     const seen = new Set<string>();
@@ -217,16 +244,18 @@ export async function deepSearch(
     const hasClientSideFilters = filters.hasAttachments || filters.hasEmbeds || filters.isPinned || filters.linkDomain || filters.linkContains || filters.excludeKeywords || filters.excludeDomains || filters.dateFrom || filters.dateTo;
 
     while (results.length < limit && offset < 5000) {
+        if (signal?.aborted) break;
         const query = buildApiQuery(filters, content, offset);
 
         try {
             const response = await RestAPI.get({
-                url: Constants.Endpoints.SEARCH_GUILD(guildId),
+                url: endpoint,
                 query,
                 retries: 2
             }) as { body?: { messages?: Message[][]; total_results?: number; }; };
 
             const { body } = response;
+            if (signal?.aborted) break;
             if (!body?.messages || body.messages.length === 0) break;
 
             const resultCountBeforePage = results.length;
@@ -234,13 +263,17 @@ export async function deepSearch(
             for (const group of body.messages) {
                 for (const msg of group) {
                     const msgId = msg.id;
-                    if (seen.has(msgId)) continue;
+                    if (!msgId || seen.has(msgId)) continue;
+
+                    // If message group contains context messages, check hit flag if available
+                    if ("hit" in msg && !(msg as any).hit) continue;
+
                     seen.add(msgId);
 
                     if (!messagePassesClientFilters(msg, filters)) continue;
 
-                    const user = UserStore.getUser(msg.author?.id) ?? null;
-                    const channel = { id: msg.channel_id, guild_id: guildId } as Channel;
+                    const user = UserStore.getUser(msg.author?.id) ?? (msg.author as User | null);
+                    const channel = { id: msg.channel_id, guild_id: target.guildId ?? "@me" } as Channel;
 
                     results.push({
                         message: msg,
@@ -261,6 +294,7 @@ export async function deepSearch(
             if (body.messages.length < pageSize) break;
             offset += pageSize;
         } catch (e: any) {
+            if (signal?.aborted) break;
             if (e?.status === 429) {
                 await sleep(1000);
                 continue;
@@ -273,6 +307,6 @@ export async function deepSearch(
         // already filtered in the loop
     }
 
-    await setCachedResults(cacheKey, results);
+    if (!signal?.aborted) await setCachedResults(cacheKey, results);
     return results;
 }

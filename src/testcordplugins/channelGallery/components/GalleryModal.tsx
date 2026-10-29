@@ -6,7 +6,7 @@
 
 import { Heading } from "@components/Heading";
 import { ModalCloseButton, ModalContent, ModalHeader, ModalProps, ModalRoot, ModalSize } from "@utils/modal";
-import { ChannelStore, React, useEffect, useMemo, useRef, useState } from "@webpack/common";
+import { ChannelStore, MessageStore, React, useEffect, useMemo, useRef, useState } from "@webpack/common";
 
 import { extractImages, GalleryItem } from "../utils/extractImages";
 import { fetchMessagesPage } from "../utils/pagination";
@@ -29,10 +29,60 @@ type GalleryCache = {
 };
 
 const cacheByChannel = new Map<string, GalleryCache>();
+const MAX_CHANNEL_CACHES = 25;
+const MAX_CACHE_ITEMS = 1000;
 
-function getOrCreateCache(channelId: string): GalleryCache {
+function pruneChannelCaches() {
+    while (cacheByChannel.size > MAX_CHANNEL_CACHES) {
+        const oldest = cacheByChannel.keys().next().value;
+        if (!oldest) break;
+        cacheByChannel.delete(oldest);
+    }
+}
+
+function pushCacheItem(cache: GalleryCache, item: GalleryItem) {
+    if (cache.items.length >= MAX_CACHE_ITEMS) {
+        const removed = cache.items.shift();
+        if (removed) cache.keys.delete(removed.key);
+    }
+
+    cache.keys.add(item.key);
+    cache.items.push(item);
+}
+
+function seedCacheFromMessageStore(cache: GalleryCache, channelId: string, settings: PluginSettings) {
+    try {
+        const localMsgs = MessageStore?.getMessages?.(channelId);
+        const msgsArray: any[] = (localMsgs as any)?._array ?? (localMsgs as any)?.toArray?.() ?? (Array.isArray(localMsgs) ? localMsgs : []);
+
+        if (msgsArray.length > 0) {
+            const extracted = extractImages(msgsArray, channelId, {
+                includeEmbeds: settings.includeEmbeds,
+                includeGifs: settings.includeGifs
+            });
+
+            for (const it of extracted) {
+                if (cache.keys.has(it.key)) continue;
+                pushCacheItem(cache, it);
+            }
+
+            if (!cache.oldestMessageId && msgsArray.length > 0) {
+                const oldest = msgsArray[0]?.id ?? msgsArray[msgsArray.length - 1]?.id;
+                if (oldest) cache.oldestMessageId = String(oldest);
+            }
+        }
+    } catch (e) {
+        console.warn("[ChannelGallery] Failed to seed from MessageStore:", e);
+    }
+}
+
+function getOrCreateCache(channelId: string, settings: PluginSettings): GalleryCache {
     const existing = cacheByChannel.get(channelId);
-    if (existing) return existing;
+    if (existing) {
+        cacheByChannel.delete(channelId);
+        cacheByChannel.set(channelId, existing);
+        return existing;
+    }
     const created: GalleryCache = {
         items: [],
         keys: new Set(),
@@ -40,16 +90,19 @@ function getOrCreateCache(channelId: string): GalleryCache {
         hasMore: true
     };
     cacheByChannel.set(channelId, created);
+    pruneChannelCaches();
+
+    seedCacheFromMessageStore(created, channelId, settings);
     return created;
 }
 
 export function GalleryModal(props: ModalProps & { channelId: string; settings: PluginSettings; }) {
     const { channelId, settings, ...modalProps } = props;
 
-    const channel = ChannelStore.getChannel(channelId);
+    const channel = ChannelStore?.getChannel?.(channelId);
     const title = channel?.name ? `Gallery — #${channel.name}` : "Gallery";
 
-    const cache = useMemo(() => getOrCreateCache(channelId), [channelId]);
+    const cache = useMemo(() => getOrCreateCache(channelId, settings), [channelId, settings]);
 
     const [items, setItems] = useState<GalleryItem[]>(() => cache.items);
     const [hasMore, setHasMore] = useState<boolean>(() => cache.hasMore);
@@ -82,7 +135,7 @@ export function GalleryModal(props: ModalProps & { channelId: string; settings: 
                 const msgs = await fetchMessagesPage({
                     channelId,
                     before,
-                    limit: Math.max(1, Math.floor(settings.pageSize)),
+                    limit: Math.max(1, Math.floor(settings.pageSize ?? 100)),
                     signal: controller.signal
                 });
 
@@ -101,8 +154,7 @@ export function GalleryModal(props: ModalProps & { channelId: string; settings: 
 
                 for (const it of extracted) {
                     if (cache.keys.has(it.key)) continue;
-                    cache.keys.add(it.key);
-                    cache.items.push(it);
+                    pushCacheItem(cache, it);
                 }
             }
 
@@ -113,16 +165,17 @@ export function GalleryModal(props: ModalProps & { channelId: string; settings: 
         } catch (e: any) {
             if (e?.name === "AbortError") return;
             setError("Unable to load gallery items");
+            setItems([...cache.items]);
         } finally {
             setLoading(false);
         }
     }
 
-    // Initial load/preload (lazy, only after modal opens).
     useEffect(() => {
-        if (cache.items.length) return;
-        void loadNextPages(Math.max(1, Math.floor(settings.preloadPages)));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (cache.items.length) {
+            setItems([...cache.items]);
+        }
+        void loadNextPages(Math.max(1, Math.floor(settings.preloadPages ?? 2)));
     }, [channelId]);
 
     const onCloseAll = () => {

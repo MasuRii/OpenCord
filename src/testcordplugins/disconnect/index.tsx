@@ -23,7 +23,7 @@ import {
 } from "@webpack/common";
 import type { PropsWithChildren, SVGProps } from "react";
 
-const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_TOP:", '.iconBadge,"top"');
+const HeaderBarIcon = findComponentByCodeLazy(".HEADER_BAR_BADGE_TOP:", '"top"===c');
 
 interface BaseIconProps extends IconProps {
     viewBox: string;
@@ -241,6 +241,8 @@ export default definePlugin({
                 <HeaderBarIcon
                     tooltip={`Disconnect user: ${current?.username ?? disconnectUserId} (right-click to disable)`}
                     icon={UnfollowIcon}
+                    className="vc-plugin-icon-button"
+                    iconClassName="vc-plugin-icon-button"
                     onClick={() => { }}
                     onContextMenu={e => {
                         e.preventDefault();

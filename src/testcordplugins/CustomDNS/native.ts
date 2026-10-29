@@ -18,6 +18,9 @@ export interface DnsResolveResult {
 }
 
 const DEFAULT_TIMEOUT_MS = 5000;
+const MAX_TIMEOUT_MS = 15000;
+const MAX_PRELOAD_HOSTNAMES = 100;
+const MAX_DNS_SERVERS = 5;
 
 const resolverCache = new Map<string, Resolver>();
 
@@ -28,7 +31,12 @@ function getErrorMessage(error: unknown) {
 function normalizeServers(servers: string[]) {
     return servers
         .map(server => server.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .slice(0, MAX_DNS_SERVERS);
+}
+
+function getTimeoutMs(timeoutMs: number) {
+    return Math.max(1000, Math.min(timeoutMs, MAX_TIMEOUT_MS));
 }
 
 function getResolver(servers: string[]) {
@@ -90,7 +98,7 @@ async function resolveHost(hostname: string, servers: string[], family: DnsFamil
 
     try {
         const resolver = getResolver(normalizedServers);
-        const addresses = await withTimeout(resolveWithResolver(resolver, hostname, family), timeoutMs);
+        const addresses = await withTimeout(resolveWithResolver(resolver, hostname, family), getTimeoutMs(timeoutMs));
 
         return {
             success: addresses.length > 0,
@@ -129,7 +137,7 @@ export async function preloadDNS(
     family: DnsFamily = 4,
     timeoutMs = DEFAULT_TIMEOUT_MS
 ) {
-    const results = await Promise.all(hostnames.map(async hostname => {
+    const results = await Promise.all(hostnames.slice(0, MAX_PRELOAD_HOSTNAMES).map(async hostname => {
         const result = await resolveHost(hostname, servers, family, timeoutMs);
         return [hostname, result.addresses] as const;
     }));

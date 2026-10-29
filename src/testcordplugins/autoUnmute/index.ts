@@ -9,11 +9,12 @@ import definePlugin from "@utils/types";
 import { findByPropsLazy, findStoreLazy } from "@webpack";
 import {
     ChannelStore,
+    Constants,
     PermissionsBits,
     PermissionStore,
+    RestAPI,
     UserStore,
 } from "@webpack/common";
-import { Constants,RestAPI } from "@webpack/common";
 
 // Retrieval of necessary stores and actions
 const VoiceStateStore = findStoreLazy("VoiceStateStore");

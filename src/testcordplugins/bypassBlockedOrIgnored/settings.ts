@@ -27,5 +27,10 @@ export default definePluginSettings({
         type: OptionType.BOOLEAN,
         description: "Bypass the modal when a user joins your voice channel.",
         default: true
+    },
+    alwaysShowBlockedProfiles: {
+        type: OptionType.BOOLEAN,
+        description: "Always show profiles for blocked users.",
+        default: false
     }
 });

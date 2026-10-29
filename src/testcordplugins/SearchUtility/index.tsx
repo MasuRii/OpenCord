@@ -231,7 +231,7 @@ const defaultSearchEngine: SearchEngineKey = "google";
 const defaultCustomSearchEngine = "https://google.com/search?q={query}";
 const useMessageMenu = findByCodeLazy(".MESSAGE,commandTargetId:") as (props: FullSearchMessageMenuProps) => React.ReactElement | null;
 const GuildlessServerListItemComponent = findComponentByCodeLazy("tooltip:", "lowerBadgeSize:");
-const GuildedServerListItemPillComponent = findComponentByCodeLazy('"pill":"empty"');
+const GuildedServerListItemPillComponent = findComponentByCodeLazy("overlay:d=!1", "unread:r=!1");
 
 let CopyIdMenuItem: (props: CopyIdMenuItemProps) => React.ReactElement | null = NoopComponent;
 let favoriteGifPickerInstance: FavoriteGifPickerInstance | null = null;
@@ -938,6 +938,8 @@ function openQuickSearchResults(options: QuickSearchModalOptions) {
     }));
 }
 
+const quickSearchState = { keys: {} as Record<string, boolean> };
+
 const quickSearchContextMenuPatch: NavContextMenuPatchCallback = (children, props) => {
     if (!props) return;
     if (props.channel && !PermissionStore.can(PermissionsBits.VIEW_CHANNEL, props.channel)) return;
@@ -948,7 +950,11 @@ const quickSearchContextMenuPatch: NavContextMenuPatchCallback = (children, prop
 
     const userId = props.message?.author?.id || props.user?.id;
     const content = props.message?.content;
-    const [queryObject, setQueryObject] = useState<Record<string, boolean>>({});
+
+    if (children.some(child => child?.props?.id === "quick-search")) return;
+
+    quickSearchState.keys = {};
+
     const quickSearchItems: QuickSearchItem[] = [
         {
             name: "quick-search-channel",
@@ -980,59 +986,58 @@ const quickSearchContextMenuPatch: NavContextMenuPatchCallback = (children, prop
         }
     ];
 
-    if (children.some(child => child?.props?.id === "quick-search")) return;
+    const searchAction = () => {
+        const query: QueryOptions = { include_nsfw: true };
+        quickSearchItems.forEach(item => {
+            if (!quickSearchState.keys[item.name]) return;
+
+            if (item.queryKey === "mentions") {
+                query.mentions = Array.isArray(item.value) ? item.value : [item.value];
+                return;
+            }
+
+            if (item.queryKey === "author_id" || item.queryKey === "channel_id") {
+                if (typeof item.value === "string" && item.value) {
+                    query[item.queryKey] = [item.value];
+                }
+                return;
+            }
+
+            if (item.queryKey === "content" && typeof item.value === "string") {
+                query.content = item.value;
+            }
+        });
+
+        openQuickSearchResults({
+            channelId,
+            guildId,
+            query,
+            queryString: getQueryString(query),
+            title: "Quick Search Results"
+        });
+    };
 
     children.push(
         <Menu.MenuSeparator />,
         <Menu.MenuItem id="quick-search" label="Quick Search">
             {quickSearchItems.map(item => {
                 if (!item.present) return null;
-
                 return (
                     <Menu.MenuCheckboxItem
                         key={item.name}
                         id={item.name}
                         label={item.label}
-                        checked={Boolean(queryObject[item.name])}
-                        action={() => setQueryObject(current => ({ ...current, [item.name]: !current[item.name] }))}
+                        checked={false}
+                        action={() => {
+                            quickSearchState.keys[item.name] = !(quickSearchState.keys[item.name] ?? false);
+                        }}
                     />
                 );
             })}
             <Menu.MenuItem
                 id="quick-search-start"
                 label="Search"
-                disabled={!Object.values(queryObject).some(Boolean)}
-                action={() => {
-                    const query: QueryOptions = { include_nsfw: true };
-
-                    quickSearchItems.forEach(item => {
-                        if (!queryObject[item.name]) return;
-
-                        if (item.queryKey === "mentions") {
-                            query.mentions = Array.isArray(item.value) ? item.value : [item.value];
-                            return;
-                        }
-
-                        if (item.queryKey === "author_id" || item.queryKey === "channel_id") {
-                            if (typeof item.value === "string" && item.value) {
-                                query[item.queryKey] = [item.value];
-                            }
-                            return;
-                        }
-
-                        if (item.queryKey === "content" && typeof item.value === "string") {
-                            query.content = item.value;
-                        }
-                    });
-
-                    openQuickSearchResults({
-                        channelId,
-                        guildId,
-                        query,
-                        queryString: getQueryString(query),
-                        title: "Quick Search Results"
-                    });
-                }}
+                action={searchAction}
             />
         </Menu.MenuItem>
     );
@@ -1421,6 +1426,7 @@ export default definePlugin({
     patches: [
         {
             find: "onClick:this.handleMessageClick,",
+            noWarn: true,
             replacement: {
                 match: /this(?=\.handleContextMenu\(\i,\i\))/,
                 replace: "$self"
@@ -1428,6 +1434,7 @@ export default definePlugin({
         },
         {
             find: "#{intl::MESSAGE_ACTIONS_MENU_LABEL}),shouldHideMediaOptions:",
+            noWarn: true,
             replacement: {
                 match: /favoriteableType:\i,(?<=(\i)\.getAttribute\("data-type"\).+?)/,
                 replace: (match, target) => `${match}reverseImageSearchType:${target}.getAttribute("data-role"),`
@@ -1436,6 +1443,7 @@ export default definePlugin({
         {
             find: "renderHeaderContent()",
             predicate: () => settings.store.disableGifPickerSearch,
+            noWarn: true,
             replacement: {
                 match: /(,suggestions:)\i,/,
                 replace: "$1null,"
@@ -1444,6 +1452,7 @@ export default definePlugin({
         {
             find: 'tutorialId:"direct-messages",',
             predicate: () => settings.store.disableDmSearchBar,
+            noWarn: true,
             replacement: {
                 match: /\(0,\i\.jsx\)\(\i\.\i,{.{0,50}?tutorialId:"direct-messages",.{0,600}?\}\)\}\)\}\),/,
                 replace: ""
@@ -1451,6 +1460,7 @@ export default definePlugin({
         },
         {
             find: "\"SearchQueryStore\";",
+            noWarn: true,
             replacement: {
                 match: /\i\.searchResultsQuery=(\i)/,
                 replace: "$&,$self.adjustSearchOffset($1)"
@@ -1458,6 +1468,7 @@ export default definePlugin({
         },
         {
             find: "#{intl::QUICKSWITCHER_PLACEHOLDER}",
+            noWarn: true,
             replacement: {
                 match: /renderInput\(\)\{return/,
                 replace: "renderInput(){try{this.props.results=Vencord.Plugins.plugins['SearchUtility'].modifyQuickSwitcherResults(this.state.query,this.props.results)}catch(e){}return"
