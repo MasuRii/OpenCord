@@ -10,10 +10,10 @@ import { get as dsGet, set as dsSet } from "@api/DataStore";
 import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
 import ErrorBoundary from "@components/ErrorBoundary";
-import definePlugin, { OptionType } from "@utils/types";
 import { MallCordDevs } from "@utils/constants";
+import definePlugin, { OptionType } from "@utils/types";
 import { findByCodeLazy, findByPropsLazy, findComponentByCodeLazy } from "@webpack";
-import { React, SearchableSelect, showToast, TextInput, Toasts, UserStore } from "@webpack/common";
+import { React, SearchableSelect, showToast, TextInput, UserStore } from "@webpack/common";
 
 const useLegacyPlatformType: (t: string) => string = findByCodeLazy(".TWITTER_LEGACY:");
 const platforms: { get(t: string): { icon: { lightSVG: string; darkSVG: string; }; }; } = findByPropsLazy("isSupported", "getByUrl");
@@ -181,7 +181,7 @@ function FakeConnectionsPanel() {
         await saveConnections(pending);
         setList([...pending]);
         setDirty(false);
-        showToast("Saved! Reopen your profile to see connections.", Toasts.Type.SUCCESS);
+        showToast("Saved! Reopen your profile to see connections.", "success");
     }
 
     if (!loaded) return <div style={{ color: "var(--text-muted)", fontSize: 13 }}>Loading...</div>;

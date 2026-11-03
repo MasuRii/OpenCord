@@ -5,6 +5,7 @@
  */
 
 import { addHeaderBarButton, HeaderBarButton, removeHeaderBarButton } from "@api/HeaderBar";
+import { MallCordDevs } from "@utils/constants";
 import { Logger } from "@utils/Logger";
 import {
     ModalCloseButton as ModalCloseButton_,
@@ -14,10 +15,9 @@ import {
     ModalRoot as ModalRoot_,
     openModal,
 } from "@utils/modal";
-import { MallCordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { React, RestAPI, SelectedChannelStore, Toasts, UserStore } from "@webpack/common";
+import { React, RestAPI, SelectedChannelStore, showToast, UserStore } from "@webpack/common";
 
 const logger = new Logger("MessagePurger");
 const MessageStore = findByPropsLazy("getMessages", "getMessage");
@@ -96,7 +96,7 @@ function PurgerModal({ rootProps }: { rootProps: any; }) {
 
         setRunning(false);
         setDone(true);
-        Toasts.show({ message: "Message purge complete.", type: Toasts.Type.SUCCESS, id: Toasts.genId() });
+        showToast("Message purge complete.", "success");
     }
 
     function close() {
