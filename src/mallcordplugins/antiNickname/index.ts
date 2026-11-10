@@ -9,7 +9,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { MallCordDevs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { RestAPI, showToast, Toasts, UserStore } from "@webpack/common";
+import { RestAPI, showToast, UserStore } from "@webpack/common";
 
 const settings = definePluginSettings({
     showToast: {
@@ -31,7 +31,7 @@ async function resetNick(guildId: string, forcedNick: string) {
                 url: `/users/@me/guilds/${guildId}/profile`,
                 body: { nick: null }
             });
-            if (settings.store.showToast) showToast(`AntiNickname: nickname "${forcedNick}" removed`, Toasts.Type.SUCCESS);
+            if (settings.store.showToast) showToast(`AntiNickname: nickname "${forcedNick}" removed`, "success");
             return;
         } catch {
             // fall through to the member endpoint
@@ -41,10 +41,10 @@ async function resetNick(guildId: string, forcedNick: string) {
             url: `/guilds/${guildId}/members/@me`,
             body: { nick: "" }
         });
-        if (settings.store.showToast) showToast(`AntiNickname: nickname "${forcedNick}" removed`, Toasts.Type.SUCCESS);
+        if (settings.store.showToast) showToast(`AntiNickname: nickname "${forcedNick}" removed`, "success");
     } catch (err: any) {
         console.warn(`[AntiNickname] Failed to reset nickname on ${guildId}:`, err);
-        if (settings.store.showToast) showToast(`AntiNickname: failed to reset nickname (${err?.status ?? "?"})`, Toasts.Type.FAILURE);
+        if (settings.store.showToast) showToast(`AntiNickname: failed to reset nickname (${err?.status ?? "?"})`, "failure");
     } finally {
         setTimeout(() => resettingGuilds.delete(guildId), 2000);
     }

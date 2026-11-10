@@ -8,7 +8,7 @@ import { definePluginSettings } from "@api/Settings";
 import { MallCordDevs } from "@utils/constants";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType } from "@utils/types";
-import { FluxDispatcher, GuildMemberStore, PresenceStore, RelationshipStore, showToast, Toasts, UserStore } from "@webpack/common";
+import { FluxDispatcher, PresenceStore, RelationshipStore, showToast, UserStore } from "@webpack/common";
 
 const logger = new Logger("FriendOnlineNotify");
 
@@ -65,9 +65,9 @@ function onPresenceUpdates({ updates }: PresenceUpdate) {
 
         try {
             if (settings.store.notifyOnline && wasOffline && isOnline) {
-                showToast(`${name} came online`, Toasts.Type.SUCCESS);
+                showToast(`${name} came online`, "success");
             } else if (settings.store.notifyOffline && !wasOffline && isOffline) {
-                showToast(`${name} went offline`, Toasts.Type.MESSAGE);
+                showToast(`${name} went offline`, "message");
             }
         } catch (e) {
             logger.error("Failed to show toast", e);

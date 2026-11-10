@@ -6,6 +6,7 @@
 
 import { MallCordDevs } from "@utils/constants";
 import definePlugin from "@utils/types";
+import type { Message } from "@vencord/discord-types";
 import { MessageStore, React, TypingStore, UserStore, useStateFromStores } from "@webpack/common";
 
 import { MessageDecorationProps } from "../../api/MessageDecorations";
@@ -25,7 +26,7 @@ function SeenIndicator({ message, channel }: MessageDecorationProps) {
         const msgs = MessageStore.getMessages(channel.id);
         if (!msgs) return false;
         const msgTs = new Date(message.timestamp).getTime();
-        return msgs.some((m: { author: { id: string; }; timestamp: string; }) =>
+        return msgs.some((m: Message) =>
             m.author.id === recipientId && new Date(m.timestamp).getTime() > msgTs
         );
     });
