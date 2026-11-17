@@ -153,15 +153,15 @@ export default definePlugin({
         {
             find: "#{intl::zr0Y5R::raw}",
             replacement: {
-                match: /(\.colorString\?\?\i;)return(.*?enableTooltip:!1\}\):null,\i\]\}\))/,
+                match: /(\.colorString\?\?\i;)return(.*?enableTooltip:!1\}\)\}\):null,\i\]\}\))/,
                 replace: "$1return $self.wrapRolePill(arguments[0],()=>$2)",
             },
         },
         {
             find: 'tutorialId:"whos-online"',
             replacement: {
-                match: /\((function\(\i\)\{let\{id:.*?#{intl::CHANNEL_MEMBERS_A11Y_LABEL}.*?\}\))\}\);/,
-                replace: "($self.wrapRoleGroup($1}));",
+                match: /\((function\(\i\)\{let\{id:.*?#{intl::CHANNEL_MEMBERS_A11Y_LABEL}.*?\}\))\}\)/,
+                replace: "($self.wrapRoleGroup($1}))",
             },
         },
     ],
