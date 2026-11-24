@@ -881,7 +881,7 @@ export default definePlugin({
 
     onBeforeMessageSend(channelId, msg, options) {
         if (!isActive() || !settings.store.fakeMessages) return;
-        const replyRef = options?.replyOptions?.messageReference;
+        const replyRef = options?.messageReference;
         const fake = buildFakeMessage(channelId, msg.content, replyRef);
         if (!fake) return;
 

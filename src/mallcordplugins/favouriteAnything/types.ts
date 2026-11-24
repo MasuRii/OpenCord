@@ -24,9 +24,7 @@ export interface ExpressionPickerTabProps extends PropsWithChildren {
     viewType: ExpressionPickerView;
 }
 
-export interface FavoriteButtonProps extends Omit<FavouriteItem, "order"> {
-    url: string;
-    gifSrc?: string;
+export interface FavoriteButtonProps extends Omit<FullFavouriteItem, "order"> {
     className?: string;
 }
 
@@ -59,9 +57,14 @@ export interface FilePickerProps {
     onSelectItem: (item: { url: string; }) => void;
 }
 
+export interface StaticFilePickerItemProps {
+    name: string;
+    subtitle: string;
+}
+
 export interface FilePickerItemProps {
-    url: string;
     file: MessageAttachment;
+    url: string;
     channel: Channel | null;
     reducePadding?: boolean;
     onResize: (key: Key, height: number) => void;
@@ -72,11 +75,16 @@ export interface AttachmentsComponentProps {
     attachment: MessageAttachment;
 }
 
+export interface AttachmentContextProviderProps extends PropsWithChildren {
+    attachment?: AttachmentItem<MessageAttachment | { media: CV2Attachment; }>;
+    component?: { id: string; size: number; name: string; spoiler: boolean; file: CV2Attachment; };
+}
+
 export interface EmbedComponent extends Component<{ embed: Embed; }> {
     __render: () => ReactNode;
 }
 
-export interface AttachmentItem {
+export interface AttachmentItem<TOriginal = MessageAttachment> {
     contentType: string;
     type: "IMAGE" | "VIDEO" | "CLIP" | "AUDIO" | "VISUAL_PLACEHOLDER" | "PLAINTEXT_PREVIEW" | "OTHER" | "INVALID";
     width?: number;
@@ -85,7 +93,17 @@ export interface AttachmentItem {
     spoiler: boolean;
     srcIsAnimated: boolean;
     uniqueId: string;
-    originalItem: MessageAttachment;
+    originalItem: TOriginal;
+}
+
+export interface CV2Attachment {
+    url: string;
+    proxyUrl: string;
+    width: number;
+    height: number;
+    placeholder?: string;
+    contentType: string;
+    flags: number;
 }
 
 export enum FavouriteItemFormat {
@@ -102,6 +120,11 @@ export interface FavouriteItem {
     order: number;
 }
 
+export interface FullFavouriteItem extends FavouriteItem {
+    gifSrc?: () => Promise<string>;
+    url: string;
+}
+
 export enum CustomItemFormat {
     ATTACHMENT = 0
 }
@@ -116,6 +139,10 @@ export type ItemsDef<T> = T & {
     [K in keyof T]: T[K] extends CustomItemDef<infer A, infer B> ? CustomItemDef<A, B> : never;
 };
 
+export interface UnfurledEmbedsResponse {
+    embeds: EmbedJSON[];
+}
+
 export interface RefreshedUrlsResponse {
     refreshed_urls: [
         {
@@ -123,10 +150,6 @@ export interface RefreshedUrlsResponse {
             refreshed: string | null;
         }
     ];
-}
-
-export interface UnfurledEmbedsResponse {
-    embeds: EmbedJSON[];
 }
 
 export type ResizeObserverHook = (
@@ -138,3 +161,5 @@ export type ResizeObserverHook = (
 export interface ImageUtils {
     isAnimated(image: { src: string; original?: string; animated: boolean; srcIsAnimated?: boolean; }): boolean;
 }
+
+export type AttachmentTransformer = (attachment: MessageAttachment, inlineAttachmentMedia?: boolean) => AttachmentItem;

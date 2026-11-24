@@ -16,7 +16,7 @@ import {
     ModalSize,
 } from "@utils/modal";
 import { RenderModalProps as ModalProps } from "@vencord/discord-types";
-import { Button, React, Select, showToast, Toasts, UserProfileStore, UserStore, UserUtils } from "@webpack/common";
+import { Button, React, Select, showToast, UserProfileStore, UserStore, UserUtils } from "@webpack/common";
 
 const ModalRoot = ModalRoot_ as React.ComponentType<any>;
 const ModalHeader = ModalHeader_ as React.ComponentType<any>;
@@ -105,12 +105,12 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
         const id = inputId.trim();
         if (!id) return;
         if (!ID_RE.test(id)) {
-            showToast("Invalid User ID format. Must be 17-20 digits.", Toasts.Type.FAILURE);
+            showToast("Invalid User ID format. Must be 17-20 digits.", "failure");
             return;
         }
         const me = UserStore.getCurrentUser();
         if (me && me.id === id) {
-            showToast("You cannot spoof as yourself!", Toasts.Type.FAILURE);
+            showToast("You cannot spoof as yourself!", "failure");
             return;
         }
         setLoading(true);
@@ -126,10 +126,10 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                     setPreviewProfile(prof);
                 }
             } else {
-                showToast("User not found.", Toasts.Type.FAILURE);
+                showToast("User not found.", "failure");
             }
         } catch {
-            showToast("Failed to fetch user.", Toasts.Type.FAILURE);
+            showToast("Failed to fetch user.", "failure");
         }
         setLoading(false);
     }
@@ -139,7 +139,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
         if (!id) return;
         const me = UserStore.getCurrentUser();
         if (me && me.id === id) {
-            showToast("You cannot spoof as yourself!", Toasts.Type.FAILURE);
+            showToast("You cannot spoof as yourself!", "failure");
             return;
         }
         if (id.startsWith("manual_")) {
@@ -149,14 +149,14 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                 settings.store.manualUsername = savedItem.name;
                 settings.store.manualAvatar = savedItem.avatar || "";
                 setEnabled(true);
-                showToast(`Activated manual mode as ${savedItem.name}`, Toasts.Type.SUCCESS);
+                showToast(`Activated manual mode as ${savedItem.name}`, "success");
                 forceUpdate();
             }
             return;
         }
 
         if (!ID_RE.test(id)) {
-            showToast("Invalid User ID format. Must be 17-20 digits.", Toasts.Type.FAILURE);
+            showToast("Invalid User ID format. Must be 17-20 digits.", "failure");
             return;
         }
 
@@ -166,9 +166,9 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
             setEnabled(true);
             settings.store.manualMode = false;
             setPreviewUser(next.user);
-            showToast(`Spoofing as ${next.user.globalName || next.user.username}`, Toasts.Type.SUCCESS);
+            showToast(`Spoofing as ${next.user.globalName || next.user.username}`, "success");
         } catch (e: any) {
-            showToast(e?.message || "Failed to load that user.", Toasts.Type.FAILURE);
+            showToast(e?.message || "Failed to load that user.", "failure");
         }
         setLoading(false);
     }
@@ -177,7 +177,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
         clearTarget();
         setPreviewUser(null);
         setPreviewProfile(null);
-        showToast("Fake identity disabled.", Toasts.Type.SUCCESS);
+        showToast("Fake identity disabled.", "success");
     }
 
     function doRemoveSaved(id: string) {
@@ -363,7 +363,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                             <div
                                                 onClick={() => {
                                                     navigator.clipboard.writeText(displayUser.id);
-                                                    showToast("Copied ID to clipboard", Toasts.Type.SUCCESS);
+                                                    showToast("Copied ID to clipboard", "success");
                                                 }}
                                                 style={{
                                                     display: "block",
@@ -420,7 +420,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                     avatar: displayUser.avatar || null
                                                 });
                                                 setSavedUsers(list); setSaved(list);
-                                                showToast("Saved profile!", Toasts.Type.SUCCESS);
+                                                showToast("Saved profile!", "success");
                                             }}>Save</Button>
                                         )}
                                     </div>
@@ -523,7 +523,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                     <div
                                                         onClick={compact ? () => {
                                                             navigator.clipboard.writeText(s.id);
-                                                            showToast("Copied ID to clipboard", Toasts.Type.SUCCESS);
+                                                            showToast("Copied ID to clipboard", "success");
                                                         } : undefined}
                                                         title={compact ? `ID: ${s.id}\n(Click to copy)` : undefined}
                                                         style={{
@@ -572,7 +572,7 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                     <div
                                                         onClick={!compact ? () => {
                                                             navigator.clipboard.writeText(s.id);
-                                                            showToast("Copied ID to clipboard", Toasts.Type.SUCCESS);
+                                                            showToast("Copied ID to clipboard", "success");
                                                         } : undefined}
                                                         style={{
                                                             display: "block",
@@ -813,12 +813,12 @@ export function FakeUserSwitcherModal({ modalProps }: { modalProps: ModalProps; 
                                                 avatar: settings.store.manualAvatar || null
                                             });
                                             setSavedUsers(list); setSaved(list);
-                                            showToast("Saved custom profile!", Toasts.Type.SUCCESS);
+                                            showToast("Saved custom profile!", "success");
                                         }}>Save Identity</Button>
                                         {active && settings.store.manualMode ? (
-                                            <Button size={Button.Sizes.MEDIUM} color={Button.Colors.RED} onClick={() => { settings.store.manualMode = false; setEnabled(false); showToast("Manual spoof disabled.", Toasts.Type.SUCCESS); forceUpdate(); }}>Deactivate</Button>
+                                            <Button size={Button.Sizes.MEDIUM} color={Button.Colors.RED} onClick={() => { settings.store.manualMode = false; setEnabled(false); showToast("Manual spoof disabled.", "success"); forceUpdate(); }}>Deactivate</Button>
                                         ) : (
-                                            <Button size={Button.Sizes.MEDIUM} color={Button.Colors.GREEN} onClick={() => { settings.store.manualMode = true; setEnabled(true); showToast("Manual spoof activated.", Toasts.Type.SUCCESS); forceUpdate(); }}>Activate Spoof</Button>
+                                            <Button size={Button.Sizes.MEDIUM} color={Button.Colors.GREEN} onClick={() => { settings.store.manualMode = true; setEnabled(true); showToast("Manual spoof activated.", "success"); forceUpdate(); }}>Activate Spoof</Button>
                                         )}
                                     </div>
                                 </div>
